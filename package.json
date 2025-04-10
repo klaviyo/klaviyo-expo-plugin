@@ -6,15 +6,18 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "prepublishOnly": "npm run clean && npm run build"
+    "prepare": "npm run clean && npm run build"
   },
   "keywords": ["expo", "klaviyo", "plugin"],
-  "author": "",
+  "author": "Klaviyo",
   "license": "ISC",
   "description": "Expo plugin for Klaviyo integration",
   "devDependencies": {
     "@expo/config-plugins": "^7.0.0",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "expo": "*"
   }
 }
