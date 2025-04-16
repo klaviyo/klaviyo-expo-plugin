@@ -7,6 +7,8 @@ export interface KlaviyoPluginProps {
 }
 
 const withKlaviyo: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+  console.log('🔄 Klaviyo Expo Plugin: Running prebuild configuration...');
+  
   // Apply iOS configuration
   config = withKlaviyoIos(config, props);
   
