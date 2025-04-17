@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "example",
-    "slug": "example",
+    "name": "klaviyo plugin example",
+    "slug": "klaviyo-plugin-example",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },
@@ -16,7 +16,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.example"
+      "package": "com.anonymous.example",
+      "jsEngine": "hermes"
     },
     "web": {
       "bundler": "metro",
@@ -25,15 +26,6 @@
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
-        }
-      ],
       [
         "klaviyo-expo-plugin",
         {
