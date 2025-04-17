@@ -31,6 +31,18 @@ coverage/
 # Expo
 .expo/
 web-build/
+dist/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Native build folders
+example/android/
+example/ios/
+example/.expo/
 
 # TypeScript
 *.tsbuildinfo
@@ -39,4 +51,12 @@ web-build/
 *.log
 *.cache
 .temp/
-.tmp/ 
+.tmp/
+
+# Metro
+.metro-health-check*
+
+# Debug logs
+npm-debug.*
+yarn-debug.*
+yarn-error.* 
