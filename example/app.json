@@ -16,7 +16,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.example",
+      "package": "com.klaviyo.expoexample",
       "jsEngine": "hermes"
     },
     "web": {
