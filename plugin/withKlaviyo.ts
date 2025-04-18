@@ -4,13 +4,13 @@ import withKlaviyoAndroid from './withKlaviyoAndroid';
 
 export interface KlaviyoPluginProps {
   /**
-   * Sets the log level for Android projects (0-5)
-   * 0: VERBOSE
-   * 1: DEBUG
-   * 2: INFO
-   * 3: WARN
-   * 4: ERROR
-   * 5: ASSERT
+    0 = disable logging entirely
+    1 = Verbose and above
+    2 = Debug and above
+    3 = Info and above
+    4 = Warning and above
+    5 = Error and above
+    6 = Assert only
    */
   androidLogLevel?: number;
 }
