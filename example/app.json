@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.klaviyo.expoexample"
     },
     "android": {
       "adaptiveIcon": {
@@ -29,6 +30,7 @@
       [
         "klaviyo-expo-plugin",
         {
+          "androidLogLevel": 1
         }
       ]
     ],

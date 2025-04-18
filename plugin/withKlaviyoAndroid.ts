@@ -1,4 +1,4 @@
-import { ConfigPlugin, withStringsXml } from '@expo/config-plugins';
+import { ConfigPlugin, withStringsXml, withAndroidManifest } from '@expo/config-plugins';
 import { KlaviyoPluginProps } from './withKlaviyo';
 
 interface StringResource {
@@ -47,8 +47,52 @@ const withProjectStrings: ConfigPlugin<KlaviyoPluginProps> = (config) => {
   });
 };
 
+const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+  return withAndroidManifest(config, (config) => {
+    console.log('🔄 Modifying Android Manifest...');
+    const androidManifest = config.modResults.manifest;
+    
+    if (!androidManifest.application) {
+      console.log('⚠️ No application tag found, creating one...');
+      androidManifest.application = [{ $: { 'android:name': '.MainApplication' } }];
+    }
+
+    const application = androidManifest.application[0];
+    
+    // Add or update the log level meta-data
+    if (!application['meta-data']) {
+      console.log('⚠️ No meta-data array found, creating one...');
+      application['meta-data'] = [];
+    }
+
+    const logLevel = props.androidLogLevel ?? 1; // Default to DEBUG (1) if not specified
+    console.log(`📝 Setting Klaviyo log level to: ${logLevel}`);
+
+    const logLevelIndex = application['meta-data'].findIndex(
+      (item: any) => item.$['android:name'] === 'com.klaviyo.core.log_level'
+    );
+
+    if (logLevelIndex > -1) {
+      console.log('📝 Updating existing Klaviyo log level...');
+      application['meta-data'][logLevelIndex].$['android:value'] = logLevel.toString();
+    } else {
+      console.log('📝 Adding new Klaviyo log level...');
+      application['meta-data'].push({
+        $: {
+          'android:name': 'com.klaviyo.core.log_level',
+          'android:value': logLevel.toString()
+        }
+      });
+    }
+
+    console.log('✅ Android Manifest modification complete');
+    return config;
+  });
+};
+
 const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
   config = withProjectStrings(config, props);
+  config = withAndroidManifestModifications(config, props);
   return config;
 };
 
