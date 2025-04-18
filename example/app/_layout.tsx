@@ -51,6 +51,10 @@ export default function RootLayout() {
     });
   };
 
+  const handleRegisterForInAppForms = () => {
+    Klaviyo.registerForInAppForms();
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.section}>
@@ -108,6 +112,13 @@ export default function RootLayout() {
         />
         <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={handleSaveProfile}>
           <Text style={styles.buttonText}>Save Profile</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>In-App Forms</Text>
+        <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={handleRegisterForInAppForms}>
+          <Text style={styles.buttonText}>Register for In-App Forms</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
