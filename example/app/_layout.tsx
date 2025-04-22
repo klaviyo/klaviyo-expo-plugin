@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 import { StyleSheet, View, Text, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import { Klaviyo } from 'klaviyo-react-native-sdk';
 import { useState, useEffect } from 'react';
-import * as Notifications from 'expo-notifications';
+import messaging from '@react-native-firebase/messaging';
 
 export default function RootLayout() {
   const [apiKey, setApiKey] = useState('');
@@ -13,31 +13,32 @@ export default function RootLayout() {
     phoneNumber: '',
     externalId: ''
   });
-  const [pushPermissionStatus, setPushPermissionStatus] = useState<Notifications.PermissionStatus | null>(null);
+  const [pushToken, setPushToken] = useState<string | null>(null);
 
   useEffect(() => {
-    checkPushPermissionStatus();
+    requestUserPermission();
   }, []);
 
-  const checkPushPermissionStatus = async () => {
-    const { status } = await Notifications.getPermissionsAsync();
-    setPushPermissionStatus(status);
+  const requestUserPermission = async () => {
+    const authStatus = await messaging().requestPermission();
+    const enabled =
+      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+    if (enabled) {
+      console.log('Authorization status:', authStatus);
+    }
   };
 
-  const handlePushPermission = async () => {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    
-    setPushPermissionStatus(finalStatus);
-    
-    if (finalStatus !== 'granted') {
-      Alert.alert('Permission Required', 'Push notifications are required for this app to function properly.');
-      return;
+  const handleGetPushToken = async () => {
+    try {
+      const token = await messaging().getToken();
+      setPushToken(token);
+      console.log('FCM Token:', token);
+      Klaviyo.setPushToken(token);
+    } catch (error) {
+      console.error('Error getting FCM token:', error);
+      Alert.alert('Error', 'Failed to get FCM token');
     }
   };
 
@@ -153,21 +154,20 @@ export default function RootLayout() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Push Notifications</Text>
         <TouchableOpacity 
-          style={[
-            styles.button, 
-            styles.fullWidthButton,
-            pushPermissionStatus === 'granted' && styles.buttonSuccess
-          ]} 
-          onPress={handlePushPermission}
+          style={[styles.button, styles.fullWidthButton]} 
+          onPress={handleGetPushToken}
         >
           <Text style={styles.buttonText}>
-            {pushPermissionStatus === 'granted' ? 'Push Enabled' : 'Enable Push Notifications'}
+            {pushToken ? 'Update Push Token' : 'Get Push Token'}
           </Text>
         </TouchableOpacity>
-        {pushPermissionStatus && (
-          <Text style={styles.permissionStatus}>
-            Status: {pushPermissionStatus}
-          </Text>
+        {pushToken && (
+          <View style={styles.tokenContainer}>
+            <Text style={styles.tokenLabel}>Current Token:</Text>
+            <Text style={styles.tokenText} numberOfLines={2} ellipsizeMode="middle">
+              {pushToken}
+            </Text>
+          </View>
         )}
       </View>
     </ScrollView>
@@ -223,12 +223,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  buttonSuccess: {
-    backgroundColor: '#34C759',
+  tokenContainer: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
   },
-  permissionStatus: {
-    textAlign: 'center',
-    marginTop: 8,
+  tokenLabel: {
+    fontSize: 14,
     color: '#666',
+    marginBottom: 5,
+  },
+  tokenText: {
+    fontSize: 12,
+    fontFamily: 'monospace',
   },
 });

@@ -10,7 +10,8 @@
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.klaviyo.expoexample"
+      "bundleIdentifier": "com.klaviyo.expoexample",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +19,8 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.klaviyo.expoexample",
-      "jsEngine": "hermes"
+      "jsEngine": "hermes",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -32,10 +34,13 @@
         {
           "androidLogLevel": 1
         }
-      ]
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "projectId": "test-push-project-kl"
   }
 }

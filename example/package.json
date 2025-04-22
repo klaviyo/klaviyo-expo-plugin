@@ -10,16 +10,19 @@
     "test": "jest --watchAll"
   },
   "dependencies": {
+    "@babel/runtime": "^7.24.0",
+    "@react-native-firebase/app": "^21.14.0",
+    "@react-native-firebase/messaging": "^21.14.0",
     "expo": "~52.0.46",
     "expo-linking": "^7.0.5",
+    "expo-notifications": "~0.29.14",
     "expo-router": "~4.0.20",
     "expo-status-bar": "~2.0.1",
     "klaviyo-expo-plugin": "file:../",
     "klaviyo-react-native-sdk": "^1.2.0",
     "react": "18.3.1",
     "react-native": "0.76.9",
-    "react-native-safe-area-context": "^5.4.0",
-    "expo-notifications": "~0.29.14"
+    "react-native-safe-area-context": "^5.4.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

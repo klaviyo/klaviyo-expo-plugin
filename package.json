@@ -8,7 +8,11 @@
     "clean": "rm -rf dist",
     "prepare": "npm run clean && npm run build"
   },
-  "keywords": ["expo", "klaviyo", "plugin"],
+  "keywords": [
+    "expo",
+    "klaviyo",
+    "plugin"
+  ],
   "author": "Klaviyo",
   "license": "ISC",
   "description": "Expo plugin for Klaviyo integration",
