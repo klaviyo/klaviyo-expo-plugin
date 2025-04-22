@@ -3,7 +3,16 @@ import withKlaviyoIos from './withKlaviyoIos';
 import withKlaviyoAndroid from './withKlaviyoAndroid';
 
 export interface KlaviyoPluginProps {
-  // Add any plugin-specific props here
+  /**
+    0 = disable logging entirely
+    1 = Verbose and above
+    2 = Debug and above
+    3 = Info and above
+    4 = Warning and above
+    5 = Error and above
+    6 = Assert only
+   */
+  androidLogLevel?: number;
 }
 
 const withKlaviyo: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
