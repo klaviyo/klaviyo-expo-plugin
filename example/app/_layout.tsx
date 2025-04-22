@@ -1,7 +1,8 @@
 import { Stack } from 'expo-router';
 import { StyleSheet, View, Text, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import { Klaviyo } from 'klaviyo-react-native-sdk';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import * as Notifications from 'expo-notifications';
 
 export default function RootLayout() {
   const [apiKey, setApiKey] = useState('');
@@ -12,6 +13,33 @@ export default function RootLayout() {
     phoneNumber: '',
     externalId: ''
   });
+  const [pushPermissionStatus, setPushPermissionStatus] = useState<Notifications.PermissionStatus | null>(null);
+
+  useEffect(() => {
+    checkPushPermissionStatus();
+  }, []);
+
+  const checkPushPermissionStatus = async () => {
+    const { status } = await Notifications.getPermissionsAsync();
+    setPushPermissionStatus(status);
+  };
+
+  const handlePushPermission = async () => {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    
+    setPushPermissionStatus(finalStatus);
+    
+    if (finalStatus !== 'granted') {
+      Alert.alert('Permission Required', 'Push notifications are required for this app to function properly.');
+      return;
+    }
+  };
 
   const handleInitialize = () => {
     if (apiKey.length !== 6) {
@@ -121,6 +149,27 @@ export default function RootLayout() {
           <Text style={styles.buttonText}>Register for In-App Forms</Text>
         </TouchableOpacity>
       </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Push Notifications</Text>
+        <TouchableOpacity 
+          style={[
+            styles.button, 
+            styles.fullWidthButton,
+            pushPermissionStatus === 'granted' && styles.buttonSuccess
+          ]} 
+          onPress={handlePushPermission}
+        >
+          <Text style={styles.buttonText}>
+            {pushPermissionStatus === 'granted' ? 'Push Enabled' : 'Enable Push Notifications'}
+          </Text>
+        </TouchableOpacity>
+        {pushPermissionStatus && (
+          <Text style={styles.permissionStatus}>
+            Status: {pushPermissionStatus}
+          </Text>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -173,5 +222,13 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  buttonSuccess: {
+    backgroundColor: '#34C759',
+  },
+  permissionStatus: {
+    textAlign: 'center',
+    marginTop: 8,
+    color: '#666',
   },
 });
