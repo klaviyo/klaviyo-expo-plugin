@@ -1,18 +1,34 @@
 import { ConfigPlugin } from '@expo/config-plugins';
-import withKlaviyoIos from './withKlaviyoIos';
 import withKlaviyoAndroid from './withKlaviyoAndroid';
+import withKlaviyoIos from './withKlaviyoIos';
 
 export interface KlaviyoPluginProps {
   /**
-    0 = disable logging entirely
-    1 = Verbose and above
-    2 = Debug and above
-    3 = Info and above
-    4 = Warning and above
-    5 = Error and above
-    6 = Assert only
+   * Android-specific configuration
    */
-  androidLogLevel?: number;
+  android?: {
+    /**
+     * Log level for Android
+     * 0 = disable logging entirely
+     * 1 = Verbose and above
+     * 2 = Debug and above
+     * 3 = Info and above
+     * 4 = Warning and above
+     * 5 = Error and above
+     * 6 = Assert only
+     */
+    logLevel?: number;
+    /**
+     * Whether to enable open tracking for push notifications
+     */
+    openTracking?: boolean;
+  };
+  /**
+   * iOS-specific configuration
+   */
+  ios?: {
+    // Add iOS-specific configuration options here
+  };
 }
 
 const withKlaviyo: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {

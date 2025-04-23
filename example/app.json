@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
-      "bundleIdentifier": "com.klaviyo.expoexample"
+      "bundleIdentifier": "com.klaviyo.expoexample",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
@@ -36,7 +37,11 @@
       [
         "klaviyo-expo-plugin",
         {
-          "androidLogLevel": 1
+          "android": {
+            "logLevel": 2,
+            "openTracking": false
+          },
+          "ios": {}
         }
       ],
       [

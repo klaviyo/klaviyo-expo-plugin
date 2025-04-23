@@ -1,9 +1,11 @@
-import { ConfigPlugin } from '@expo/config-plugins';
+import { ConfigPlugin, withInfoPlist } from '@expo/config-plugins';
 import { KlaviyoPluginProps } from './withKlaviyo';
 
 const withKlaviyoIos: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
-  // TODO: Add iOS-specific configuration
-  return config;
+  return withInfoPlist(config, (config) => {
+    const infoPlist = config.modResults;
+    return config;
+  });
 };
 
 export default withKlaviyoIos; 

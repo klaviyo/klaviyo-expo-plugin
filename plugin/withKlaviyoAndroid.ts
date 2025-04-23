@@ -22,11 +22,11 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginProps> = (conf
       application['meta-data'] = [];
     }
 
-    const logLevel = props.androidLogLevel ?? 1; // Default to DEBUG (1) if not specified
+    const logLevel = props.android?.logLevel ?? 1; // Default to DEBUG (1) if not specified
     console.log(`📝 Setting Klaviyo log level to: ${logLevel}`);
 
     const logLevelIndex = application['meta-data'].findIndex(
-      (item: any) => item.$['android:name'] === 'com.klaviyo.core.log_level'
+      (item: any) => item.$['android:name'] === 'com.klaviyo.android.log_level'
     );
 
     if (logLevelIndex > -1) {
@@ -36,7 +36,7 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginProps> = (conf
       console.log('📝 Adding new Klaviyo log level...');
       application['meta-data'].push({
         $: {
-          'android:name': 'com.klaviyo.core.log_level',
+          'android:name': 'com.klaviyo.android.log_level',
           'android:value': logLevel.toString()
         }
       });
@@ -48,14 +48,14 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginProps> = (conf
     }
 
     const pushServiceIndex = application.service.findIndex(
-      (item: any) => item.$['android:name'] === 'com.klaviyo.pushFcm.KlaviyoPushService'
+      (item: any) => item.$['android:name'] === 'com.klaviyo.push.KlaviyoPushService'
     );
 
     if (pushServiceIndex === -1) {
       console.log('📝 Adding KlaviyoPushService to manifest...');
       application.service.push({
         $: {
-          'android:name': 'com.klaviyo.pushFcm.KlaviyoPushService',
+          'android:name': 'com.klaviyo.push.KlaviyoPushService',
           'android:exported': 'false'
         },
         'intent-filter': [{
@@ -73,7 +73,7 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginProps> = (conf
   });
 };
 
-const withMainActivityModifications: ConfigPlugin = (config) => {
+const withMainActivityModifications: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
   return withDangerousMod(config, [
     'android',
     async (config) => {
@@ -90,36 +90,47 @@ const withMainActivityModifications: ConfigPlugin = (config) => {
       // Read the current content
       const mainActivityContent = fs.readFileSync(mainActivityPath, 'utf-8');
 
-      // Add the imports if they don't exist
-      const importContents = mergeContents({
-        tag: 'klaviyo-imports',
-        src: mainActivityContent,
-        newSrc: `
+      // Remove existing Klaviyo code if it exists
+      const cleanedContent = mainActivityContent
+        .replace(/\/\/ @generated begin klaviyo-imports[\s\S]*?\/\/ @generated end klaviyo-imports\n/g, '')
+        .replace(/\/\/ @generated begin klaviyo-onNewIntent[\s\S]*?\/\/ @generated end klaviyo-onNewIntent\n/g, '');
+
+      // Only add the code if openTracking is enabled
+      if (props.android?.openTracking) {
+        // Add the imports if they don't exist
+        const importContents = mergeContents({
+          tag: 'klaviyo-imports',
+          src: cleanedContent,
+          newSrc: `
 import android.content.Intent
 import com.klaviyo.analytics.Klaviyo`,
-        anchor: 'import',
-        offset: 1,
-        comment: '//',
-      });
+          anchor: 'import',
+          offset: 1,
+          comment: '//',
+        });
 
-      // Add the onNewIntent override
-      const methodContents = mergeContents({
-        tag: 'klaviyo-onNewIntent',
-        src: importContents.contents,
-        newSrc: `
+        // Add the onNewIntent override
+        const methodContents = mergeContents({
+          tag: 'klaviyo-onNewIntent',
+          src: importContents.contents,
+          newSrc: `
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
 
         // Tracks when a system tray notification is opened
         Klaviyo.handlePush(intent)
     }`,
-        anchor: 'class MainActivity',
-        offset: 1,
-        comment: '//',
-      });
+          anchor: 'class MainActivity',
+          offset: 1,
+          comment: '//',
+        });
 
-      // Write the modified content back to the file
-      fs.writeFileSync(mainActivityPath, methodContents.contents);
+        // Write the modified content back to the file
+        fs.writeFileSync(mainActivityPath, methodContents.contents);
+      } else {
+        // Just write the cleaned content back
+        fs.writeFileSync(mainActivityPath, cleanedContent);
+      }
 
       return config;
     },
@@ -128,7 +139,7 @@ import com.klaviyo.analytics.Klaviyo`,
 
 const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
   config = withAndroidManifestModifications(config, props);
-  config = withMainActivityModifications(config);
+  config = withMainActivityModifications(config, props);
   return config;
 };
 
