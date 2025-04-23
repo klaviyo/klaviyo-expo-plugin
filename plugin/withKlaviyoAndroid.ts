@@ -1,57 +1,8 @@
-import { ConfigPlugin, withStringsXml, withAndroidManifest } from '@expo/config-plugins';
+import { ConfigPlugin, withDangerousMod, withAndroidManifest } from '@expo/config-plugins';
 import { KlaviyoPluginProps } from './withKlaviyo';
-
-interface StringResource {
-  $: { name: string };
-  _: string;
-}
-
-interface StringsXml {
-  resources: {
-    string: StringResource[];
-  };
-}
-
-const withProjectStrings: ConfigPlugin<KlaviyoPluginProps> = (config) => {
-  return withStringsXml(config, (config) => {
-    config.modResults = config.modResults ?? { resources: { string: [] } };
-    config.modResults.resources.string = config.modResults.resources.string ?? [];
-
-    // Add or update the version string
-    const versionIndex = config.modResults.resources.string.findIndex(
-      (item: StringResource) => item.$.name === 'klaviyo_sdk_version_override'
-    );
-    if (versionIndex > -1) {
-      config.modResults.resources.string[versionIndex]._ = '.0.0.1';
-    } else {
-      config.modResults.resources.string.push({
-        $: { name: 'klaviyo_sdk_version_override' },
-        _: '.0.0.1',
-      });
-    }
-
-    // Add or update the name string
-    const nameIndex = config.modResults.resources.string.findIndex(
-      (item: StringResource) => item.$.name === 'klaviyo_sdk_name_override'
-    );
-    if (nameIndex > -1) {
-      config.modResults.resources.string[nameIndex]._ = 'expo';
-    } else {
-      config.modResults.resources.string.push({
-        $: { name: 'klaviyo_sdk_name_override' },
-        _: 'expo',
-      });
-    }
-
-    return config;
-  });
-};
-
-
-const withDangerousMod: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
-  //todo add klaviyo notification listener
-  return withDangerousMod(config, props);
-};
+import * as fs from 'fs';
+import * as path from 'path';
+import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
 
 const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
   return withAndroidManifest(config, (config) => {
@@ -91,16 +42,93 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginProps> = (conf
       });
     }
 
+    // Add KlaviyoPushService to the manifest
+    if (!application.service) {
+      application.service = [];
+    }
+
+    const pushServiceIndex = application.service.findIndex(
+      (item: any) => item.$['android:name'] === 'com.klaviyo.pushFcm.KlaviyoPushService'
+    );
+
+    if (pushServiceIndex === -1) {
+      console.log('📝 Adding KlaviyoPushService to manifest...');
+      application.service.push({
+        $: {
+          'android:name': 'com.klaviyo.pushFcm.KlaviyoPushService',
+          'android:exported': 'false'
+        },
+        'intent-filter': [{
+          action: [{
+            $: {
+              'android:name': 'com.google.firebase.MESSAGING_EVENT'
+            }
+          }]
+        }]
+      });
+    }
+
     console.log('✅ Android Manifest modification complete');
     return config;
   });
 };
 
+const withMainActivityModifications: ConfigPlugin = (config) => {
+  return withDangerousMod(config, [
+    'android',
+    async (config) => {
+      const mainActivityPath = path.join(
+        config.modRequest.platformProjectRoot,
+        'app',
+        'src',
+        'main',
+        'java',
+        ...config.android?.package?.split('.') ?? ['com', 'klaviyo', 'expoexample'],
+        'MainActivity.kt'
+      );
+
+      // Read the current content
+      const mainActivityContent = fs.readFileSync(mainActivityPath, 'utf-8');
+
+      // Add the imports if they don't exist
+      const importContents = mergeContents({
+        tag: 'klaviyo-imports',
+        src: mainActivityContent,
+        newSrc: `
+import android.content.Intent
+import com.klaviyo.analytics.Klaviyo`,
+        anchor: 'import',
+        offset: 1,
+        comment: '//',
+      });
+
+      // Add the onNewIntent override
+      const methodContents = mergeContents({
+        tag: 'klaviyo-onNewIntent',
+        src: importContents.contents,
+        newSrc: `
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+
+        // Tracks when a system tray notification is opened
+        Klaviyo.handlePush(intent)
+    }`,
+        anchor: 'class MainActivity',
+        offset: 1,
+        comment: '//',
+      });
+
+      // Write the modified content back to the file
+      fs.writeFileSync(mainActivityPath, methodContents.contents);
+
+      return config;
+    },
+  ]);
+};
+
 const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
-  // commenting this out since we're not overriding the sdk name and version
-  //config = withProjectStrings(config, props);
   config = withAndroidManifestModifications(config, props);
-  config = withDangerousMod(config, props);
+  config = withMainActivityModifications(config);
   return config;
 };
 
