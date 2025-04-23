@@ -6,7 +6,9 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "prepare": "npm run clean && npm run build"
+    "prepare": "npm run clean && npm run build",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "keywords": [
     "expo",
@@ -23,5 +25,10 @@
   },
   "peerDependencies": {
     "expo": "*"
+  },
+  "dependencies": {
+    "expo": "~52.0.46",
+    "react": "18.3.1",
+    "react-native": "0.76.9"
   }
-}
+} 

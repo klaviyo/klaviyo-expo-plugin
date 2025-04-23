@@ -47,6 +47,12 @@ const withProjectStrings: ConfigPlugin<KlaviyoPluginProps> = (config) => {
   });
 };
 
+
+const withDangerousMod: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+  //todo add klaviyo notification listener
+  return withDangerousMod(config, props);
+};
+
 const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
   return withAndroidManifest(config, (config) => {
     console.log('🔄 Modifying Android Manifest...');
@@ -91,8 +97,10 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginProps> = (conf
 };
 
 const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
-  config = withProjectStrings(config, props);
+  // commenting this out since we're not overriding the sdk name and version
+  //config = withProjectStrings(config, props);
   config = withAndroidManifestModifications(config, props);
+  config = withDangerousMod(config, props);
   return config;
 };
 

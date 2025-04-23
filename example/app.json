@@ -9,9 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.klaviyo.expoexample",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "bundleIdentifier": "com.klaviyo.expoexample"
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +18,13 @@
       },
       "package": "com.klaviyo.expoexample",
       "jsEngine": "hermes",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "useNextNotificationsApi": true,
+      "notification": {
+        "icon": "./assets/images/notification-icon.png",
+        "color": "#ffffff",
+        "defaultChannelId": "default"
+      }
     },
     "web": {
       "bundler": "metro",
@@ -35,8 +39,20 @@
           "androidLogLevel": 1
         }
       ],
-      "@react-native-firebase/app",
-      "@react-native-firebase/messaging"
+      [
+        "@react-native-firebase/app",
+        {
+          "android_package_name": "com.klaviyo.expoexample",
+          "ios_bundle_id": "com.klaviyo.expoexample"
+        }
+      ],
+      [
+        "@react-native-firebase/messaging",
+        {
+          "android_package_name": "com.klaviyo.expoexample",
+          "ios_bundle_id": "com.klaviyo.expoexample"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

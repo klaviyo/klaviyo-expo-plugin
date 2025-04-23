@@ -1,8 +1,19 @@
+import React from 'react';
 import { Stack } from 'expo-router';
-import { StyleSheet, View, Text, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Clipboard } from 'react-native';
 import { Klaviyo } from 'klaviyo-react-native-sdk';
 import { useState, useEffect } from 'react';
 import messaging from '@react-native-firebase/messaging';
+import * as Notifications from 'expo-notifications';
+
+// Configure notification handler
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 export default function RootLayout() {
   const [apiKey, setApiKey] = useState('');
@@ -13,20 +24,39 @@ export default function RootLayout() {
     phoneNumber: '',
     externalId: ''
   });
+  const [pushPermissionStatus, setPushPermissionStatus] = useState<Notifications.PermissionStatus | null>(null);
   const [pushToken, setPushToken] = useState<string | null>(null);
 
   useEffect(() => {
-    requestUserPermission();
+    setupNotifications();
   }, []);
 
-  const requestUserPermission = async () => {
-    const authStatus = await messaging().requestPermission();
-    const enabled =
-      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+  const setupNotifications = async () => {
+    // Request permissions
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    
+    setPushPermissionStatus(finalStatus);
+    
+    if (finalStatus !== 'granted') {
+      Alert.alert('Permission Required', 'Push notifications are required for this app to function properly.');
+      return;
+    }
 
-    if (enabled) {
-      console.log('Authorization status:', authStatus);
+    // Get FCM token
+    try {
+      const token = await messaging().getToken();
+      setPushToken(token);
+      console.log('FCM Token:', token);
+      Klaviyo.setPushToken(token);
+    } catch (error) {
+      console.error('Error getting FCM token:', error);
+      Alert.alert('Error', 'Failed to get FCM token');
     }
   };
 
@@ -154,20 +184,42 @@ export default function RootLayout() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Push Notifications</Text>
         <TouchableOpacity 
-          style={[styles.button, styles.fullWidthButton]} 
-          onPress={handleGetPushToken}
+          style={[
+            styles.button, 
+            styles.fullWidthButton,
+            pushPermissionStatus === 'granted' && styles.buttonSuccess
+          ]} 
+          onPress={setupNotifications}
         >
           <Text style={styles.buttonText}>
-            {pushToken ? 'Update Push Token' : 'Get Push Token'}
+            {pushPermissionStatus === 'granted' ? 'Push Enabled' : 'Enable Push Notifications'}
           </Text>
         </TouchableOpacity>
-        {pushToken && (
-          <View style={styles.tokenContainer}>
-            <Text style={styles.tokenLabel}>Current Token:</Text>
-            <Text style={styles.tokenText} numberOfLines={2} ellipsizeMode="middle">
-              {pushToken}
-            </Text>
-          </View>
+        {pushPermissionStatus && (
+          <Text style={styles.permissionStatus}>
+            Status: {pushPermissionStatus}
+          </Text>
+        )}
+
+        {pushPermissionStatus === 'granted' && (
+          <>
+            <TouchableOpacity 
+              style={[styles.button, styles.fullWidthButton]} 
+              onPress={handleGetPushToken}
+            >
+              <Text style={styles.buttonText}>
+                {pushToken ? 'Update Push Token' : 'Get Push Token'}
+              </Text>
+            </TouchableOpacity>
+            {pushToken && (
+              <View style={styles.tokenContainer}>
+                <Text style={styles.tokenLabel}>Current Token:</Text>
+                <Text style={styles.tokenText} numberOfLines={2} ellipsizeMode="middle">
+                  {pushToken}
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </View>
     </ScrollView>
@@ -222,6 +274,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  buttonSuccess: {
+    backgroundColor: '#34C759',
+  },
+  permissionStatus: {
+    textAlign: 'center',
+    marginTop: 8,
+    color: '#666',
   },
   tokenContainer: {
     marginTop: 10,
