@@ -151,14 +151,20 @@ const withMainActivityModifications: ConfigPlugin<KlaviyoPluginProps> = (config,
       if (props.android?.openTracking) {
         console.log('📝 Adding push tracking code to MainActivity...');
         
+        // First, remove any existing generated content
+        let contentWithoutGenerated = cleanedContent.replace(
+          /\/\/ @generated begin klaviyo-[\s\S]*?\/\/ @generated end klaviyo-/g,
+          ''
+        ).trim();
+
         // Add imports right after the package declaration
         const importContents = mergeContents({
           tag: 'klaviyo-imports',
-          src: cleanedContent,
+          src: contentWithoutGenerated,
           newSrc: `
 import android.content.Intent
 import com.klaviyo.analytics.Klaviyo`,
-          anchor: packageMatch[0],
+          anchor: /^package .+$/m,
           offset: 1,
           comment: '//',
         });
@@ -174,7 +180,7 @@ import com.klaviyo.analytics.Klaviyo`,
         // Tracks when a system tray notification is opened
         Klaviyo.handlePush(intent)
     }`,
-          anchor: classMatch[0],
+          anchor: /^class MainActivity : ReactActivity\(\) \{$/m,
           offset: 1,
           comment: '//',
         });
