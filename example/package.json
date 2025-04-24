@@ -7,7 +7,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test": "jest --watchAll"
+    "test": "jest --watchAll",
+    "clean-android": "cd .. && npm run build && cd example && rm -rf android && npx expo prebuild --clean --platform android && npx expo run:android"
   },
   "dependencies": {
     "@babel/runtime": "^7.24.0",
