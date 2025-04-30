@@ -1,8 +1,22 @@
 import { ConfigPlugin, withDangerousMod, withAndroidManifest } from '@expo/config-plugins';
-import { KlaviyoPluginProps } from './withKlaviyo';
+import { KlaviyoPluginProps as BaseKlaviyoPluginProps } from './withKlaviyo';
 import * as fs from 'fs';
 import * as path from 'path';
 import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
+import { getMainActivityAsync } from '@expo/config-plugins/build/android/Paths';
+import * as glob from 'glob';
+
+
+// todo make these default to true
+interface KlaviyoAndroidProps {
+  logLevel?: number;
+  openTracking?: boolean;
+}
+
+interface KlaviyoPluginProps extends BaseKlaviyoPluginProps {
+  android?: KlaviyoAndroidProps;
+  ios?: {};
+}
 
 const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
   return withAndroidManifest(config, (config) => {
@@ -70,6 +84,52 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginProps> = (conf
   });
 };
 
+const findMainActivity = async (projectRoot: string): Promise<string | null> => {
+  console.log('🔍 Searching for MainActivity in:', projectRoot);
+  
+  // First try Expo's built-in detection
+  try {
+    const expoMainActivity = await getMainActivityAsync(projectRoot);
+    const mainActivityPath = expoMainActivity?.toString();
+    if (mainActivityPath && fs.existsSync(mainActivityPath)) {
+      console.log('✅ Found MainActivity using Expo detection:', mainActivityPath);
+      return mainActivityPath;
+    }
+  } catch (e: unknown) {
+    console.log('⚠️ Could not find main activity using Expo detection:', e instanceof Error ? e.message : String(e));
+  }
+
+  // Fall back to searching for ReactActivity
+  const possibleJavaDirs = [
+    path.join(projectRoot, 'app', 'src', 'main', 'java'),
+    path.join(projectRoot, 'src', 'main', 'java'),
+    path.join(projectRoot, 'java')
+  ];
+
+  for (const javaDir of possibleJavaDirs) {
+    console.log('🔍 Checking directory:', javaDir);
+    if (!fs.existsSync(javaDir)) {
+      console.log('⚠️ Directory does not exist:', javaDir);
+      continue;
+    }
+
+    const files = glob.sync('**/*.kt', { cwd: javaDir });
+    console.log(`📝 Found ${files.length} Kotlin files in ${javaDir}`);
+    
+    for (const file of files) {
+      const filePath = path.join(javaDir, file);
+      const content = fs.readFileSync(filePath, 'utf-8');
+      if (content.includes('class') && (content.includes(': ReactActivity') || content.includes('extends ReactActivity'))) {
+        console.log('✅ Found ReactActivity in:', filePath);
+        return filePath;
+      }
+    }
+  }
+
+  console.log('❌ Could not find MainActivity in any of the expected locations');
+  return null;
+};
+
 const withMainActivityModifications: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
   return withDangerousMod(config, [
     'android',
@@ -81,20 +141,16 @@ const withMainActivityModifications: ConfigPlugin<KlaviyoPluginProps> = (config,
         throw new Error('Android package not found in app config');
       }
 
-      const mainActivityPath = path.join(
-        config.modRequest.platformProjectRoot,
-        'app',
-        'src',
-        'main',
-        'java',
-        ...config.android.package.split('.'),
-        'MainActivity.kt'
-      );
+      const mainActivityPath = await findMainActivity(config.modRequest.platformProjectRoot);
 
-      console.log('📝 MainActivity.kt path:', mainActivityPath);
+      if (!mainActivityPath) {
+        throw new Error('Could not find main activity file. Please ensure your app has a valid ReactActivity.');
+      }
+
+      console.log('📝 MainActivity path:', mainActivityPath);
 
       if (!fs.existsSync(mainActivityPath)) {
-        throw new Error(`MainActivity.kt not found at path: ${mainActivityPath}`);
+        throw new Error(`MainActivity not found at path: ${mainActivityPath}`);
       }
 
       // Read the current content

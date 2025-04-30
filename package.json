@@ -20,6 +20,7 @@
   "description": "Expo plugin for Klaviyo integration",
   "devDependencies": {
     "@expo/config-plugins": "^7.0.0",
+    "@types/glob": "^8.1.0",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
   },
@@ -27,8 +28,8 @@
     "expo": "*"
   },
   "dependencies": {
-    "expo": "~52.0.46",
+    "expo": "*",
     "react": "18.3.1",
     "react-native": "0.76.9"
   }
-} 
+}

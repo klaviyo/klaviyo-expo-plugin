@@ -6,15 +6,6 @@ import { useState, useEffect } from 'react';
 import messaging from '@react-native-firebase/messaging';
 import * as Notifications from 'expo-notifications';
 
-// Configure notification handler
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
-
 export default function RootLayout() {
   const [apiKey, setApiKey] = useState('');
   const [profile, setProfile] = useState({
