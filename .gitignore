@@ -63,3 +63,4 @@ yarn-error.*
 
 # Klaviyo
 google-services.json 
+GoogleService-Info.plist
