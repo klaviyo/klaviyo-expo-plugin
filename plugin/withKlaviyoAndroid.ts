@@ -1,24 +1,13 @@
 import { ConfigPlugin, withDangerousMod, withAndroidManifest } from '@expo/config-plugins';
-import { KlaviyoPluginProps as BaseKlaviyoPluginProps } from './withKlaviyo';
 import * as fs from 'fs';
 import * as path from 'path';
 import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
 import { getMainActivityAsync } from '@expo/config-plugins/build/android/Paths';
 import * as glob from 'glob';
+import { KlaviyoPluginAndroidConfig } from './types';
 
 
-// todo make these default to true
-interface KlaviyoAndroidProps {
-  logLevel?: number;
-  openTracking?: boolean;
-}
-
-interface KlaviyoPluginProps extends BaseKlaviyoPluginProps {
-  android?: KlaviyoAndroidProps;
-  ios?: {};
-}
-
-const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidConfig> = (config, props) => {
   return withAndroidManifest(config, (config) => {
     console.log('🔄 Modifying Android Manifest...');
     const androidManifest = config.modResults.manifest;
@@ -36,7 +25,7 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginProps> = (conf
       application['meta-data'] = [];
     }
 
-    const logLevel = props.android?.logLevel ?? 1; // Default to DEBUG (1) if not specified
+    const logLevel = props.logLevel ?? 1; // Default to DEBUG (1) if not specified
     console.log(`📝 Setting Klaviyo log level to: ${logLevel}`);
 
     // Remove any existing log level meta-data entries
@@ -130,12 +119,12 @@ const findMainActivity = async (projectRoot: string): Promise<string | null> => 
   return null;
 };
 
-const withMainActivityModifications: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidConfig> = (config, props) => {
   return withDangerousMod(config, [
     'android',
     async (config) => {
       console.log('🔄 Modifying MainActivity.kt...');
-      console.log('📝 OpenTracking setting:', props.android?.openTracking);
+      console.log('📝 OpenTracking setting:', props.openTracking);
 
       if (!config.android?.package) {
         throw new Error('Android package not found in app config');
@@ -204,7 +193,7 @@ const withMainActivityModifications: ConfigPlugin<KlaviyoPluginProps> = (config,
       let cleanedContent = newLines.join('\n').replace(/\n{3,}/g, '\n\n');
 
       // Only add the code if openTracking is enabled
-      if (props.android?.openTracking) {
+      if (props.openTracking) {
         console.log('📝 Adding push tracking code to MainActivity...');
         
         // First, remove any existing generated content
@@ -254,7 +243,7 @@ import com.klaviyo.analytics.Klaviyo`,
   ]);
 };
 
-const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidConfig> = (config, props) => {
   console.log('🔄 Starting Android plugin configuration...');
   console.log('📝 Plugin props:', JSON.stringify(props, null, 2));
   

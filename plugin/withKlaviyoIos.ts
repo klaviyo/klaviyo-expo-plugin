@@ -1,7 +1,7 @@
 import { ConfigPlugin, withInfoPlist } from '@expo/config-plugins';
-import { KlaviyoPluginProps } from './withKlaviyo';
+import { KlaviyoPluginIosConfig } from './types';
 
-const withKlaviyoIos: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => {
   return withInfoPlist(config, (config) => {
     const infoPlist = config.modResults;
     return config;
