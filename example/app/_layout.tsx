@@ -1,6 +1,5 @@
 import React from 'react';
-import { Stack } from 'expo-router';
-import { StyleSheet, View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Clipboard } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Linking } from 'react-native';
 import { Klaviyo } from 'klaviyo-react-native-sdk';
 import { useState, useEffect } from 'react';
 import messaging from '@react-native-firebase/messaging';
@@ -29,6 +28,25 @@ export default function RootLayout() {
 
   useEffect(() => {
     setupNotifications();
+      // When app is *opened* via a deep link
+      const handleDeepLink = (event) => {
+        // event.url will be your deeplink
+        console.log('Deep link handled in JS:', event.url);
+        // ...your logic
+      };
+
+      const subscription = Linking.addEventListener('url', handleDeepLink);
+
+      // Handle when app is coldstarted via a deep link
+      Linking.getInitialURL().then((url) => {
+        if (url) {
+          handleDeepLink({ url });
+        }
+      });
+
+      return () => {
+        subscription.remove();
+      };
   }, []);
 
   const setupNotifications = async () => {
