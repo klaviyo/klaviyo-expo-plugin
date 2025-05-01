@@ -28,6 +28,7 @@ export default function RootLayout() {
     let finalStatus = existingStatus;
     
     if (existingStatus !== 'granted') {
+      console.log('Requesting permissions');
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
@@ -38,17 +39,7 @@ export default function RootLayout() {
       Alert.alert('Permission Required', 'Push notifications are required for this app to function properly.');
       return;
     }
-
-    // Get FCM token
-    try {
-      const token = await messaging().getToken();
-      setPushToken(token);
-      console.log('FCM Token:', token);
-      Klaviyo.setPushToken(token);
-    } catch (error) {
-      console.error('Error getting FCM token:', error);
-      Alert.alert('Error', 'Failed to get FCM token');
-    }
+    handleGetPushToken();
   };
 
   const handleGetPushToken = async () => {
@@ -192,7 +183,7 @@ export default function RootLayout() {
           </Text>
         )}
 
-        {pushPermissionStatus === 'granted' && (
+        {
           <>
             <TouchableOpacity 
               style={[styles.button, styles.fullWidthButton]} 
@@ -211,7 +202,7 @@ export default function RootLayout() {
               </View>
             )}
           </>
-        )}
+        }
       </View>
     </ScrollView>
   );
