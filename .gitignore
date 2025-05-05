@@ -59,4 +59,8 @@ example/.expo/
 # Debug logs
 npm-debug.*
 yarn-debug.*
-yarn-error.* 
+yarn-error.*
+
+# Klaviyo
+google-services.json 
+GoogleService-Info.plist

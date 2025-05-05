@@ -1,28 +1,16 @@
 import { ConfigPlugin } from '@expo/config-plugins';
-import withKlaviyoIos from './withKlaviyoIos';
 import withKlaviyoAndroid from './withKlaviyoAndroid';
+import withKlaviyoIos from './withKlaviyoIos';
+import { KlaviyoPluginConfig, mergeConfig } from './types';
 
-export interface KlaviyoPluginProps {
-  /**
-    0 = disable logging entirely
-    1 = Verbose and above
-    2 = Debug and above
-    3 = Info and above
-    4 = Warning and above
-    5 = Error and above
-    6 = Assert only
-   */
-  androidLogLevel?: number;
-}
-
-const withKlaviyo: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+const withKlaviyo: ConfigPlugin<KlaviyoPluginConfig> = (config, props) => {
   console.log('🔄 Klaviyo Expo Plugin: Running prebuild configuration...');
-  
+  const mergedProps = mergeConfig(config as KlaviyoPluginConfig);
   // Apply iOS configuration
-  config = withKlaviyoIos(config, props);
+  config = withKlaviyoIos(config, mergedProps.ios);
   
   // Apply Android configuration
-  config = withKlaviyoAndroid(config, props);
+  config = withKlaviyoAndroid(config, mergedProps.android);
 
   return config;
 };
