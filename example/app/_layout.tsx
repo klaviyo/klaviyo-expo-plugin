@@ -5,6 +5,15 @@ import { Klaviyo } from 'klaviyo-react-native-sdk';
 import { useState, useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
 
+// Configure notification handler
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
 export default function RootLayout() {
   const [apiKey, setApiKey] = useState('');
   const [profile, setProfile] = useState({
@@ -16,9 +25,28 @@ export default function RootLayout() {
   });
   const [pushPermissionStatus, setPushPermissionStatus] = useState<Notifications.PermissionStatus | null>(null);
   const [pushToken, setPushToken] = useState<string | null>(null);
+  const [lastNotification, setLastNotification] = useState<Notifications.Notification | null>(null);
 
   useEffect(() => {
     setupNotifications();
+
+    // Foreground notification listener
+    const foregroundSubscription = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Received foreground notification:', notification);
+      setLastNotification(notification);
+    });
+
+    // Background/Quit notification listener
+    const backgroundSubscription = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Received background notification response:', response);
+      setLastNotification(response.notification);
+    });
+
+    // Cleanup listeners on unmount
+    return () => {
+      foregroundSubscription.remove();
+      backgroundSubscription.remove();
+    };
   }, []);
 
   const setupNotifications = async () => {
@@ -182,6 +210,23 @@ export default function RootLayout() {
           </Text>
         )}
 
+        {lastNotification && (
+          <View style={styles.notificationContainer}>
+            <Text style={styles.notificationTitle}>Last Notification:</Text>
+            <Text style={styles.notificationText}>
+              Title: {lastNotification.request.content.title}
+            </Text>
+            <Text style={styles.notificationText}>
+              Body: {lastNotification.request.content.body}
+            </Text>
+            {lastNotification.request.content.data && (
+              <Text style={styles.notificationText}>
+                Data: {JSON.stringify(lastNotification.request.content.data)}
+              </Text>
+            )}
+          </View>
+        )}
+
         {
           <>
             <TouchableOpacity 
@@ -195,9 +240,20 @@ export default function RootLayout() {
             {pushToken && (
               <View style={styles.tokenContainer}>
                 <Text style={styles.tokenLabel}>Current Token:</Text>
-                <Text style={styles.tokenText} numberOfLines={2} ellipsizeMode="middle">
-                  {pushToken}
-                </Text>
+                <View style={styles.tokenRow}>
+                  <Text style={styles.tokenText} selectable={true}>
+                    {pushToken}
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.copyButton}
+                    onPress={() => {
+                      Clipboard.setString(pushToken);
+                      Alert.alert('Copied', 'Token copied to clipboard');
+                    }}
+                  >
+                    <Text style={styles.copyButtonText}>Copy</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
           </>
@@ -275,8 +331,45 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 5,
   },
+  tokenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
   tokenText: {
     fontSize: 12,
     fontFamily: 'monospace',
+    flex: 1,
+  },
+  copyButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  copyButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  notificationContainer: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  notificationTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    color: '#333',
+  },
+  notificationText: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 3,
   },
 });

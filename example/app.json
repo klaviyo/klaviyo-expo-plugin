@@ -9,8 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
-      "bundleIdentifier": "com.klaviyo.expoexample",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "bundleIdentifier": "com.klaviyo.expoexample"
     },
     "android": {
       "adaptiveIcon": {
@@ -49,12 +48,6 @@
         {
           "icon": "./assets/images/notification-icon.png",
           "color": "#ffffff"
-        }
-      ],
-      [
-        "@react-native-firebase/app",
-        {
-          "android_package_name": "com.klaviyo.expoexample"
         }
       ]
     ],
