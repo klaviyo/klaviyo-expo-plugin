@@ -3,7 +3,6 @@ import { Stack } from 'expo-router';
 import { StyleSheet, View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Clipboard } from 'react-native';
 import { Klaviyo } from 'klaviyo-react-native-sdk';
 import { useState, useEffect } from 'react';
-import messaging from '@react-native-firebase/messaging';
 import * as Notifications from 'expo-notifications';
 
 export default function RootLayout() {
@@ -44,13 +43,13 @@ export default function RootLayout() {
 
   const handleGetPushToken = async () => {
     try {
-      const token = await messaging().getToken();
+      const token = (await Notifications.getDevicePushTokenAsync()).data;
       setPushToken(token);
-      console.log('FCM Token:', token);
+      console.log('Expo Push Token:', token);
       Klaviyo.setPushToken(token);
     } catch (error) {
-      console.error('Error getting FCM token:', error);
-      Alert.alert('Error', 'Failed to get FCM token');
+      console.error('Error getting push token:', error);
+      Alert.alert('Error', 'Failed to get push token');
     }
   };
 
