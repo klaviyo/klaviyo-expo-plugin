@@ -1,6 +1,5 @@
 import React from 'react';
-import { Stack } from 'expo-router';
-import { StyleSheet, View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Clipboard } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Clipboard, Platform, SafeAreaView } from 'react-native';
 import { Klaviyo } from 'klaviyo-react-native-sdk';
 import { useState, useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
@@ -32,13 +31,41 @@ export default function RootLayout() {
 
     // Foreground notification listener
     const foregroundSubscription = Notifications.addNotificationReceivedListener(notification => {
-      console.log('Received foreground notification:', notification);
+      console.log('Received foreground notification:', JSON.stringify({
+        actionIdentifier: 'foreground',
+        notification: {
+          request: {
+            trigger: notification.request.trigger,
+            content: {
+              title: notification.request.content.title,
+              body: notification.request.content.body,
+              data: notification.request.content.data
+            },
+            identifier: notification.request.identifier
+          },
+          date: notification.date
+        }
+      }, null, 2));
       setLastNotification(notification);
     });
 
     // Background/Quit notification listener
     const backgroundSubscription = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('Received background notification response:', response);
+      console.log('Received background notification response:', JSON.stringify({
+        actionIdentifier: response.actionIdentifier,
+        notification: {
+          request: {
+            trigger: response.notification.request.trigger,
+            content: {
+              title: response.notification.request.content.title,
+              body: response.notification.request.content.body,
+              data: response.notification.request.content.data
+            },
+            identifier: response.notification.request.identifier
+          },
+          date: response.notification.date
+        }
+      }, null, 2));
       setLastNotification(response.notification);
     });
 
@@ -52,12 +79,14 @@ export default function RootLayout() {
   const setupNotifications = async () => {
     // Request permissions
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    console.log('Existing permission status:', existingStatus);
     let finalStatus = existingStatus;
     
     if (existingStatus !== 'granted') {
-      console.log('Requesting permissions');
+      console.log('Requesting permissions...');
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
+      console.log('New permission status:', status);
     }
     
     setPushPermissionStatus(finalStatus);
@@ -71,13 +100,41 @@ export default function RootLayout() {
 
   const handleGetPushToken = async () => {
     try {
-      const token = (await Notifications.getDevicePushTokenAsync()).data;
-      setPushToken(token);
-      console.log('Expo Push Token:', token);
-      Klaviyo.setPushToken(token);
+      console.log('Getting push token...');
+      console.log('Platform:', Platform.OS);
+      
+      // Add timeout promise with longer timeout for iOS
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`getDevicePushTokenAsync timed out after ${Platform.OS === 'ios' ? '30' : '10'} seconds`));
+        }, Platform.OS === 'ios' ? 30000 : 10000);
+      });
+
+      const tokenPromise = Notifications.getDevicePushTokenAsync();
+      
+      // Race between the actual call and the timeout
+      const tokenResponse = await Promise.race([tokenPromise, timeoutPromise]) as Notifications.DevicePushToken;
+      const token = tokenResponse.data;
+      console.log('Extracted token:', token);
+      setPushToken(token);      
+      console.log('Setting token in Klaviyo...');
+      try {
+        Klaviyo.setPushToken(token);
+        console.log('Token set in Klaviyo successfully');
+      } catch (klaviyoError) {
+        console.error('Error setting token in Klaviyo:', klaviyoError);
+        Alert.alert('Warning', 'Token was retrieved but could not be set in Klaviyo. Please try again.');
+      }
     } catch (error) {
       console.error('Error getting push token:', error);
-      Alert.alert('Error', 'Failed to get push token');
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
+      Alert.alert('Error', `Failed to get push token: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -124,146 +181,152 @@ export default function RootLayout() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.section}>
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.apiInput}
-            placeholder="Enter 6-char API key"
-            value={apiKey}
-            onChangeText={setApiKey}
-            maxLength={6}
-          />
-          <TouchableOpacity style={styles.button} onPress={handleInitialize}>
-            <Text style={styles.buttonText}>Initialize</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container}>
+        <View style={styles.section}>
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.apiInput}
+              placeholder="Enter 6-char API key"
+              value={apiKey}
+              onChangeText={setApiKey}
+              maxLength={6}
+            />
+            <TouchableOpacity style={styles.button} onPress={handleInitialize}>
+              <Text style={styles.buttonText}>Initialize</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={handleTrackEvent}>
+            <Text style={styles.buttonText}>Track Event</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={handleTrackEvent}>
-          <Text style={styles.buttonText}>Track Event</Text>
-        </TouchableOpacity>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Profile Information</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={profile.email}
-          onChangeText={(text) => setProfile({ ...profile, email: text })}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="First Name"
-          value={profile.firstName}
-          onChangeText={(text) => setProfile({ ...profile, firstName: text })}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Last Name"
-          value={profile.lastName}
-          onChangeText={(text) => setProfile({ ...profile, lastName: text })}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Phone Number"
-          value={profile.phoneNumber}
-          onChangeText={(text) => setProfile({ ...profile, phoneNumber: text })}
-          keyboardType="phone-pad"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="External ID"
-          value={profile.externalId}
-          onChangeText={(text) => setProfile({ ...profile, externalId: text })}
-        />
-        <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={handleSaveProfile}>
-          <Text style={styles.buttonText}>Save Profile</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Profile Information</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            value={profile.email}
+            onChangeText={(text) => setProfile({ ...profile, email: text })}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="First Name"
+            value={profile.firstName}
+            onChangeText={(text) => setProfile({ ...profile, firstName: text })}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Last Name"
+            value={profile.lastName}
+            onChangeText={(text) => setProfile({ ...profile, lastName: text })}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Phone Number"
+            value={profile.phoneNumber}
+            onChangeText={(text) => setProfile({ ...profile, phoneNumber: text })}
+            keyboardType="phone-pad"
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="External ID"
+            value={profile.externalId}
+            onChangeText={(text) => setProfile({ ...profile, externalId: text })}
+          />
+          <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={handleSaveProfile}>
+            <Text style={styles.buttonText}>Save Profile</Text>
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>In-App Forms</Text>
-        <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={handleRegisterForInAppForms}>
-          <Text style={styles.buttonText}>Register for In-App Forms</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>In-App Forms</Text>
+          <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={handleRegisterForInAppForms}>
+            <Text style={styles.buttonText}>Register for In-App Forms</Text>
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Push Notifications</Text>
-        <TouchableOpacity 
-          style={[
-            styles.button, 
-            styles.fullWidthButton,
-            pushPermissionStatus === 'granted' && styles.buttonSuccess
-          ]} 
-          onPress={setupNotifications}
-        >
-          <Text style={styles.buttonText}>
-            {pushPermissionStatus === 'granted' ? 'Push Enabled' : 'Enable Push Notifications'}
-          </Text>
-        </TouchableOpacity>
-        {pushPermissionStatus && (
-          <Text style={styles.permissionStatus}>
-            Status: {pushPermissionStatus}
-          </Text>
-        )}
-
-        {lastNotification && (
-          <View style={styles.notificationContainer}>
-            <Text style={styles.notificationTitle}>Last Notification:</Text>
-            <Text style={styles.notificationText}>
-              Title: {lastNotification.request.content.title}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Push Notifications</Text>
+          <TouchableOpacity 
+            style={[
+              styles.button, 
+              styles.fullWidthButton,
+              pushPermissionStatus === 'granted' && styles.buttonSuccess
+            ]} 
+            onPress={setupNotifications}
+          >
+            <Text style={styles.buttonText}>
+              {pushPermissionStatus === 'granted' ? 'Push Enabled' : 'Enable Push Notifications'}
             </Text>
-            <Text style={styles.notificationText}>
-              Body: {lastNotification.request.content.body}
+          </TouchableOpacity>
+          {pushPermissionStatus && (
+            <Text style={styles.permissionStatus}>
+              Status: {pushPermissionStatus}
             </Text>
-            {lastNotification.request.content.data && (
+          )}
+
+          {lastNotification && (
+            <View style={styles.notificationContainer}>
+              <Text style={styles.notificationTitle}>Last Notification:</Text>
               <Text style={styles.notificationText}>
-                Data: {JSON.stringify(lastNotification.request.content.data)}
+                Title: {lastNotification.request.content.title}
               </Text>
-            )}
-          </View>
-        )}
+              <Text style={styles.notificationText}>
+                Body: {lastNotification.request.content.body}
+              </Text>
+              {lastNotification.request.content.data && (
+                <Text style={styles.notificationText}>
+                  Data: {JSON.stringify(lastNotification.request.content.data)}
+                </Text>
+              )}
+            </View>
+          )}
 
-        {
-          <>
-            <TouchableOpacity 
-              style={[styles.button, styles.fullWidthButton]} 
-              onPress={handleGetPushToken}
-            >
-              <Text style={styles.buttonText}>
-                {pushToken ? 'Update Push Token' : 'Get Push Token'}
-              </Text>
-            </TouchableOpacity>
-            {pushToken && (
-              <View style={styles.tokenContainer}>
-                <Text style={styles.tokenLabel}>Current Token:</Text>
-                <View style={styles.tokenRow}>
-                  <Text style={styles.tokenText} selectable={true}>
-                    {pushToken}
-                  </Text>
-                  <TouchableOpacity 
-                    style={styles.copyButton}
-                    onPress={() => {
-                      Clipboard.setString(pushToken);
-                      Alert.alert('Copied', 'Token copied to clipboard');
-                    }}
-                  >
-                    <Text style={styles.copyButtonText}>Copy</Text>
-                  </TouchableOpacity>
+          {
+            <>
+              <TouchableOpacity 
+                style={[styles.button, styles.fullWidthButton]} 
+                onPress={handleGetPushToken}
+              >
+                <Text style={styles.buttonText}>
+                  {pushToken ? 'Update Push Token' : 'Get Push Token'}
+                </Text>
+              </TouchableOpacity>
+              {pushToken && (
+                <View style={styles.tokenContainer}>
+                  <Text style={styles.tokenLabel}>Current Token:</Text>
+                  <View style={styles.tokenRow}>
+                    <Text style={styles.tokenText} selectable={true}>
+                      {pushToken}
+                    </Text>
+                    <TouchableOpacity 
+                      style={styles.copyButton}
+                      onPress={() => {
+                        Clipboard.setString(pushToken);
+                        Alert.alert('Copied', 'Token copied to clipboard');
+                      }}
+                    >
+                      <Text style={styles.copyButtonText}>Copy</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            )}
-          </>
-        }
-      </View>
-    </ScrollView>
+              )}
+            </>
+          }
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
