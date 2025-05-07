@@ -8,12 +8,11 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest --watchAll",
-    "clean-android": "cd .. && npm run build && cd example && rm -rf android && npx expo prebuild --clean --platform android && npx expo run:android"
+    "clean-android": "cd .. && npm run build && cd example && rm -rf android && npx expo prebuild --clean --platform android && npx expo run:android",
+    "clean-ios": "cd .. && npm run build && cd example && rm -rf ios && npx expo prebuild --clean --platform ios && npx expo run:ios"
   },
   "dependencies": {
     "@babel/runtime": "^7.24.0",
-    "@react-native-firebase/app": "^21.14.0",
-    "@react-native-firebase/messaging": "^21.14.0",
     "expo": "~52.0.46",
     "expo-linking": "^7.0.5",
     "expo-notifications": "~0.29.14",

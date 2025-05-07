@@ -9,8 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
-      "bundleIdentifier": "com.klaviyo.expoexample",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "bundleIdentifier": "com.klaviyo.expoexample"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,8 +18,8 @@
       },
       "package": "com.klaviyo.expoexample",
       "jsEngine": "hermes",
-      "googleServicesFile": "./google-services.json",
       "useNextNotificationsApi": true,
+      "googleServicesFile": "./google-services.json",
       "notification": {
         "icon": "./assets/images/notification-icon.png",
         "color": "#ffffff",
@@ -45,17 +44,10 @@
         }
       ],
       [
-        "@react-native-firebase/app",
+        "expo-notifications",
         {
-          "android_package_name": "com.klaviyo.expoexample",
-          "ios_bundle_id": "com.klaviyo.expoexample"
-        }
-      ],
-      [
-        "@react-native-firebase/messaging",
-        {
-          "android_package_name": "com.klaviyo.expoexample",
-          "ios_bundle_id": "com.klaviyo.expoexample"
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#ffffff"
         }
       ]
     ],
