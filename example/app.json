@@ -38,7 +38,7 @@
         {
           "android": {
             "logLevel": 1,
-            "openTracking": true
+            "openTracking": false
           },
           "ios": {}
         }
