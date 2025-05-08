@@ -21,7 +21,7 @@ interface KlaviyoPluginIosProps extends KlaviyoPluginIosConfig {
   // Add any iOS-specific configuration here
 }
 
-interface KlaviyoPluginProps extends KlaviyoPluginConfig {
+export interface KlaviyoPluginProps extends KlaviyoPluginConfig {
   android: KlaviyoPluginAndroidProps;
   ios: KlaviyoPluginIosProps;
 }
