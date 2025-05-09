@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet} from 'react-native';
+import { StyleSheet, Platform} from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,22 @@ Notifications.setNotificationHandler({
     shouldShowInForeground: true,
   }),
 });
+
+// Helper function to handle deeplink URLs from notifications
+const handleDeeplink = (notification: Notifications.Notification | Notifications.NotificationResponse) => {
+  const request = 'notification' in notification 
+    ? notification.notification.request 
+    : notification.request;
+
+  const deeplinkUrl = Platform.OS === 'ios'
+    ? (request.trigger as any)?.payload?.url
+    : request.content.data?.url;
+
+  if (deeplinkUrl) {
+    console.log('Opening deeplink URL:', deeplinkUrl);
+    Linking.openURL(deeplinkUrl);
+  }
+};
 
 export default function AppLayout() {
   
@@ -37,10 +53,7 @@ export default function AppLayout() {
         }
       }, null, 2));
 
-      // Handle deeplink if present in notification data
-      if (notification.request.content.data?.url) {
-        Linking.openURL(notification.request.content.data.url);
-      }
+      handleDeeplink(notification);
     });
 
     // Background/Quit notification listener
@@ -62,10 +75,7 @@ export default function AppLayout() {
         }
       }, null, 2));
 
-      // Handle deeplink if present in notification data
-      if (response.notification.request.content.data?.url) {
-        Linking.openURL(response.notification.request.content.data.url);
-      }
+      handleDeeplink(response);
     });
 
     // Cleanup listeners on unmount
