@@ -53,7 +53,6 @@ export default function AppLayout() {
         }
       }, null, 2));
 
-      handleDeeplink(notification);
     });
 
     // Background/Quit notification listener
