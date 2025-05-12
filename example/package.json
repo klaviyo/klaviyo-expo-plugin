@@ -19,7 +19,7 @@
     "expo-router": "~4.0.20",
     "expo-status-bar": "~2.0.1",
     "klaviyo-expo-plugin": "file:../",
-    "klaviyo-react-native-sdk": "^1.2.0",
+    "klaviyo-react-native-sdk": "file:../../klaviyo-react-native-sdk",
     "react": "18.3.1",
     "react-native": "0.76.9",
     "react-native-safe-area-context": "^5.4.0",
@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@react-native/metro-config": "^0.79.2",
     "@types/react": "~18.3.12",
     "typescript": "^5.3.0"
   },
