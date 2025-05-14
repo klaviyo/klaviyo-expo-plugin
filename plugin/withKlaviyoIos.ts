@@ -30,14 +30,30 @@ export const NSE_EXT_FILES = [
   `${NSE_TARGET_NAME}-Info.plist`
 ];
 
-const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config) => {
+const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
   return withXcodeProject(config, async (config) => {
     const xcodeProject = config.modResults;
-    const projectName = xcodeProject.getFirstProject().firstProject.name;
-    const extGroup = xcodeProject.addPbxGroup(NSE_EXT_FILES, NSE_TARGET_NAME, NSE_TARGET_NAME);
 
-    // Add the new PBXGroup to the top level group. This makes the
-    // files / folder appear in the file explorer in Xcode.
+    // Skip if NSE already exists
+    if (!!xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
+      console.log(NSE_TARGET_NAME + " already exists in project. Skipping...");
+      return config;
+    }
+
+    // Get the main app target
+    const mainTarget = xcodeProject.getFirstTarget();
+    if (!mainTarget) {
+      throw new Error('Could not find main app target');
+    }
+
+    // Create the NSE group
+    const extGroup = xcodeProject.addPbxGroup(
+      ["NotificationService.swift", "NotificationServiceExtension-Info.plist"], 
+      NSE_TARGET_NAME, 
+      NSE_TARGET_NAME
+    );
+
+    // Add the group to the main group
     const groups = xcodeProject.hash.project.objects["PBXGroup"];
     Object.keys(groups).forEach(function(key) {
       if (typeof groups[key] === "object" && groups[key].name === undefined && groups[key].path === undefined) {
@@ -45,32 +61,64 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config) => {
       }
     });
     // WORK AROUND for codeProject.addTarget BUG
-    // Xcode projects don't contain these if there is only one target
-    // An upstream fix should be made to the code referenced in this link:
-    //   - https://github.com/apache/cordova-node-xcode/blob/8b98cabc5978359db88dc9ff2d4c015cba40f150/lib/pbxProject.js#L860
-    const projObjects = xcodeProject.hash.project.objects;
+    const projObjects = config.modResults.hash.project.objects;
     projObjects['PBXTargetDependency'] = projObjects['PBXTargetDependency'] || {};
     projObjects['PBXContainerItemProxy'] = projObjects['PBXTargetDependency'] || {};
 
     // Add the NSE target
-    // This adds PBXTargetDependency and PBXContainerItemProxy for you
-    const nseTarget = xcodeProject.addTarget(NSE_TARGET_NAME, "app_extension", NSE_TARGET_NAME, `${config.ios?.bundleIdentifier}.${NSE_TARGET_NAME}`);
+    const parentBundleId = config.ios?.bundleIdentifier || props.ios?.bundleIdentifier;
+    if (!parentBundleId) {
+      throw new Error('Parent app bundle identifier is required');
+    }
+    const nseBundleId = `${parentBundleId}.${NSE_TARGET_NAME}`;
+    const nseTarget = xcodeProject.addTarget(
+      NSE_TARGET_NAME,
+      "app_extension", 
+      NSE_TARGET_NAME, 
+      nseBundleId
+    );
 
-    // Add build phases to the new target
-    // xcodeProject.addBuildPhase(
-    //   ["NotificationService.m"],
-    //   "PBXSourcesBuildPhase",
-    //   "Sources",
-    //   nseTarget.uuid
-    // );
-    // xcodeProject.addBuildPhase([], "PBXResourcesBuildPhase", "Resources", nseTarget.uuid);
+    // Add build phases
+    xcodeProject.addBuildPhase(
+      ["NotificationService.swift"],
+      "PBXSourcesBuildPhase",
+      "Sources",
+      nseTarget.uuid
+    );
 
-    // xcodeProject.addBuildPhase(
-    //   [],
-    //   "PBXFrameworksBuildPhase",
-    //   "Frameworks",
-    //   nseTarget.uuid
-    // );
+    xcodeProject.addBuildPhase(
+      [], 
+      "PBXResourcesBuildPhase", 
+      "Resources", 
+      nseTarget.uuid
+    );
+
+    xcodeProject.addBuildPhase(
+      [],
+      "PBXFrameworksBuildPhase",
+      "Frameworks",
+      nseTarget.uuid
+    );
+    
+     // Edit the Deployment info of the new Target, only IphoneOS and Targeted Device Family
+    // However, can be more
+    const configurations = xcodeProject.pbxXCBuildConfigurationSection();
+    for (const key in configurations) {
+      if (typeof configurations[key].buildSettings !== "undefined") {
+        const buildSettingsObj = configurations[key].buildSettings;
+        
+        // Set versions for all targets
+        buildSettingsObj.CURRENT_PROJECT_VERSION = "1";
+        buildSettingsObj.MARKETING_VERSION = "1.0";
+        
+        // Additional settings for the extension target
+        if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
+          buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
+          buildSettingsObj.SWIFT_VERSION = "5.0";
+          buildSettingsObj.CODE_SIGN_STYLE = "Automatic";
+        }
+      }
+    }
 
     return config;
   });
@@ -144,7 +192,7 @@ export async function updatePodfile(iosPath: string) {
   await FileManager.writeFile(`${iosPath}/Podfile`, updatedPodfile);
 }
 
-export default withKlaviyoIos; 
+export default withKlaviyoIos;
 
 class FileManager {
   static async readFile(path: string): Promise<string> {

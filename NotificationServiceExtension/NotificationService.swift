@@ -1,5 +1,5 @@
 import UserNotifications
-import KlaviyoSwiftExtension
+// import KlaviyoSwiftExtension
 
 class NotificationService: UNNotificationServiceExtension {
     var contentHandler: ((UNNotificationContent) -> Void)?
