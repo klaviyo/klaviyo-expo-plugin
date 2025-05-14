@@ -1,24 +1,33 @@
 import UserNotifications
-// import KlaviyoSwiftExtension
+import KlaviyoSwiftExtension
 
 class NotificationService: UNNotificationServiceExtension {
+    var request: UNNotificationRequest!
     var contentHandler: ((UNNotificationContent) -> Void)?
     var bestAttemptContent: UNMutableNotificationContent?
 
-    override func didReceive(_ request: UNNotificationRequest, withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
+    override func didReceive(
+        _ request: UNNotificationRequest,
+        withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
+        self.request = request
         self.contentHandler = contentHandler
         bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent)
-        
+
         if let bestAttemptContent = bestAttemptContent {
-            // Modify the notification content here if needed
-            contentHandler(bestAttemptContent)
+            KlaviyoExtensionSDK.handleNotificationServiceDidReceivedRequest(
+                request: self.request,
+                bestAttemptContent: bestAttemptContent,
+                contentHandler: contentHandler)
         }
     }
-    
+
     override func serviceExtensionTimeWillExpire() {
-        // Called just before the extension will be terminated by the system.
-        if let contentHandler = contentHandler, let bestAttemptContent = bestAttemptContent {
-            contentHandler(bestAttemptContent)
+        if let contentHandler = contentHandler,
+           let bestAttemptContent = bestAttemptContent {
+            KlaviyoExtensionSDK.handleNotificationServiceExtensionTimeWillExpireRequest(
+                request: request,
+                bestAttemptContent: bestAttemptContent,
+                contentHandler: contentHandler)
         }
     }
-} 
+}

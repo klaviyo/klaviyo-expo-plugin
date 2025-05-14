@@ -26,7 +26,7 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginProps> = (
 export const NSE_TARGET_NAME = "NotificationServiceExtension";
 export const NSE_EXT_FILES = [
   "NotificationService.swift",
-  `${NSE_TARGET_NAME}.entitlements`,
+  // `${NSE_TARGET_NAME}.entitlements`,
   `${NSE_TARGET_NAME}-Info.plist`
 ];
 
@@ -113,7 +113,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config, props
         
         // Additional settings for the extension target
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
-          buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
+          // buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
           buildSettingsObj.SWIFT_VERSION = "5.0";
           buildSettingsObj.CODE_SIGN_STYLE = "Automatic";
         }
@@ -155,39 +155,62 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginProps> = (config) => {
   ]);
 };
 
+const withProperNSE: ConfigPlugin<KlaviyoPluginProps> = (config) => {
+  return withDangerousMod(config, [
+    'ios',
+    async config => {
+      const iosRoot = path.join(config.modRequest.projectRoot, "ios");
+      const nsePath = path.join(iosRoot, NSE_TARGET_NAME);
+
+      // Ensure NSE folder exists
+      if (!FileManager.dirExists(nsePath)) {
+        fs.mkdirSync(nsePath, { recursive: true });
+      }
+
+      const sourceDir = path.join(config.modRequest.projectRoot, "..", NSE_TARGET_NAME);
+
+      const srcFile = path.join(sourceDir, "NotificationService.swift");
+      const destFile = path.join(nsePath, "NotificationService copy.swift"); // overwrite the 'copy' version
+
+      try {
+        await FileManager.copyFile(srcFile, destFile);
+        console.log(`Replaced NotificationService copy.swift with NotificationService.swift`);
+      } catch (error) {
+        console.error(`Failed to replace NotificationService.swift:`, error);
+        throw error;
+      }
+
+      return config;
+    },
+  ]);
+};
+
+
 const withKlaviyoIos: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
   config = withRemoteNotificationsPermissions(config, props);
   config = withKlaviyoPodfile(config, props);
-  config = withKlaviyoNSE(config, props);
   config = withKlaviyoXcodeProject(config, props);
+  config = withKlaviyoNSE(config, props);
   return config;
 };
 
+const podInsertion = 
+`
+target 'NotificationServiceExtension' do
+   pod 'KlaviyoSwiftExtension'
+end
+`;
+
 export async function updatePodfile(iosPath: string) {
   const podfile = await FileManager.readFile(`${iosPath}/Podfile`);
-  
-  // Check if the pod is already added
+
+  // Check if the extension pod is already added
   if (podfile.includes("pod 'KlaviyoSwiftExtension'")) {
     return;
   }
 
-  // Find the main target declaration
-  const targetRegex = /target '([^']+)' do/;
-  const match = podfile.match(targetRegex);
-  
-  if (!match) {
-    console.error("Could not find target declaration in Podfile");
-    return;
-  }
-
-  // Insert the pod after the target declaration
-  const targetLine = match[0];
-  const podInsertion = `  pod 'KlaviyoSwiftExtension'`;
-  
-  const updatedPodfile = podfile.replace(
-    targetLine,
-    `${targetLine}\n${podInsertion}`
-  );
+  // Add the extension target configuration at the end of the Podfile
+  const updatedPodfile = `${podfile}\n${podInsertion}`;
 
   await FileManager.writeFile(`${iosPath}/Podfile`, updatedPodfile);
 }

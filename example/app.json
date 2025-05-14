@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
-      "bundleIdentifier": "com.klaviyo.expoexample"
+      "bundleIdentifier": "com.klaviyo.expoexample",
+      "appleTeamId": "G3793W2RJ2"
     },
     "android": {
       "adaptiveIcon": {
