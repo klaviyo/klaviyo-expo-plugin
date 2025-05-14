@@ -1,4 +1,4 @@
-import { ConfigPlugin, withDangerousMod, withAndroidManifest } from '@expo/config-plugins';
+import { ConfigPlugin, withDangerousMod, withAndroidManifest, withStringsXml } from '@expo/config-plugins';
 import * as fs from 'fs';
 import * as path from 'path';
 import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
@@ -252,8 +252,35 @@ const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidConfig> = (config, pr
   
   config = withMainActivityModifications(config, props);
   console.log('✅ MainActivity modifications complete');
+
+  config = withKlaviyoPluginNameVersion(config);
+  console.log('✅ Klaviyo plugin name and version modifications complete');
   
   return config;
+};
+
+/**
+ * Adds or updates the klaviyo_sdk_plugin_name_override and klaviyo_sdk_plugin_version_override
+ * string resources in android/app/src/main/res/values/strings.xml.
+ */
+export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
+  return withStringsXml(config, config => {
+    let strings = config.modResults;
+
+    function setStringResource(name: string, value: string) {
+      const existing = strings.resources.string?.find((item: any) => item.$.name === name);
+      if (existing) {
+        existing._ = value;
+      } else {
+        if (!strings.resources.string) strings.resources.string = [];
+        strings.resources.string.push({ $: { name }, _: value });
+      }    }
+
+    setStringResource('klaviyo_sdk_plugin_name_override', 'klaviyo-expo');
+    setStringResource('klaviyo_sdk_plugin_version_override', '0.0.2');
+
+    return config;
+  });
 };
 
 export default withKlaviyoAndroid; 
