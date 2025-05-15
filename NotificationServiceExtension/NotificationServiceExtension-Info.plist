@@ -9,6 +9,8 @@
         <key>NSExtensionPrincipalClass</key>
         <string>$(PRODUCT_MODULE_NAME).NotificationService</string>
     </dict>
+	<key>klaviyo_app_group</key>
+	<string>group.com.klaviyo.expoexample.shared</string>
     <key>CFBundleIdentifier</key>
     <string>com.klaviyo.expoexample.NotificationServiceExtension</string>
     <key>CFBundleVersion</key>

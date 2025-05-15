@@ -1,4 +1,4 @@
-import { ConfigPlugin, withDangerousMod, withInfoPlist, withXcodeProject } from '@expo/config-plugins';
+import { ConfigPlugin, withDangerousMod, withEntitlementsPlist, withInfoPlist, withXcodeProject } from '@expo/config-plugins';
 import { KlaviyoPluginProps } from './types';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -9,6 +9,7 @@ const withKlaviyoIos: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
   config = withKlaviyoPodfile(config, props);
   config = withKlaviyoXcodeProject(config, props);
   config = withKlaviyoNSE(config, props);
+  config = withKlaviyoAppGroup(config, props);
   return config;
 };
 export default withKlaviyoIos;
@@ -19,6 +20,7 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginProps> = (
 ) => {
   return withInfoPlist(config, (config) => {
     const infoPlist = config.modResults;
+    infoPlist.klaviyo_app_group = "group.com.klaviyo.expoexample.shared";
     return config;
   });
 };
@@ -52,7 +54,7 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginProps> = (config) => {
 export const NSE_TARGET_NAME = "NotificationServiceExtension";
 export const NSE_EXT_FILES = [
   "NotificationService.swift",
-  // `${NSE_TARGET_NAME}.entitlements`,
+  `${NSE_TARGET_NAME}.entitlements`,
   `${NSE_TARGET_NAME}-Info.plist`
 ];
 
@@ -66,7 +68,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config, props
 
     // Create the NSE group
     const extGroup = xcodeProject.addPbxGroup(
-      ["NotificationService.swift", "NotificationServiceExtension-Info.plist"], 
+      NSE_EXT_FILES,
       NSE_TARGET_NAME, 
       NSE_TARGET_NAME
     );
@@ -125,7 +127,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config, props
         buildSettingsObj.MARKETING_VERSION = "1.0";
         
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
-          // buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
+          buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
           buildSettingsObj.SWIFT_VERSION = "5.0";
           buildSettingsObj.CODE_SIGN_STYLE = "Automatic";
         }
@@ -144,12 +146,9 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginProps> = (config) => {
       const iosRoot = path.join(config.modRequest.projectRoot, "ios");
       const nsePath = path.join(iosRoot, NSE_TARGET_NAME);
       
-      // Create NSE directory
       if (!FileManager.dirExists(nsePath)) {
         fs.mkdirSync(nsePath, { recursive: true });
       }
-
-      // Copy NSE files from the plugin root directory
       const sourceDir = path.join(config.modRequest.projectRoot, "..", NSE_TARGET_NAME);
       for (const file of NSE_EXT_FILES) {
         try {
@@ -166,4 +165,19 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginProps> = (config) => {
       return config;
     },
   ]);
+};
+
+// plugin to add app group to target entitlements
+const withKlaviyoAppGroup: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+  let iosPushStoryAppGroup = "group.com.klaviyo.expoexample.shared";
+  return withEntitlementsPlist(config, (config) => {
+    const appGroupsKey = 'com.apple.security.application-groups';
+      const existingAppGroups = config.modResults[appGroupsKey];
+      if (Array.isArray(existingAppGroups) && !existingAppGroups.includes(iosPushStoryAppGroup)) {
+        config.modResults[appGroupsKey] = existingAppGroups.concat([iosPushStoryAppGroup]);
+      } else {
+        config.modResults[appGroupsKey] = [iosPushStoryAppGroup];
+      }
+    return config;
+  });
 };
