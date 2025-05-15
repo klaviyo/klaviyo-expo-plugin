@@ -1,10 +1,10 @@
 import { ConfigPlugin, withDangerousMod, withEntitlementsPlist, withInfoPlist, withXcodeProject } from '@expo/config-plugins';
-import { KlaviyoPluginProps } from './types';
+import { KlaviyoPluginIosConfig } from './types';
 import * as path from 'path';
 import * as fs from 'fs';
 import { FileManager } from './support/fileManager';
 
-const withKlaviyoIos: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => {
   config = withRemoteNotificationsPermissions(config, props);
   config = withKlaviyoPodfile(config, props);
   config = withKlaviyoXcodeProject(config, props);
@@ -15,18 +15,21 @@ const withKlaviyoIos: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
 export default withKlaviyoIos;
 
 // plugin to enable remote notifications
-const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginProps> = (
-  config
+const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosConfig> = (
+  config,
+  props
 ) => {
+  console.log("BADGE AUTOCLEARING", props.badgeAutoclearing);
   return withInfoPlist(config, (config) => {
     const infoPlist = config.modResults;
     infoPlist.klaviyo_app_group = "group.com.klaviyo.expoexample.shared";
+    infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing ?? true;
     return config;
   });
 };
 
 // plugin to add the necessary Klaviyo pods to the Podfile setup
-const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginProps> = (config) => {
+const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosConfig> = (config) => {
   return withDangerousMod(config, [
     'ios',
     async config => {
@@ -58,7 +61,7 @@ export const NSE_EXT_FILES = [
   `${NSE_TARGET_NAME}-Info.plist`
 ];
 
-const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => {
   return withXcodeProject(config, async (config) => {
     const xcodeProject = config.modResults;
     if (!!xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
@@ -87,7 +90,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config, props
     projObjects['PBXContainerItemProxy'] = projObjects['PBXTargetDependency'] || {};
 
     // Add the NSE target
-    const parentBundleId = config.ios?.bundleIdentifier || props.ios?.bundleIdentifier;
+    const parentBundleId = config.ios?.bundleIdentifier || props.bundleIdentifier;
     if (!parentBundleId) {
       throw new Error('Parent app bundle identifier is required');
     }
@@ -139,7 +142,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config, props
 };
 
 // plugin to setup NotificationServiceExtension with Klaviyo files
-const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginProps> = (config) => {
+const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosConfig> = (config) => {
   return withDangerousMod(config, [
     'ios',
     async config => {
@@ -168,7 +171,7 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginProps> = (config) => {
 };
 
 // plugin to add app group to target entitlements
-const withKlaviyoAppGroup: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+const withKlaviyoAppGroup: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => {
   let iosPushStoryAppGroup = "group.com.klaviyo.expoexample.shared";
   return withEntitlementsPlist(config, (config) => {
     const appGroupsKey = 'com.apple.security.application-groups';

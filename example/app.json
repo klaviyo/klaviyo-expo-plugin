@@ -9,8 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
-      "bundleIdentifier": "com.klaviyo.expoexample",
-      "appleTeamId": "G3793W2RJ2"
+      "bundleIdentifier": "com.klaviyo.expoexample"
     },
     "android": {
       "adaptiveIcon": {
@@ -41,7 +40,9 @@
             "logLevel": 1,
             "openTracking": false
           },
-          "ios": {}
+          "ios": {
+            "badgeAutoclearing": false
+          }
         }
       ],
       [

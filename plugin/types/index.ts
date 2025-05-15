@@ -5,8 +5,8 @@ export interface KlaviyoPluginAndroidConfig {
 
 export interface KlaviyoPluginIosConfig {
   // Add any iOS-specific configuration here
-  teamId?: string;
   bundleIdentifier?: string;
+  badgeAutoclearing?: boolean;
 }
 
 export interface KlaviyoPluginConfig {
@@ -35,7 +35,8 @@ const DEFAULTS: KlaviyoPluginProps = {
   },
   ios: {
     // Add any iOS-specific defaults here
-    bundleIdentifier: "com.klaviyo.expoexample"
+    bundleIdentifier: "com.klaviyo.expoexample",
+    badgeAutoclearing: true
   }
 };
 
