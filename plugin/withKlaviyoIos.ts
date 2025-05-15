@@ -1,19 +1,19 @@
 import { ConfigPlugin, withDangerousMod, withInfoPlist, withXcodeProject } from '@expo/config-plugins';
-import { KlaviyoPluginIosConfig, KlaviyoPluginProps } from './types';
+import { KlaviyoPluginProps } from './types';
 import * as path from 'path';
 import * as fs from 'fs';
+import { FileManager } from './support/fileManager';
 
-const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginProps> = (config) => {
-  return withDangerousMod(config, [
-    'ios',
-    async config => {
-      const iosRoot = path.join(config.modRequest.projectRoot, "ios")
-      updatePodfile(iosRoot).catch(err => { console.log(err) });
-      return config;
-    },
-  ]);
-}
+const withKlaviyoIos: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+  config = withRemoteNotificationsPermissions(config, props);
+  config = withKlaviyoPodfile(config, props);
+  config = withKlaviyoXcodeProject(config, props);
+  config = withKlaviyoNSE(config, props);
+  return config;
+};
+export default withKlaviyoIos;
 
+// plugin to enable remote notifications
 const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginProps> = (
   config
 ) => {
@@ -22,6 +22,32 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginProps> = (
     return config;
   });
 };
+
+// plugin to add the necessary Klaviyo pods to the Podfile setup
+const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginProps> = (config) => {
+  return withDangerousMod(config, [
+    'ios',
+    async config => {
+      const iosRoot = path.join(config.modRequest.projectRoot, "ios");
+      const podInsertion = `
+  target 'NotificationServiceExtension' do
+    pod 'KlaviyoSwiftExtension'
+  end
+  `;
+      try {
+        const podfile = await FileManager.readFile(`${iosRoot}/Podfile`);
+        if (!podfile.includes("pod 'KlaviyoSwiftExtension'")) {
+          const updatedPodfile = `${podfile}\n${podInsertion}`;
+          await FileManager.writeFile(`${iosRoot}/Podfile`, updatedPodfile);
+        }
+      } catch (err) {
+        console.log(err);
+      }
+      
+      return config;
+    },
+  ]);
+}
 
 export const NSE_TARGET_NAME = "NotificationServiceExtension";
 export const NSE_EXT_FILES = [
@@ -33,17 +59,9 @@ export const NSE_EXT_FILES = [
 const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
   return withXcodeProject(config, async (config) => {
     const xcodeProject = config.modResults;
-
-    // Skip if NSE already exists
     if (!!xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
       console.log(NSE_TARGET_NAME + " already exists in project. Skipping...");
       return config;
-    }
-
-    // Get the main app target
-    const mainTarget = xcodeProject.getFirstTarget();
-    if (!mainTarget) {
-      throw new Error('Could not find main app target');
     }
 
     // Create the NSE group
@@ -60,6 +78,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config, props
         xcodeProject.addToPbxGroup(extGroup.uuid, key);
       }
     });
+    
     // WORK AROUND for codeProject.addTarget BUG
     const projObjects = config.modResults.hash.project.objects;
     projObjects['PBXTargetDependency'] = projObjects['PBXTargetDependency'] || {};
@@ -78,14 +97,12 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config, props
       nseBundleId
     );
 
-    // Add build phases
     xcodeProject.addBuildPhase(
       ["NotificationService.swift"],
       "PBXSourcesBuildPhase",
       "Sources",
       nseTarget.uuid
     );
-
     xcodeProject.addBuildPhase(
       [], 
       "PBXResourcesBuildPhase", 
@@ -100,18 +117,13 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config, props
       nseTarget.uuid
     );
     
-     // Edit the Deployment info of the new Target, only IphoneOS and Targeted Device Family
-    // However, can be more
     const configurations = xcodeProject.pbxXCBuildConfigurationSection();
     for (const key in configurations) {
       if (typeof configurations[key].buildSettings !== "undefined") {
         const buildSettingsObj = configurations[key].buildSettings;
-        
-        // Set versions for all targets
         buildSettingsObj.CURRENT_PROJECT_VERSION = "1";
         buildSettingsObj.MARKETING_VERSION = "1.0";
         
-        // Additional settings for the extension target
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
           // buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
           buildSettingsObj.SWIFT_VERSION = "5.0";
@@ -124,6 +136,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginProps> = (config, props
   });
 };
 
+// plugin to setup NotificationServiceExtension with Klaviyo files
 const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginProps> = (config) => {
   return withDangerousMod(config, [
     'ios',
@@ -131,7 +144,7 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginProps> = (config) => {
       const iosRoot = path.join(config.modRequest.projectRoot, "ios");
       const nsePath = path.join(iosRoot, NSE_TARGET_NAME);
       
-      // Create NSE directory if it doesn't exist
+      // Create NSE directory
       if (!FileManager.dirExists(nsePath)) {
         fs.mkdirSync(nsePath, { recursive: true });
       }
@@ -154,102 +167,3 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginProps> = (config) => {
     },
   ]);
 };
-
-const withProperNSE: ConfigPlugin<KlaviyoPluginProps> = (config) => {
-  return withDangerousMod(config, [
-    'ios',
-    async config => {
-      const iosRoot = path.join(config.modRequest.projectRoot, "ios");
-      const nsePath = path.join(iosRoot, NSE_TARGET_NAME);
-
-      // Ensure NSE folder exists
-      if (!FileManager.dirExists(nsePath)) {
-        fs.mkdirSync(nsePath, { recursive: true });
-      }
-
-      const sourceDir = path.join(config.modRequest.projectRoot, "..", NSE_TARGET_NAME);
-
-      const srcFile = path.join(sourceDir, "NotificationService.swift");
-      const destFile = path.join(nsePath, "NotificationService copy.swift"); // overwrite the 'copy' version
-
-      try {
-        await FileManager.copyFile(srcFile, destFile);
-        console.log(`Replaced NotificationService copy.swift with NotificationService.swift`);
-      } catch (error) {
-        console.error(`Failed to replace NotificationService.swift:`, error);
-        throw error;
-      }
-
-      return config;
-    },
-  ]);
-};
-
-
-const withKlaviyoIos: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
-  config = withRemoteNotificationsPermissions(config, props);
-  config = withKlaviyoPodfile(config, props);
-  config = withKlaviyoXcodeProject(config, props);
-  config = withKlaviyoNSE(config, props);
-  return config;
-};
-
-const podInsertion = 
-`
-target 'NotificationServiceExtension' do
-   pod 'KlaviyoSwiftExtension'
-end
-`;
-
-export async function updatePodfile(iosPath: string) {
-  const podfile = await FileManager.readFile(`${iosPath}/Podfile`);
-
-  // Check if the extension pod is already added
-  if (podfile.includes("pod 'KlaviyoSwiftExtension'")) {
-    return;
-  }
-
-  // Add the extension target configuration at the end of the Podfile
-  const updatedPodfile = `${podfile}\n${podInsertion}`;
-
-  await FileManager.writeFile(`${iosPath}/Podfile`, updatedPodfile);
-}
-
-export default withKlaviyoIos;
-
-class FileManager {
-  static async readFile(path: string): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
-      fs.readFile(path, 'utf8', (err, data) => {
-        if (err || !data) {
-          console.log("Couldn't read file:" + path);
-          reject(err);
-          return;
-        }
-        resolve(data);
-      });
-    });
-  }
-
-  static async writeFile(path: string, contents: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      fs.writeFile(path, contents, 'utf8', (err) => {
-        if (err) {
-          console.log("Couldn't write file:" + path);
-          reject(err);
-          return;
-        }
-        resolve();
-      });
-    });
-  }
-
-  static async copyFile(path1: string, path2: string): Promise<void> {
-    const fileContents = await FileManager.readFile(path1);
-    await FileManager.writeFile(path2, fileContents);
-  }
-
-  static dirExists(path: string): boolean {
-    return fs.existsSync(path)
-  }
-}
