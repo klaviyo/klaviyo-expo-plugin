@@ -19,7 +19,6 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosConfig> =
   config,
   props
 ) => {
-  console.log("BADGE AUTOCLEARING", props.badgeAutoclearing);
   return withInfoPlist(config, (config) => {
     const infoPlist = config.modResults;
     infoPlist.klaviyo_app_group = "group.com.klaviyo.expoexample.shared";
