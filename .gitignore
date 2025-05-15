@@ -55,6 +55,7 @@ example/.expo/
 
 # Metro
 .metro-health-check*
+example/metro.local.js
 
 # Debug logs
 npm-debug.*
