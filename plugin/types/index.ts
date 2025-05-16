@@ -7,6 +7,7 @@ export interface KlaviyoPluginIosConfig {
   // Add any iOS-specific configuration here
   bundleIdentifier?: string;
   badgeAutoclearing?: boolean;
+  developmentTeam?: string;
 }
 
 export interface KlaviyoPluginConfig {
@@ -35,7 +36,6 @@ const DEFAULTS: KlaviyoPluginProps = {
   },
   ios: {
     // Add any iOS-specific defaults here
-    bundleIdentifier: "com.klaviyo.expoexample",
     badgeAutoclearing: true
   }
 };

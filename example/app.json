@@ -41,7 +41,8 @@
             "openTracking": false
           },
           "ios": {
-            "badgeAutoclearing": false
+            "badgeAutoclearing": true,
+            "developmentTeam": "G3793W2RJ2"
           }
         }
       ],

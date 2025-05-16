@@ -14,6 +14,14 @@ const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => 
 };
 export default withKlaviyoIos;
 
+const NSE_TARGET_NAME = "NotificationServiceExtension";
+const NSE_EXT_FILES = [
+  "NotificationService.swift",
+  `${NSE_TARGET_NAME}.entitlements`,
+  `${NSE_TARGET_NAME}-Info.plist`
+];
+const appGroupName = `group.$(PRODUCT_BUNDLE_IDENTIFIER).${NSE_TARGET_NAME}.shared`;
+
 // plugin to enable remote notifications
 const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosConfig> = (
   config,
@@ -21,7 +29,7 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosConfig> =
 ) => {
   return withInfoPlist(config, (config) => {
     const infoPlist = config.modResults;
-    infoPlist.klaviyo_app_group = "group.com.klaviyo.expoexample.shared";
+    infoPlist.klaviyo_app_group = appGroupName;
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing ?? true;
     return config;
   });
@@ -53,13 +61,7 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosConfig> = (config) => {
   ]);
 }
 
-export const NSE_TARGET_NAME = "NotificationServiceExtension";
-export const NSE_EXT_FILES = [
-  "NotificationService.swift",
-  `${NSE_TARGET_NAME}.entitlements`,
-  `${NSE_TARGET_NAME}-Info.plist`
-];
-
+// plugin to add the Notification Service Extension target
 const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => {
   return withXcodeProject(config, async (config) => {
     const xcodeProject = config.modResults;
@@ -68,14 +70,14 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosConfig> = (config, p
       return config;
     }
 
-    // Create the NSE group
+    // create the NSE group
     const extGroup = xcodeProject.addPbxGroup(
       NSE_EXT_FILES,
       NSE_TARGET_NAME, 
       NSE_TARGET_NAME
     );
 
-    // Add the group to the main group
+    // add the group to the main group
     const groups = xcodeProject.hash.project.objects["PBXGroup"];
     Object.keys(groups).forEach(function(key) {
       if (typeof groups[key] === "object" && groups[key].name === undefined && groups[key].path === undefined) {
@@ -83,12 +85,11 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosConfig> = (config, p
       }
     });
     
-    // WORK AROUND for codeProject.addTarget BUG
     const projObjects = config.modResults.hash.project.objects;
     projObjects['PBXTargetDependency'] = projObjects['PBXTargetDependency'] || {};
     projObjects['PBXContainerItemProxy'] = projObjects['PBXTargetDependency'] || {};
 
-    // Add the NSE target
+    // add the NSE target
     const parentBundleId = config.ios?.bundleIdentifier || props.bundleIdentifier;
     if (!parentBundleId) {
       throw new Error('Parent app bundle identifier is required');
@@ -125,13 +126,14 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosConfig> = (config, p
     for (const key in configurations) {
       if (typeof configurations[key].buildSettings !== "undefined") {
         const buildSettingsObj = configurations[key].buildSettings;
+        buildSettingsObj.DEVELOPMENT_TEAM = props.developmentTeam;
+        buildSettingsObj.CODE_SIGN_STYLE = "Automatic";
         buildSettingsObj.CURRENT_PROJECT_VERSION = "1";
         buildSettingsObj.MARKETING_VERSION = "1.0";
+        buildSettingsObj.SWIFT_VERSION = "5.0";
         
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
           buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
-          buildSettingsObj.SWIFT_VERSION = "5.0";
-          buildSettingsObj.CODE_SIGN_STYLE = "Automatic";
         }
       }
     }
@@ -171,14 +173,13 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosConfig> = (config) => {
 
 // plugin to add app group to target entitlements
 const withKlaviyoAppGroup: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => {
-  let iosPushStoryAppGroup = "group.com.klaviyo.expoexample.shared";
   return withEntitlementsPlist(config, (config) => {
     const appGroupsKey = 'com.apple.security.application-groups';
       const existingAppGroups = config.modResults[appGroupsKey];
-      if (Array.isArray(existingAppGroups) && !existingAppGroups.includes(iosPushStoryAppGroup)) {
-        config.modResults[appGroupsKey] = existingAppGroups.concat([iosPushStoryAppGroup]);
+      if (Array.isArray(existingAppGroups) && !existingAppGroups.includes(appGroupName)) {
+        config.modResults[appGroupsKey] = existingAppGroups.concat([appGroupName]);
       } else {
-        config.modResults[appGroupsKey] = [iosPushStoryAppGroup];
+        config.modResults[appGroupsKey] = [appGroupName];
       }
     return config;
   });

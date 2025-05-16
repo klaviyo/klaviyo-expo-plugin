@@ -10,9 +10,9 @@
         <string>$(PRODUCT_MODULE_NAME).NotificationService</string>
     </dict>
 	<key>klaviyo_app_group</key>
-	<string>group.com.klaviyo.expoexample.shared</string>
+	<string>group.$(PRODUCT_BUNDLE_IDENTIFIER).shared</string>
     <key>CFBundleIdentifier</key>
-    <string>com.klaviyo.expoexample.NotificationServiceExtension</string>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER).NotificationServiceExtension</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>CFBundleShortVersionString</key>
