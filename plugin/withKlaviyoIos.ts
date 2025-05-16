@@ -126,7 +126,6 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosConfig> = (config, p
     for (const key in configurations) {
       if (typeof configurations[key].buildSettings !== "undefined") {
         const buildSettingsObj = configurations[key].buildSettings;
-        buildSettingsObj.DEVELOPMENT_TEAM = props.developmentTeam;
         buildSettingsObj.CODE_SIGN_STYLE = "Automatic";
         buildSettingsObj.CURRENT_PROJECT_VERSION = "1";
         buildSettingsObj.MARKETING_VERSION = "1.0";
