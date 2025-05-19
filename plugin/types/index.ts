@@ -1,6 +1,8 @@
 export interface KlaviyoPluginAndroidConfig {
   logLevel?: number;
   openTracking?: boolean;
+  notificationIconFilePath?: string;
+  notificationColor?: string;
 }
 
 export interface KlaviyoPluginIosConfig {
@@ -19,6 +21,8 @@ export interface KlaviyoPluginConfig {
 interface KlaviyoPluginAndroidProps extends KlaviyoPluginAndroidConfig {
   logLevel: number;
   openTracking: boolean;
+  notificationIconFilePath: string | undefined;
+  notificationColor: string | undefined;
 }
 
 interface KlaviyoPluginIosProps extends KlaviyoPluginIosConfig {
@@ -33,7 +37,9 @@ interface KlaviyoPluginProps extends KlaviyoPluginConfig {
 const DEFAULTS: KlaviyoPluginProps = {
   android: {
     logLevel: 1,
-    openTracking: true
+    openTracking: true,
+    notificationIconFilePath: undefined,
+    notificationColor: undefined
   },
   ios: {
     badgeAutoclearing: true,
