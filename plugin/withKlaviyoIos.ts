@@ -6,7 +6,7 @@ import * as path from 'path';
 /**
  * Adds klaviyo-plugin-configuration.plist to the iOS project and includes it in the app bundle.
  */
-export const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
+const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
   return withXcodeProject(config, async (config) => {
     const xcodeProject = config.modResults;
     const projectName = config.modRequest.projectName || config.name;
