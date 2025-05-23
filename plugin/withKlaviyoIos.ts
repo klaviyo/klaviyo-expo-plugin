@@ -249,10 +249,10 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosConfig> = (config, p
     for (const key in configurations) {
       if (typeof configurations[key].buildSettings !== "undefined") {
         const buildSettingsObj = configurations[key].buildSettings;
-        buildSettingsObj.CODE_SIGN_STYLE = "Automatic";
-        buildSettingsObj.CURRENT_PROJECT_VERSION = "1";
-        buildSettingsObj.MARKETING_VERSION = "1.0";
-        buildSettingsObj.SWIFT_VERSION = "5.0";
+        buildSettingsObj.CODE_SIGN_STYLE = props.codeSigningStyle;
+        buildSettingsObj.CURRENT_PROJECT_VERSION = props.projectVersion;
+        buildSettingsObj.MARKETING_VERSION = props.marketingVersion;
+        buildSettingsObj.SWIFT_VERSION = props.swiftVersion;
         
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
           buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
