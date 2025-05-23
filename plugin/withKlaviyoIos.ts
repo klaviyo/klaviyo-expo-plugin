@@ -1,7 +1,34 @@
-import { ConfigPlugin, withXcodeProject } from '@expo/config-plugins';
+import { ConfigPlugin, withDangerousMod, withEntitlementsPlist, withInfoPlist, withXcodeProject } from '@expo/config-plugins';
 import { KlaviyoPluginIosConfig } from './types';
-import * as fs from 'fs';
 import * as path from 'path';
+import * as fs from 'fs';
+import { FileManager } from './support/fileManager';
+
+const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => {
+  console.log('🔄 Starting iOS plugin configuration...');
+  console.log('📝 Plugin props:', JSON.stringify(props, null, 2));
+
+  config = withKlaviyoPluginConfigurationPlist(config);
+  console.log('✅ Plist configured');
+
+  config = withRemoteNotificationsPermissions(config, props);
+  console.log('✅ Remote notifications permissions set up');
+
+  config = withKlaviyoPodfile(config, props);
+  console.log('✅ Klaviyo Podfile modifications complete');
+
+  config = withKlaviyoXcodeProject(config, props);
+  console.log('✅ Notification Service Extension target added');
+  
+  config = withKlaviyoNSE(config, props);
+  console.log('✅ Notification Service Extension target setup with Klaviyo files');
+
+  config = withKlaviyoAppGroup(config, props);
+  console.log('✅ App group configured');
+
+  return config;
+};
+export default withKlaviyoIos;
 
 /**
  * Adds klaviyo-plugin-configuration.plist to the iOS project and includes it in the app bundle.
@@ -11,7 +38,7 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
     const xcodeProject = config.modResults;
     const projectName = config.modRequest.projectName || config.name;
     if (!projectName) {
-      throw new Error('Could not determine project name for iOS build');
+      throw new Error('⚠️ Could not determine project name for iOS build');
     }
 
     // Get the plugin's root directory, accounting for the dist folder
@@ -29,7 +56,6 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
       console.log(`✅ Copied klaviyo-plugin-configuration.plist to ${destPlistPath}`);
 
       // Get the main group
-      const mainGroup = xcodeProject.getFirstProject().firstProject.mainGroup;
       const mainGroupId = xcodeProject.findPBXGroupKey({ name: projectName });
       
       if (!mainGroupId) {
@@ -104,9 +130,182 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
   });
 };
 
-const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => {
-  config = withKlaviyoPluginConfigurationPlist(config);
-  return config;
+const NSE_TARGET_NAME = "NotificationServiceExtension";
+const NSE_EXT_FILES = [
+  "NotificationService.swift",
+  `${NSE_TARGET_NAME}.entitlements`,
+  `${NSE_TARGET_NAME}-Info.plist`
+];
+const appGroupName = `group.$(PRODUCT_BUNDLE_IDENTIFIER).${NSE_TARGET_NAME}.shared`;
+
+/**
+ * Adds remote notifications permissions and other associated values in the plist.
+ */
+const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosConfig> = (
+  config,
+  props
+) => {
+  return withInfoPlist(config, (config) => {
+    const infoPlist = config.modResults;
+    infoPlist.klaviyo_app_group = appGroupName;
+    infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
+    return config;
+  });
 };
 
-export default withKlaviyoIos; 
+/**
+ * Adds necessary Klaviyo pods to the Podfile setup.
+ */
+const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosConfig> = (config) => {
+  return withDangerousMod(config, [
+    'ios',
+    async config => {
+      const iosRoot = path.join(config.modRequest.projectRoot, "ios");
+      const podInsertion = `
+  target 'NotificationServiceExtension' do
+    pod 'KlaviyoSwiftExtension'
+  end
+  `;
+      try {
+        const podfile = await FileManager.readFile(`${iosRoot}/Podfile`);
+        if (!podfile.includes("pod 'KlaviyoSwiftExtension'")) {
+          const updatedPodfile = `${podfile}\n${podInsertion}`;
+          await FileManager.writeFile(`${iosRoot}/Podfile`, updatedPodfile);
+        }
+      } catch (err) {
+        console.log('⚠️ Could not write Klaviyo changes to Podfile:', err);
+      }
+      
+      return config;
+    },
+  ]);
+}
+
+/**
+ * Adds the Notification Service Extension target and build phases.
+ */
+const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => {
+  return withXcodeProject(config, async (config) => {
+    const xcodeProject = config.modResults;
+    if (!!xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
+      console.log(`⚠️ ${NSE_TARGET_NAME} already exists in project. Skipping...`);
+      return config;
+    }
+
+    // create the NSE group
+    const extGroup = xcodeProject.addPbxGroup(
+      NSE_EXT_FILES,
+      NSE_TARGET_NAME, 
+      NSE_TARGET_NAME
+    );
+
+    // add the group to the main group
+    const groups = xcodeProject.hash.project.objects["PBXGroup"];
+    Object.keys(groups).forEach(function(key) {
+      if (typeof groups[key] === "object" && groups[key].name === undefined && groups[key].path === undefined) {
+        xcodeProject.addToPbxGroup(extGroup.uuid, key);
+      }
+    });
+    
+    const projObjects = config.modResults.hash.project.objects;
+    projObjects['PBXTargetDependency'] = projObjects['PBXTargetDependency'] || {};
+    projObjects['PBXContainerItemProxy'] = projObjects['PBXTargetDependency'] || {};
+
+    // add the NSE target
+    const parentBundleId = config.ios?.bundleIdentifier;
+    if (!parentBundleId) {
+      throw new Error('⚠️ Parent app bundle identifier is required');
+    }
+    const nseBundleId = `${parentBundleId}.${NSE_TARGET_NAME}`;
+    const nseTarget = xcodeProject.addTarget(
+      NSE_TARGET_NAME,
+      "app_extension", 
+      NSE_TARGET_NAME, 
+      nseBundleId
+    );
+
+    xcodeProject.addBuildPhase(
+      ["NotificationService.swift"],
+      "PBXSourcesBuildPhase",
+      "Sources",
+      nseTarget.uuid
+    );
+    xcodeProject.addBuildPhase(
+      [], 
+      "PBXResourcesBuildPhase", 
+      "Resources", 
+      nseTarget.uuid
+    );
+
+    xcodeProject.addBuildPhase(
+      [],
+      "PBXFrameworksBuildPhase",
+      "Frameworks",
+      nseTarget.uuid
+    );
+    
+    const configurations = xcodeProject.pbxXCBuildConfigurationSection();
+    for (const key in configurations) {
+      if (typeof configurations[key].buildSettings !== "undefined") {
+        const buildSettingsObj = configurations[key].buildSettings;
+        buildSettingsObj.CODE_SIGN_STYLE = props.codeSigningStyle;
+        buildSettingsObj.CURRENT_PROJECT_VERSION = props.projectVersion;
+        buildSettingsObj.MARKETING_VERSION = props.marketingVersion;
+        buildSettingsObj.SWIFT_VERSION = props.swiftVersion;
+        
+        if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
+          buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
+        }
+      }
+    }
+
+    return config;
+  });
+};
+
+/**
+ * Adds the Klaviyo files to the NotificationServiceExtension target.
+ */
+const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosConfig> = (config) => {
+  return withDangerousMod(config, [
+    'ios',
+    async config => {
+      const iosRoot = path.join(config.modRequest.projectRoot, "ios");
+      const nsePath = path.join(iosRoot, NSE_TARGET_NAME);
+      
+      if (!FileManager.dirExists(nsePath)) {
+        fs.mkdirSync(nsePath, { recursive: true });
+      }
+      const sourceDir = path.join(config.modRequest.projectRoot, "..", NSE_TARGET_NAME);
+      for (const file of NSE_EXT_FILES) {
+        try {
+          await FileManager.copyFile(
+            path.join(sourceDir, file),
+            path.join(nsePath, file)
+          );
+        } catch (error) {
+          console.error(`⚠️ Failed to copy ${file}:`, error);
+          throw error;
+        }
+      }
+
+      return config;
+    },
+  ]);
+};
+
+/**
+ * Adds the app group to target entitlements.
+ */
+const withKlaviyoAppGroup: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => {
+  return withEntitlementsPlist(config, (config) => {
+    const appGroupsKey = 'com.apple.security.application-groups';
+      const existingAppGroups = config.modResults[appGroupsKey];
+      if (Array.isArray(existingAppGroups) && !existingAppGroups.includes(appGroupName)) {
+        config.modResults[appGroupsKey] = existingAppGroups.concat([appGroupName]);
+      } else {
+        config.modResults[appGroupsKey] = [appGroupName];
+      }
+    return config;
+  });
+};

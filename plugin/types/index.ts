@@ -4,7 +4,11 @@ export interface KlaviyoPluginAndroidConfig {
 }
 
 export interface KlaviyoPluginIosConfig {
-  // Add any iOS-specific configuration here
+  badgeAutoclearing: boolean;
+  codeSigningStyle: string;
+  projectVersion: string;
+  marketingVersion: string;
+  swiftVersion: string;
 }
 
 export interface KlaviyoPluginConfig {
@@ -32,7 +36,11 @@ const DEFAULTS: KlaviyoPluginProps = {
     openTracking: true
   },
   ios: {
-    // Add any iOS-specific defaults here
+    badgeAutoclearing: true,
+    codeSigningStyle: "Automatic",
+    projectVersion: "1",
+    marketingVersion: "1.0",
+    swiftVersion: "5.0"
   }
 };
 
