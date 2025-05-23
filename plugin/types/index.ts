@@ -6,7 +6,7 @@ export interface KlaviyoPluginAndroidConfig {
 export interface KlaviyoPluginIosConfig {
   // Add any iOS-specific configuration here
   bundleIdentifier?: string;
-  badgeAutoclearing?: boolean;
+  badgeAutoclearing: boolean;
 }
 
 export interface KlaviyoPluginConfig {
@@ -23,7 +23,7 @@ interface KlaviyoPluginIosProps extends KlaviyoPluginIosConfig {
   // Add any iOS-specific configuration here
 }
 
-export interface KlaviyoPluginProps extends KlaviyoPluginConfig {
+interface KlaviyoPluginProps extends KlaviyoPluginConfig {
   android: KlaviyoPluginAndroidProps;
   ios: KlaviyoPluginIosProps;
 }
