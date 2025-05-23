@@ -213,7 +213,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosConfig> = (config, p
     projObjects['PBXContainerItemProxy'] = projObjects['PBXTargetDependency'] || {};
 
     // add the NSE target
-    const parentBundleId = config.ios?.bundleIdentifier || props.bundleIdentifier;
+    const parentBundleId = config.ios?.bundleIdentifier;
     if (!parentBundleId) {
       throw new Error('Parent app bundle identifier is required');
     }
