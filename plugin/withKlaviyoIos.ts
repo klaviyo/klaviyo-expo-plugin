@@ -38,7 +38,7 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
     const xcodeProject = config.modResults;
     const projectName = config.modRequest.projectName || config.name;
     if (!projectName) {
-      throw new Error('Could not determine project name for iOS build');
+      throw new Error('⚠️ Could not determine project name for iOS build');
     }
 
     // Get the plugin's root directory, accounting for the dist folder
@@ -56,7 +56,6 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
       console.log(`✅ Copied klaviyo-plugin-configuration.plist to ${destPlistPath}`);
 
       // Get the main group
-      const mainGroup = xcodeProject.getFirstProject().firstProject.mainGroup;
       const mainGroupId = xcodeProject.findPBXGroupKey({ name: projectName });
       
       if (!mainGroupId) {
@@ -174,7 +173,7 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosConfig> = (config) => {
           await FileManager.writeFile(`${iosRoot}/Podfile`, updatedPodfile);
         }
       } catch (err) {
-        console.log("⚠️ Could not write Klaviyo changes to Podfile:", err);
+        console.log('⚠️ Could not write Klaviyo changes to Podfile:', err);
       }
       
       return config;
@@ -189,7 +188,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosConfig> = (config, p
   return withXcodeProject(config, async (config) => {
     const xcodeProject = config.modResults;
     if (!!xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
-      console.log(NSE_TARGET_NAME + " already exists in project. Skipping...");
+      console.log(`⚠️ ${NSE_TARGET_NAME} already exists in project. Skipping...`);
       return config;
     }
 
@@ -215,7 +214,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosConfig> = (config, p
     // add the NSE target
     const parentBundleId = config.ios?.bundleIdentifier;
     if (!parentBundleId) {
-      throw new Error('Parent app bundle identifier is required');
+      throw new Error('⚠️ Parent app bundle identifier is required');
     }
     const nseBundleId = `${parentBundleId}.${NSE_TARGET_NAME}`;
     const nseTarget = xcodeProject.addTarget(
@@ -285,7 +284,7 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosConfig> = (config) => {
             path.join(nsePath, file)
           );
         } catch (error) {
-          console.error(`Failed to copy ${file}:`, error);
+          console.error(`⚠️ Failed to copy ${file}:`, error);
           throw error;
         }
       }
