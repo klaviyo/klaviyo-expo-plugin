@@ -4,10 +4,11 @@ import * as path from 'path';
 import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
 import { getMainActivityAsync } from '@expo/config-plugins/build/android/Paths';
 import * as glob from 'glob';
-import { KlaviyoPluginAndroidConfig } from './types';
+import { KlaviyoPluginAndroidProps } from './types';
+import * as xml2js from 'xml2js';
 
 
-const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidConfig> = (config, props) => {
+const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withAndroidManifest(config, (config) => {
     console.log('🔄 Modifying Android Manifest...');
     const androidManifest = config.modResults.manifest;
@@ -119,7 +120,7 @@ const findMainActivity = async (projectRoot: string): Promise<string | null> => 
   return null;
 };
 
-const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidConfig> = (config, props) => {
+const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withDangerousMod(config, [
     'android',
     async (config) => {
@@ -251,17 +252,31 @@ const createColorResource = async (config: any, color: string) => {
   }
 
   const colorsXmlPath = path.join(colorsDir, 'colors.xml');
-  let colorsXml = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n';
-  
-  // Add our notification color
-  colorsXml += `    <color name="klaviyo_notification_color">${color}</color>\n`;
-  colorsXml += '</resources>';
+  let colorsObj: any = { resources: { color: [] } };
 
-  fs.writeFileSync(colorsXmlPath, colorsXml);
-  console.log('✅ Created colors.xml with notification color');
+  if (fs.existsSync(colorsXmlPath)) {
+    const xml = fs.readFileSync(colorsXmlPath, 'utf-8');
+    const parsed = await xml2js.parseStringPromise(xml);
+    colorsObj = parsed;
+  }
+
+  // Remove any existing klaviyo_notification_color
+  colorsObj.resources.color = (colorsObj.resources.color || []).filter(
+    (c: any) => c.$.name !== 'klaviyo_notification_color'
+  );
+
+  // Add the new color
+  colorsObj.resources.color.push({ $: { name: 'klaviyo_notification_color' }, _: color });
+
+  // Build XML
+  const builder = new xml2js.Builder();
+  const newXml = builder.buildObject(colorsObj);
+
+  fs.writeFileSync(colorsXmlPath, newXml);
+  console.log('✅ Merged colors.xml with notification color');
 };
 
-const withNotificationResources: ConfigPlugin<KlaviyoPluginAndroidConfig> = (config, props) => {
+const withNotificationResources: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withDangerousMod(config, [
     'android',
     async (config) => {
@@ -281,7 +296,7 @@ const withNotificationResources: ConfigPlugin<KlaviyoPluginAndroidConfig> = (con
   ]);
 };
 
-const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidConfig> = (config, props) => {
+const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withAndroidManifest(config, (config) => {
     const androidManifest = config.modResults.manifest;
     
@@ -292,25 +307,19 @@ const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidConfig> = (conf
 
     const application = androidManifest.application[0];
     
-    // Ensure meta-data array exists
     if (!application['meta-data']) {
-      console.log('⚠️ No meta-data array found, creating one...');
       application['meta-data'] = [];
     }
 
-    // Log existing meta-data entries
-    console.log('📝 Current meta-data entries:', JSON.stringify(application['meta-data'], null, 2));
-
     // Add notification icon if provided
     if (props.notificationIconFilePath) {
-      console.log('📝 Adding notification icon:', props.notificationIconFilePath);
+      console.log('📝 Adding notification icon meta-data:', props.notificationIconFilePath);
       const iconMetaData = {
         $: {
           'android:name': 'com.klaviyo.push.default_notification_icon',
           'android:resource': '@drawable/notification_icon'
         }
       };
-      // Only add if it doesn't already exist
       const iconExists = application['meta-data'].some(
         (item: any) => item.$['android:name'] === 'com.klaviyo.push.default_notification_icon'
       );
@@ -320,20 +329,17 @@ const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidConfig> = (conf
       } else {
         console.log('📝 Icon meta-data already exists, skipping');
       }
-    } else {
-      console.log('⚠️ No notification icon path provided');
     }
 
     // Add notification color if provided
     if (props.notificationColor) {
-      console.log('📝 Adding notification color:', props.notificationColor);
+      console.log('📝 Adding notification color meta-data:', props.notificationColor);
       const colorMetaData = {
         $: {
           'android:name': 'com.klaviyo.push.default_notification_color',
           'android:resource': '@color/klaviyo_notification_color'
         }
       };
-      // Only add if it doesn't already exist
       const colorExists = application['meta-data'].some(
         (item: any) => item.$['android:name'] === 'com.klaviyo.push.default_notification_color'
       );
@@ -343,18 +349,13 @@ const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidConfig> = (conf
       } else {
         console.log('📝 Color meta-data already exists, skipping');
       }
-    } else {
-      console.log('⚠️ No notification color provided');
     }
 
-    // Log final meta-data entries
-    console.log('📝 Final meta-data entries:', JSON.stringify(application['meta-data'], null, 2));
-    console.log('✅ Notification resources added to Android Manifest');
     return config;
   });
 };
 
-const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidConfig> = (config, props) => {
+const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withDangerousMod(config, [
     'android',
     async (config) => {
@@ -384,7 +385,7 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidConfig> = (config, 
   ]);
 };
 
-const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidConfig> = (config, props) => {
+const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   console.log('🔄 Starting Android plugin configuration...');
   console.log('📝 Plugin props:', JSON.stringify(props, null, 2));
   

@@ -1,10 +1,10 @@
 import { ConfigPlugin, withDangerousMod, withEntitlementsPlist, withInfoPlist, withXcodeProject } from '@expo/config-plugins';
-import { KlaviyoPluginIosConfig } from './types';
+import { KlaviyoPluginIosProps } from './types';
 import * as path from 'path';
 import * as fs from 'fs';
 import { FileManager } from './support/fileManager';
 
-const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => {
+const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   console.log('🔄 Starting iOS plugin configuration...');
   console.log('📝 Plugin props:', JSON.stringify(props, null, 2));
 
@@ -141,7 +141,7 @@ const appGroupName = `group.$(PRODUCT_BUNDLE_IDENTIFIER).${NSE_TARGET_NAME}.shar
 /**
  * Adds remote notifications permissions and other associated values in the plist.
  */
-const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosConfig> = (
+const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = (
   config,
   props
 ) => {
@@ -156,7 +156,7 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosConfig> =
 /**
  * Adds necessary Klaviyo pods to the Podfile setup.
  */
-const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosConfig> = (config) => {
+const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
   return withDangerousMod(config, [
     'ios',
     async config => {
@@ -184,7 +184,7 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosConfig> = (config) => {
 /**
  * Adds the Notification Service Extension target and build phases.
  */
-const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => {
+const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withXcodeProject(config, async (config) => {
     const xcodeProject = config.modResults;
     if (!!xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
@@ -266,7 +266,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosConfig> = (config, p
 /**
  * Adds the Klaviyo files to the NotificationServiceExtension target.
  */
-const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosConfig> = (config) => {
+const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
   return withDangerousMod(config, [
     'ios',
     async config => {
@@ -297,7 +297,7 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosConfig> = (config) => {
 /**
  * Adds the app group to target entitlements.
  */
-const withKlaviyoAppGroup: ConfigPlugin<KlaviyoPluginIosConfig> = (config, props) => {
+const withKlaviyoAppGroup: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withEntitlementsPlist(config, (config) => {
     const appGroupsKey = 'com.apple.security.application-groups';
       const existingAppGroups = config.modResults[appGroupsKey];

@@ -40,18 +40,11 @@
             "logLevel": 1,
             "openTracking": false,
             "notificationIconFilePath": "./assets/images/ic_notification.png",
-            "notificationColor": "#0000FF"
+            "notificationColor": "#FF0000"
           },
           "ios": {
             "badgeAutoclearing": true
           }
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/images/notification-icon.png",
-          "color": "#ffffff"
         }
       ]
     ],
