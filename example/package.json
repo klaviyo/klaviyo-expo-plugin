@@ -8,7 +8,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest --watchAll",
-    "reset-all": "rm -rf node_modules package-lock.json && npm install && cd .. && rm -rf node_modules package-lock.json && npm install",
+    "reset-all": "cd .. && rm -rf node_modules package-lock.json && npm install && cd example && rm -rf node_modules package-lock.json && npm install",
     "clean-android": "cd .. && npm run build && cd example && rm -rf android && npx expo prebuild --clean --platform android && npx expo run:android",
     "clean-ios": "cd .. && npm run build && cd example && rm -rf ios && npx expo prebuild --clean --platform ios && npx expo run:ios"
   },
