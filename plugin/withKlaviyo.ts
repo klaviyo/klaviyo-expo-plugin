@@ -1,11 +1,11 @@
 import { ConfigPlugin } from '@expo/config-plugins';
 import withKlaviyoAndroid from './withKlaviyoAndroid';
 import withKlaviyoIos from './withKlaviyoIos';
-import { KlaviyoPluginConfig, mergeConfig } from './types';
+import { KlaviyoPluginProps, mergeProps } from './types';
 
-const withKlaviyo: ConfigPlugin<KlaviyoPluginConfig> = (config, props) => {
+const withKlaviyo: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
   console.log('🔄 Klaviyo Expo Plugin: Running prebuild configuration...');
-  const mergedProps = mergeConfig(config as KlaviyoPluginConfig);
+  const mergedProps = mergeProps(props);
   // Apply iOS configuration
   config = withKlaviyoIos(config, mergedProps.ios);
   

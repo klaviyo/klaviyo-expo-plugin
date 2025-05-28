@@ -1,9 +1,11 @@
-export interface KlaviyoPluginAndroidConfig {
+export interface KlaviyoPluginAndroidBaseProps {
   logLevel?: number;
   openTracking?: boolean;
+  notificationIconFilePath?: string;
+  notificationColor?: string;
 }
 
-export interface KlaviyoPluginIosConfig {
+export interface KlaviyoPluginIosBaseProps  {
   badgeAutoclearing: boolean;
   codeSigningStyle: string;
   projectVersion: string;
@@ -11,29 +13,33 @@ export interface KlaviyoPluginIosConfig {
   swiftVersion: string;
 }
 
-export interface KlaviyoPluginConfig {
-  android?: KlaviyoPluginAndroidConfig;
-  ios?: KlaviyoPluginIosConfig;
+export interface KlaviyoPluginProps {
+  android?: KlaviyoPluginAndroidBaseProps;
+  ios?: KlaviyoPluginIosBaseProps;
 }
 
-interface KlaviyoPluginAndroidProps extends KlaviyoPluginAndroidConfig {
+export interface KlaviyoPluginAndroidProps extends KlaviyoPluginAndroidBaseProps {
   logLevel: number;
   openTracking: boolean;
+  notificationIconFilePath: string | undefined;
+  notificationColor: string | undefined;
 }
 
-interface KlaviyoPluginIosProps extends KlaviyoPluginIosConfig {
+export interface KlaviyoPluginIosProps extends KlaviyoPluginIosBaseProps {
   // Add any iOS-specific configuration here
 }
 
-interface KlaviyoPluginProps extends KlaviyoPluginConfig {
+export interface KlaviyoPluginPropsDefaultValues extends KlaviyoPluginProps {
   android: KlaviyoPluginAndroidProps;
   ios: KlaviyoPluginIosProps;
 }
 
-const DEFAULTS: KlaviyoPluginProps = {
+const DEFAULTS: KlaviyoPluginPropsDefaultValues = {
   android: {
     logLevel: 1,
-    openTracking: true
+    openTracking: true,
+    notificationIconFilePath: undefined,
+    notificationColor: undefined
   },
   ios: {
     badgeAutoclearing: true,
@@ -44,9 +50,9 @@ const DEFAULTS: KlaviyoPluginProps = {
   }
 };
 
-export const mergeConfig = (config: KlaviyoPluginConfig): KlaviyoPluginProps => {
+export const mergeProps = (props: KlaviyoPluginProps): KlaviyoPluginPropsDefaultValues => {
   return {
-    android: { ...DEFAULTS.android, ...(config.android ?? {}) },
-    ios: { ...DEFAULTS.ios, ...(config.ios ?? {}) }
+    android: { ...DEFAULTS.android, ...(props.android ?? {}) },
+    ios: { ...DEFAULTS.ios, ...(props.ios ?? {}) }
   };
 };
