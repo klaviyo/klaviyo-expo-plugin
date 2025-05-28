@@ -1,32 +1,35 @@
 import ExpoModulesCore
 import KlaviyoSwift
 
-public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber {
-  public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-    return true
-  }
-
-  public func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-  }
-
-  public func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-  }
-
-  public func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-  }
+public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotificationCenterDelegate {
+    public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
     
-    public func applicationDidBecomeActive(_ application: UIApplication) {
+    public func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+    }
+    
+    public func application(_ application)
+    
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void) {
+        let handled = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: completionHandler)
+        if !handled {
+            completionHandler()
+        }
     }
 
-    public func applicationWillResignActive(_ application: UIApplication) {
-    }
-
-    public func applicationDidEnterBackground(_ application: UIApplication) {
-    }
-
-    public func applicationWillEnterForeground(_ application: UIApplication) {
-    }
-
-    public func applicationWillTerminate(_ application: UIApplication) {
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        if #available(iOS 14.0, *) {
+            completionHandler([.list, .banner])
+        } else {
+            completionHandler([.alert])
+        }
     }
 }
