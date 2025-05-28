@@ -19,6 +19,7 @@
     "expo-notifications": "~0.29.14",
     "expo-router": "~5.0.6",
     "expo-status-bar": "~2.2.3",
+    "expo-task-manager": "^13.1.5",
     "klaviyo-expo-plugin": "file:../",
     "klaviyo-react-native-sdk": "^1.2.0",
     "react": "19.0.0",

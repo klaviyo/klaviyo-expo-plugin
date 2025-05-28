@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
-      "bundleIdentifier": "com.klaviyo.expoexample"
+      "bundleIdentifier": "com.klaviyo.expoexample",
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -51,6 +54,8 @@
     "experiments": {
       "typedRoutes": true
     },
-    "projectId": "test-push-project-kl"
+    "assetBundlePatterns": [
+      "**/*"
+    ]
   }
 }
