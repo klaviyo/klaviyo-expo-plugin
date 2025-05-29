@@ -1,18 +1,76 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, Platform} from 'react-native';
 import * as Notifications from 'expo-notifications';
+import * as TaskManager from 'expo-task-manager';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 
+const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
+
+// Define the background task
+TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error, executionInfo }) => {
+  console.log('Received a notification in background task!', {
+    data,
+    error,
+    executionInfo
+  });
+
+  if (error) {
+    console.error('Error in background notification task:', error);
+    return;
+  }
+
+  // Store the notification data in global variable for later retrieval
+  if (data) {
+    const notificationData = {
+      ...data,
+      receivedAt: new Date().toISOString(),
+      isBackground: true
+    };
+    // Store in global variable
+    global.lastBackgroundNotification = notificationData;
+    console.log('Stored background notification:', notificationData);
+  }
+});
+
+// Helper function to check for new background notifications
+export const checkForBackgroundNotifications = () => {
+  if (global.lastBackgroundNotification) {
+    console.log('Found background notification:', global.lastBackgroundNotification);
+    return global.lastBackgroundNotification;
+  }
+  return null;
+};
+
 // Configure notification handler
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowInForeground: true,
-  }),
+  handleNotification: async (notification) => {
+    // Check for silent push by looking at content-available in APS payload
+    const isSilentPush = notification.request.content.data?.aps?.contentAvailable === 1;
+    
+    console.log('Notification received:', {
+      isSilentPush,
+      data: notification.request.content.data
+    });
+
+    // For silent notifications, we don't want to show an alert
+    if (isSilentPush) {
+      return {
+        shouldShowAlert: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      };
+    }
+
+    // For regular notifications, show alert and play sound
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowInForeground: true,
+    };
+  },
 });
 
 // Helper function to handle deeplink URLs from notifications
@@ -34,11 +92,17 @@ const handleDeeplink = (notification: Notifications.Notification | Notifications
 export default function AppLayout() {
   
   useEffect(() => {
+    // Register the background task
+    Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
+
     // Foreground notification listener
     console.log('Setting up foreground notification listener');
     const foregroundSubscription = Notifications.addNotificationReceivedListener(notification => {
+      const isSilentPush = notification.request.content.data?.aps?.contentAvailable === 1;
+      
       console.log('Received foreground notification:', JSON.stringify({
         actionIdentifier: 'foreground',
+        isSilentPush,
         notification: {
           request: {
             trigger: notification.request.trigger,
@@ -53,6 +117,14 @@ export default function AppLayout() {
         }
       }, null, 2));
 
+      // Store the notification in the app's state
+      if (isSilentPush) {
+        // Store the notification data globally
+        global.lastBackgroundNotification = {
+          ...notification.request.content.data,
+          receivedAt: new Date().toISOString()
+        };
+      }
     });
 
     // Background/Quit notification listener

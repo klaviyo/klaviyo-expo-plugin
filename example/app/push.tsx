@@ -2,14 +2,43 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Alert, Clipboard, Platform, ScrollView } from 'react-native';
 import { Klaviyo } from 'klaviyo-react-native-sdk';
 import * as Notifications from 'expo-notifications';
+import { useNavigation } from 'expo-router';
+
+// Add type declaration for global variable
+declare global {
+  var lastBackgroundNotification: any;
+}
 
 export default function PushScreen() {
   const [pushPermissionStatus, setPushPermissionStatus] = useState<Notifications.PermissionStatus | null>(null);
   const [pushToken, setPushToken] = useState<string | null>(null);
   const [lastNotification, setLastNotification] = useState<Notifications.Notification | null>(null);
+  const [lastSilentNotification, setLastSilentNotification] = useState<any>(null);
+  const [lastBackgroundNotification, setLastBackgroundNotification] = useState<any>(null);
+  const navigation = useNavigation();
 
   useEffect(() => {
     setupNotifications();
+    
+    // Check for any background notifications that were received
+    if (global.lastBackgroundNotification) {
+      console.log('Found background notification in global:', global.lastBackgroundNotification);
+      setLastBackgroundNotification(global.lastBackgroundNotification);
+    }
+
+    // Add a listener for when the screen comes into focus
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('Push screen focused, checking for background notifications');
+      if (global.lastBackgroundNotification) {
+        console.log('Found background notification on focus:', global.lastBackgroundNotification);
+        setLastBackgroundNotification(global.lastBackgroundNotification);
+      }
+    });
+
+    // Cleanup function
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const setupNotifications = async () => {
@@ -77,6 +106,60 @@ export default function PushScreen() {
     }
   };
 
+  const renderNotificationPayload = (notification: any, type: 'regular' | 'silent' | 'background') => {
+    if (!notification) return null;
+
+    console.log('Rendering notification:', { type, notification });
+
+    const content = notification.request?.content || notification;
+    const data = content.data || {};
+    const isSilent = content.data?.aps?.contentAvailable === 1;
+
+    // Helper function to safely stringify objects
+    const safeStringify = (obj: any) => {
+      try {
+        return JSON.stringify(obj, null, 2);
+      } catch (e) {
+        return String(obj);
+      }
+    };
+
+    return (
+      <View style={styles.notificationContainer}>
+        <Text style={styles.notificationTitle}>
+          {type === 'background' ? 'Last Background Notification:' : 
+           type === 'silent' ? 'Last Silent Push:' : 'Last Notification:'}
+        </Text>
+        {content.title && (
+          <Text style={styles.notificationText}>
+            Title: {content.title}
+          </Text>
+        )}
+        {content.body && (
+          <Text style={styles.notificationText}>
+            Body: {typeof content.body === 'object' ? safeStringify(content.body) : content.body}
+          </Text>
+        )}
+        <Text style={styles.notificationText}>
+          Data: {safeStringify(data)}
+        </Text>
+        {notification.key_value_pairs && (
+          <Text style={styles.notificationText}>
+            Key-Value Pairs: {safeStringify(notification.key_value_pairs)}
+          </Text>
+        )}
+        <Text style={styles.notificationText}>
+          Received: {new Date(notification.receivedAt || notification.date).toLocaleString()}
+        </Text>
+        {type === 'background' && (
+          <Text style={styles.notificationText}>
+            Source: Background Task
+          </Text>
+        )}
+      </View>
+    );
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.section}>
@@ -99,22 +182,9 @@ export default function PushScreen() {
           </Text>
         )}
 
-        {lastNotification && (
-          <View style={styles.notificationContainer}>
-            <Text style={styles.notificationTitle}>Last Notification:</Text>
-            <Text style={styles.notificationText}>
-              Title: {lastNotification.request.content.title}
-            </Text>
-            <Text style={styles.notificationText}>
-              Body: {lastNotification.request.content.body}
-            </Text>
-            {lastNotification.request.content.data && (
-              <Text style={styles.notificationText}>
-                Data: {JSON.stringify(lastNotification.request.content.data)}
-              </Text>
-            )}
-          </View>
-        )}
+        {lastNotification && renderNotificationPayload(lastNotification, 'regular')}
+        {lastSilentNotification && renderNotificationPayload(lastSilentNotification, 'silent')}
+        {lastBackgroundNotification && renderNotificationPayload(lastBackgroundNotification, 'background')}
 
         {
           <>
@@ -240,5 +310,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginBottom: 3,
+    fontFamily: 'monospace',
   },
 }); 
