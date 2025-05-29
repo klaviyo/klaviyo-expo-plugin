@@ -6,7 +6,7 @@ Pod::Spec.new do |s|
   s.name           = 'ExpoKlaviyo'
   s.version        = package['version']
   s.summary        = package['description']
-  s.description    = 'A React Native module for integrating Klaviyo SDK into Expo applications. Provides push notification support and analytics tracking capabilities.'
+  s.description    = package['description']
   s.license        = package['license']
   s.author         = package['author']
   s.homepage       = 'https://github.com/klaviyo/klaviyo-expo-plugin'
@@ -24,7 +24,6 @@ Pod::Spec.new do |s|
   # Swift/Objective-C compatibility
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    # 'SWIFT_COMPILATION_MODE' => 'wholemodule'
   }
 
   if !$ExpoUseSources&.include?(package['name']) && ENV['EXPO_USE_SOURCE'].to_i == 0 && File.exist?("#{s.name}.xcframework") && Gem::Version.new(Pod::VERSION) >= Gem::Version.new('1.10.0')
