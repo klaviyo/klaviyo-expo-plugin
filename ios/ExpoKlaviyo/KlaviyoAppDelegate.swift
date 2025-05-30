@@ -16,9 +16,4 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
             completionHandler()
         }
     }
-    
-    public func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        return RCTLinkingManager.application(app, open: url, options: options)
-    }
-
 }
