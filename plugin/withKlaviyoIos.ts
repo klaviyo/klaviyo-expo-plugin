@@ -163,6 +163,7 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
       const iosRoot = path.join(config.modRequest.projectRoot, "ios");
       const podInsertion = `
   target 'NotificationServiceExtension' do
+    use_frameworks!
     pod 'KlaviyoSwiftExtension'
   end
   `;
@@ -276,7 +277,7 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
       if (!FileManager.dirExists(nsePath)) {
         fs.mkdirSync(nsePath, { recursive: true });
       }
-      const sourceDir = path.join(config.modRequest.projectRoot, "..", NSE_TARGET_NAME);
+      const sourceDir = path.join(config.modRequest.projectRoot, "/node_modules/klaviyo-expo-plugin/", NSE_TARGET_NAME);
       for (const file of NSE_EXT_FILES) {
         try {
           await FileManager.copyFile(
