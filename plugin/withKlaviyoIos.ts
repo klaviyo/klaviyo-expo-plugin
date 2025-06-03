@@ -161,13 +161,27 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
     'ios',
     async config => {
       const iosRoot = path.join(config.modRequest.projectRoot, "ios");
-      const podInsertion = `
+      try {
+        const podfile = await FileManager.readFile(`${iosRoot}/Podfile`);
+        // Check for both standard and linkage-specific use_frameworks!
+        const usesFrameworks = podfile.includes('use_frameworks!');
+        const usesFrameworksWithLinkage = podfile.includes('use_frameworks! :linkage');
+        
+        // Extract the linkage type if it exists
+        let linkageType = '';
+        if (usesFrameworksWithLinkage) {
+          const linkageMatch = podfile.match(/use_frameworks!\s*:linkage\s*=>\s*([^,\n]+)/);
+          if (linkageMatch) {
+            linkageType = linkageMatch[1];
+          }
+        }
+        
+        const podInsertion = `
   target 'NotificationServiceExtension' do
+    ${usesFrameworks ? `use_frameworks!${linkageType ? ` :linkage => ${linkageType}` : ''}` : ''}
     pod 'KlaviyoSwiftExtension'
   end
   `;
-      try {
-        const podfile = await FileManager.readFile(`${iosRoot}/Podfile`);
         if (!podfile.includes("pod 'KlaviyoSwiftExtension'")) {
           const updatedPodfile = `${podfile}\n${podInsertion}`;
           await FileManager.writeFile(`${iosRoot}/Podfile`, updatedPodfile);
@@ -276,7 +290,7 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
       if (!FileManager.dirExists(nsePath)) {
         fs.mkdirSync(nsePath, { recursive: true });
       }
-      const sourceDir = path.join(config.modRequest.projectRoot, "..", NSE_TARGET_NAME);
+      const sourceDir = path.join(config.modRequest.projectRoot, "/node_modules/klaviyo-expo-plugin/", NSE_TARGET_NAME);
       for (const file of NSE_EXT_FILES) {
         try {
           await FileManager.copyFile(
