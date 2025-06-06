@@ -34,25 +34,32 @@ export interface KlaviyoPluginPropsDefaultValues extends KlaviyoPluginProps {
   ios: KlaviyoPluginIosProps;
 }
 
-const DEFAULTS: KlaviyoPluginPropsDefaultValues = {
-  android: {
-    logLevel: 1,
-    openTracking: true,
-    notificationIconFilePath: undefined,
-    notificationColor: undefined
-  },
-  ios: {
-    badgeAutoclearing: true,
-    codeSigningStyle: "Automatic",
-    projectVersion: "1",
-    marketingVersion: "1.0",
-    swiftVersion: "5.0"
-  }
+const ANDROID_DEFAULTS: KlaviyoPluginAndroidProps = {
+  logLevel: 1,
+  openTracking: true,
+  notificationIconFilePath: undefined,
+  notificationColor: undefined
+};
+
+const IOS_DEFAULTS: KlaviyoPluginIosProps = {
+  badgeAutoclearing: true,
+  codeSigningStyle: "Automatic",
+  projectVersion: "1",
+  marketingVersion: "1.0",
+  swiftVersion: "5.0"
+};
+
+export const mergeAndroidProps = (props?: KlaviyoPluginAndroidBaseProps): KlaviyoPluginAndroidProps => {
+  return { ...ANDROID_DEFAULTS, ...(props ?? {}) };
+};
+
+export const mergeIosProps = (props?: KlaviyoPluginIosBaseProps): KlaviyoPluginIosProps => {
+  return { ...IOS_DEFAULTS, ...(props ?? {}) };
 };
 
 export const mergeProps = (props: KlaviyoPluginProps): KlaviyoPluginPropsDefaultValues => {
   return {
-    android: { ...DEFAULTS.android, ...(props.android ?? {}) },
-    ios: { ...DEFAULTS.ios, ...(props.ios ?? {}) }
+    android: mergeAndroidProps(props.android),
+    ios: mergeIosProps(props.ios)
   };
 };
