@@ -7,12 +7,12 @@
         <key>NSExtensionPointIdentifier</key>
         <string>com.apple.usernotifications.service</string>
         <key>NSExtensionPrincipalClass</key>
-        <string>$(PRODUCT_MODULE_NAME).NotificationService</string>
+        <string>$(PRODUCT_MODULE_NAME).KlaviyoNotificationService</string>
     </dict>
 	<key>klaviyo_app_group</key>
 	<string>group.$(PRODUCT_BUNDLE_IDENTIFIER).shared</string>
     <key>CFBundleIdentifier</key>
-    <string>$(PRODUCT_BUNDLE_IDENTIFIER).NotificationServiceExtension</string>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER).KlaviyoNotificationServiceExtension</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>CFBundleShortVersionString</key>
