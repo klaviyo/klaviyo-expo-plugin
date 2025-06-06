@@ -1,7 +1,7 @@
 import UserNotifications
 import KlaviyoSwiftExtension
 
-class NotificationService: UNNotificationServiceExtension {
+class KlaviyoNotificationService: UNNotificationServiceExtension {
     var request: UNNotificationRequest!
     var contentHandler: ((UNNotificationContent) -> Void)?
     var bestAttemptContent: UNMutableNotificationContent?

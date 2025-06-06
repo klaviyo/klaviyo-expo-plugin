@@ -130,9 +130,9 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
   });
 };
 
-const NSE_TARGET_NAME = "NotificationServiceExtension";
+const NSE_TARGET_NAME = "KlaviyoNotificationServiceExtension";
 const NSE_EXT_FILES = [
-  "NotificationService.swift",
+  "KlaviyoNotificationService.swift",
   `${NSE_TARGET_NAME}.entitlements`,
   `${NSE_TARGET_NAME}-Info.plist`
 ];
@@ -177,7 +177,7 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
         }
         
         const podInsertion = `
-  target 'NotificationServiceExtension' do
+  target 'KlaviyoNotificationServiceExtension' do
     ${usesFrameworks ? `use_frameworks!${linkageType ? ` :linkage => ${linkageType}` : ''}` : ''}
     pod 'KlaviyoSwiftExtension'
   end
@@ -239,7 +239,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
     );
 
     xcodeProject.addBuildPhase(
-      ["NotificationService.swift"],
+      ["KlaviyoNotificationService.swift"],
       "PBXSourcesBuildPhase",
       "Sources",
       nseTarget.uuid
