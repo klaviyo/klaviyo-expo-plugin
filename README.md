@@ -271,12 +271,8 @@ Common issues and solutions:
    - Verify Expo SDK version compatibility
    - Check native dependencies
 
-## Contributing
-
-We welcome contributions! Please see our [contributing guide](.github/CONTRIBUTING.md) for details.
-
 ## License
 
-The Klaviyo Expo Plugin is available under the terms of the MIT license. @Ajay how do we write this license?
+The Klaviyo Expo Plugin is available under the terms of the [MIT license](LICENSE). 
 
 
