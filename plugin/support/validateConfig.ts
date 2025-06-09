@@ -74,7 +74,12 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
   }
 
   // Validate swiftVersion
-  if (config.swiftVersion && !/^\d+\.\d+$/.test(config.swiftVersion)) {
-    throw new KlaviyoConfigError('iOS swiftVersion must be in format "X.Y"');
+  if (config.swiftVersion) {
+    const allowedSwiftVersions = ['4.0', '4.2', '5.0', '6.0'];
+    if (!allowedSwiftVersions.includes(String(config.swiftVersion))) {
+      throw new KlaviyoConfigError(
+        `iOS swiftVersion must be one of: ${allowedSwiftVersions.join(', ')}`
+      );
+    }
   }
 };
