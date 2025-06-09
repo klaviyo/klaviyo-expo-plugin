@@ -40,8 +40,9 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 - Push notification handling
 - Deep linking configuration
 - Badge count management
-- Notification service extensions
+- Notification service extension
 - Icon / color notification configuration
+- Rich push support
 
 ## Requirements
 
@@ -56,7 +57,6 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 ### iOS
 - Minimum Deployment Target `13.0+`
 - Apple Push Notification Service (APNs) set up
-- App Groups capability for rich push notifications
 
 ## Expo Config Dependencies
 
@@ -92,8 +92,8 @@ The plugin will modify the following native properties:
 - Updates `strings.xml` with plugin metadata
 
 #### iOS
-- Adds notification service extension target
-- Configures app groups for rich push
+- Adds notification service extension target for rich push and badge count
+- Configures app groups for badge count support
 - Updates `Info.plist` with notification permissions
 - Modifies `AppDelegate` for push handling
 - Adds Klaviyo configuration plist
@@ -126,7 +126,11 @@ npx expo install klaviyo-expo-plugin
             "notificationColor": "#FF0000" // hex code format
           },
           "ios": {
-            "badgeAutoclearing": true
+            "badgeAutoclearing": true,
+            "codeSigningStyle": "Automatic",
+            "projectVersion": "1",
+            "marketingVersion": "1.0",
+            "swiftVersion": "5.0"
           }
         }
       ]
@@ -148,7 +152,10 @@ npx expo install klaviyo-expo-plugin
 | `android.notificationIconFilePath` | optional | Path to the notification icon file. Should be a white, transparent PNG. Default: none specified. Note that you should set this instead of the `expo-notifications` one, as they can conflict with eachother. |
 | `android.notificationColor` | optional | Hex color for notification accent. Must be a valid hex value, e.g: `"#FF0000"` |
 | `ios.badgeAutoclearing` | optional | Enables automatic badge count clearing when app is opened. Default: `true` |
-|TODO| TODO| Belle any shot you can help me explain these other ones?|
+|`ios.codeSigningStyle`| optional | Declares management style for Code Signing Identity, Entitlements, and Provisioning Profile handled through XCode. Must be either "Manual" or "Automatic". Default: "Automatic". Note: We highly recommend using the automatic signing style. If you select manual, you may need to go into your developer.apple.com console and import the appropriate files and enable capabilities yourself.|
+|`ios.projectVersion`| optional | The internal build number for version. Default: 1|
+|`ios.marketingVersion`| optional| The app version displayed in the App Store. Must be of the format Major.Minor or Major.Minor.Patch. Default: 1.0|
+|`ios.swiftVersion`| optional| The version of Swift Language used in the project. Must be one of 4.0, 4.2, 5.0, or 6.0. Default: 5.0|
 
 
 ### Versioning
@@ -199,46 +206,6 @@ The plugin handles badge count management:
 
 - iOS: Configures badge autoclearing
 - Android: Automatically manages badge counts
-
-## Generated Code
-
-The plugin uses Expo's config plugins system to modify native code. Here's what gets generated:
-
-### Android Generated Code
-
-1. **MainActivity.kt** modifications:
-```kotlin
-override fun onNewIntent(intent: Intent) {
-    super.onNewIntent(intent)
-    // Tracks when a system tray notification is opened
-    Klaviyo.handlePush(intent)
-}
-```
-
-2. **AndroidManifest.xml** additions:
-```xml
-<service
-    android:name="com.klaviyo.pushFcm.KlaviyoPushService"
-    android:exported="false">
-    <intent-filter>
-        <action android:name="com.google.firebase.MESSAGING_EVENT" />
-    </intent-filter>
-</service>
-```
-
-### iOS Generated Code
-
-1. **NotificationService.swift**:
-```swift
-import UserNotifications
-import KlaviyoSwiftExtension
-
-class NotificationService: UNNotificationServiceExtension {
-    // Handles rich push notifications
-}
-```
-
-2. **AppDelegate** modifications for push handling and deep linking
 
 ## Example App
 
