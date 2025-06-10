@@ -69,7 +69,6 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> 
       });
     }
 
-    console.log('✅ Android Manifest modification complete');
     return config;
   });
 };
@@ -379,19 +378,10 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, p
       const platformProjectRoot = path.resolve(config.modRequest.platformProjectRoot);
       const drawableDir = path.join(platformProjectRoot, 'app', 'src', 'main', 'res', 'drawable');
       const destPath = path.join(drawableDir, 'notification_icon.png');
-      
-      console.log('🔄 withNotificationIcon called with props:', JSON.stringify(props, null, 2));
-      console.log('📝 Platform project root:', platformProjectRoot);
-      console.log('📝 Drawable directory:', drawableDir);
-      console.log('📝 Destination path:', destPath);
-      console.log('📝 File exists check:', fs.existsSync(destPath));
 
       if (props.notificationIconFilePath) {
-        console.log('🔄 Copying notification icon to Android resources...');
         
         const sourcePath = path.resolve(config.modRequest.projectRoot, props.notificationIconFilePath);
-        console.log('📝 Source path:', sourcePath);
-        console.log('📝 Source exists check:', fs.existsSync(sourcePath));
         
         if (!fs.existsSync(sourcePath)) {
           console.error('❌ Notification icon file not found:', sourcePath);
@@ -399,13 +389,11 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, p
         }
 
         if (!fs.existsSync(drawableDir)) {
-          console.log('📝 Creating drawable directory');
           fs.mkdirSync(drawableDir, { recursive: true });
         }
 
         try {
           fs.copyFileSync(sourcePath, destPath);
-          console.log('✅ Notification icon copied to:', destPath);
         } catch (error) {
           console.error('❌ Failed to copy notification icon:', error);
         }
@@ -416,15 +404,12 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, p
           try {
             // First try to remove the file
             fs.unlinkSync(destPath);
-            console.log('✅ Notification icon removed from:', destPath);
             
             // Verify the file was actually removed
             if (fs.existsSync(destPath)) {
-              console.error('❌ File still exists after removal attempt');
               // Try force removal
               try {
                 fs.rmSync(destPath, { force: true });
-                console.log('✅ Force removed notification icon');
               } catch (forceError) {
                 console.error('❌ Failed to force remove notification icon:', forceError);
               }
@@ -454,7 +439,6 @@ const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, pro
   console.log('📝 Plugin props:', JSON.stringify(props, null, 2));
   
   // First handle the notification icon file (add or remove)
-  console.log('🔄 About to handle notification icon...');
   config = withNotificationIcon(config, props);
   console.log('✅ Notification icon handling complete');
 
