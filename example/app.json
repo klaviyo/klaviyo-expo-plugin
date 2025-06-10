@@ -46,7 +46,11 @@
             "notificationColor": "#FF0000"
           },
           "ios": {
-            "badgeAutoclearing": true
+            "badgeAutoclearing": true,
+            "codeSigningStyle": "Automatic",
+            "projectVersion": "1",
+            "marketingVersion": "1.0",
+            "swiftVersion": "5.0"
           }
         }
       ]
