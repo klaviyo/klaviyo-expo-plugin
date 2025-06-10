@@ -244,7 +244,7 @@ import com.klaviyo.analytics.Klaviyo`,
   ]);
 };
 
-const createColorResource = async (config: any, color: string) => {
+const createColorResource = async (config: any, color: string | undefined) => {
   console.log('📝 Creating color resource for:', color);
   const colorsDir = path.join(config.modRequest.platformProjectRoot, 'app', 'src', 'main', 'res', 'values');
   if (!fs.existsSync(colorsDir)) {
@@ -265,8 +265,10 @@ const createColorResource = async (config: any, color: string) => {
     (c: any) => c.$.name !== 'klaviyo_notification_color'
   );
 
-  // Add the new color
-  colorsObj.resources.color.push({ $: { name: 'klaviyo_notification_color' }, _: color });
+  // Only add the new color if it's truthy
+  if (color) {
+    colorsObj.resources.color.push({ $: { name: 'klaviyo_notification_color' }, _: color });
+  }
 
   // Build XML
   const builder = new xml2js.Builder();
@@ -286,10 +288,8 @@ const withNotificationResources: ConfigPlugin<KlaviyoPluginAndroidProps> = (conf
         color: props.notificationColor
       });
 
-      // First, create the color resource if a color is provided
-      if (props.notificationColor) {
-        await createColorResource(config, props.notificationColor);
-      }
+      // Always call createColorResource with the notificationColor (which may be undefined)
+      await createColorResource(config, props.notificationColor);
 
       return config;
     },
@@ -355,6 +355,12 @@ const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (confi
       } else {
         console.log('📝 Color meta-data already exists, skipping');
       }
+    } else {
+      // Remove notification color meta-data if it exists
+      console.log('📝 Removing notification color meta-data');
+      application['meta-data'] = application['meta-data'].filter(
+        (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_color'
+      );
     }
 
     return config;

@@ -40,8 +40,7 @@
         {
           "android": {
             "logLevel": 1,
-            "openTracking": false,
-            "notificationColor": "#00FF00"
+            "openTracking": false
           },
           "ios": {
             "badgeAutoclearing": true
