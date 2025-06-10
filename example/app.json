@@ -24,7 +24,6 @@
       "useNextNotificationsApi": true,
       "googleServicesFile": "./google-services.json",
       "notification": {
-        "icon": "./assets/images/notification-icon.png",
         "color": "#ffffff",
         "defaultChannelId": "default"
       }
@@ -40,10 +39,9 @@
         "klaviyo-expo-plugin",
         {
           "android": {
-            "logLevel": 6,
-            "openTracking": true,
-            "notificationIconFilePath": "./assets/images/ic_notification.png",
-            "notificationColor": "#FF0000"
+            "logLevel": 1,
+            "openTracking": false,
+            "notificationColor": "#00FF00"
           },
           "ios": {
             "badgeAutoclearing": true

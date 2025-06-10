@@ -311,7 +311,7 @@ const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (confi
       application['meta-data'] = [];
     }
 
-    // Add notification icon if provided
+    // Handle notification icon meta-data
     if (props.notificationIconFilePath) {
       console.log('📝 Adding notification icon meta-data:', props.notificationIconFilePath);
       const iconMetaData = {
@@ -329,6 +329,12 @@ const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (confi
       } else {
         console.log('📝 Icon meta-data already exists, skipping');
       }
+    } else {
+      // Remove notification icon meta-data if it exists
+      console.log('📝 Removing notification icon meta-data');
+      application['meta-data'] = application['meta-data'].filter(
+        (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_icon'
+      );
     }
 
     // Add notification color if provided
@@ -356,29 +362,81 @@ const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (confi
 };
 
 const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
+  console.log('🔄 Setting up notification icon handling...');
+  
   return withDangerousMod(config, [
     'android',
     async (config) => {
-      if (!props.notificationIconFilePath) {
-        return config;
-      }
-
-      console.log('🔄 Copying notification icon to Android resources...');
+      console.log('🔄 Executing notification icon handling...');
       
-      const sourcePath = path.resolve(config.modRequest.projectRoot, props.notificationIconFilePath);
-      if (!fs.existsSync(sourcePath)) {
-        console.error('❌ Notification icon file not found:', sourcePath);
-        return config;
-      }
-
-      const drawableDir = path.join(config.modRequest.platformProjectRoot, 'app', 'src', 'main', 'res', 'drawable');
-      if (!fs.existsSync(drawableDir)) {
-        fs.mkdirSync(drawableDir, { recursive: true });
-      }
-
+      // Get absolute paths
+      const platformProjectRoot = path.resolve(config.modRequest.platformProjectRoot);
+      const drawableDir = path.join(platformProjectRoot, 'app', 'src', 'main', 'res', 'drawable');
       const destPath = path.join(drawableDir, 'notification_icon.png');
-      fs.copyFileSync(sourcePath, destPath);
-      console.log('✅ Notification icon copied to:', destPath);
+      
+      console.log('🔄 withNotificationIcon called with props:', JSON.stringify(props, null, 2));
+      console.log('📝 Platform project root:', platformProjectRoot);
+      console.log('📝 Drawable directory:', drawableDir);
+      console.log('📝 Destination path:', destPath);
+      console.log('📝 File exists check:', fs.existsSync(destPath));
+
+      if (props.notificationIconFilePath) {
+        console.log('🔄 Copying notification icon to Android resources...');
+        
+        const sourcePath = path.resolve(config.modRequest.projectRoot, props.notificationIconFilePath);
+        console.log('📝 Source path:', sourcePath);
+        console.log('📝 Source exists check:', fs.existsSync(sourcePath));
+        
+        if (!fs.existsSync(sourcePath)) {
+          console.error('❌ Notification icon file not found:', sourcePath);
+          return config;
+        }
+
+        if (!fs.existsSync(drawableDir)) {
+          console.log('📝 Creating drawable directory');
+          fs.mkdirSync(drawableDir, { recursive: true });
+        }
+
+        try {
+          fs.copyFileSync(sourcePath, destPath);
+          console.log('✅ Notification icon copied to:', destPath);
+        } catch (error) {
+          console.error('❌ Failed to copy notification icon:', error);
+        }
+      } else {
+        // Remove the notification icon file if it exists
+        console.log('🔄 Removing notification icon from Android resources...');
+        if (fs.existsSync(destPath)) {
+          try {
+            // First try to remove the file
+            fs.unlinkSync(destPath);
+            console.log('✅ Notification icon removed from:', destPath);
+            
+            // Verify the file was actually removed
+            if (fs.existsSync(destPath)) {
+              console.error('❌ File still exists after removal attempt');
+              // Try force removal
+              try {
+                fs.rmSync(destPath, { force: true });
+                console.log('✅ Force removed notification icon');
+              } catch (forceError) {
+                console.error('❌ Failed to force remove notification icon:', forceError);
+              }
+            }
+          } catch (error) {
+            console.error('❌ Failed to remove notification icon:', error);
+            // Try force removal as fallback
+            try {
+              fs.rmSync(destPath, { force: true });
+              console.log('✅ Force removed notification icon');
+            } catch (forceError) {
+              console.error('❌ Failed to force remove notification icon:', forceError);
+            }
+          }
+        } else {
+          console.log('📝 No notification icon found to remove');
+        }
+      }
 
       return config;
     },
@@ -389,19 +447,18 @@ const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, pro
   console.log('🔄 Starting Android plugin configuration...');
   console.log('📝 Plugin props:', JSON.stringify(props, null, 2));
   
-  // First handle the notification icon file copy
-  if (props.notificationIconFilePath) {
-    config = withNotificationIcon(config, props);
-    console.log('✅ Notification icon copied to resources');
-  }
+  // First handle the notification icon file (add or remove)
+  console.log('🔄 About to handle notification icon...');
+  config = withNotificationIcon(config, props);
+  console.log('✅ Notification icon handling complete');
+
+  // Then handle notification manifest entries
+  config = withNotificationManifest(config, props);
+  console.log('✅ Notification manifest entries handled');
 
   // Then add notification resources
   config = withNotificationResources(config, props);
   console.log('✅ Notification resources created');
-
-  // Then add notification manifest entries
-  config = withNotificationManifest(config, props);
-  console.log('✅ Notification manifest entries added');
 
   // Then handle other manifest modifications
   config = withAndroidManifestModifications(config, props);
