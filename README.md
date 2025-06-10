@@ -10,26 +10,12 @@
     - [Expo](#expo)
     - [Android](#android)
     - [iOS](#ios)
-  - [Expo Config Dependencies](#expo-config-dependencies)
-    - [Required Config Values](#required-config-values)
-    - [Modified Config Values](#modified-config-values)
   - [Installation](#installation)
   - [Configuration](#configuration)
     - [Plugin Props](#plugin-props)
-    - [Versioning](#versioning)
-  - [Features](#features)
-    - [Push Notifications](#push-notifications)
-      - [Android Push Setup](#android-push-setup)
-      - [iOS Push Setup](#ios-push-setup)
-      - [Notification Icons and Colors](#notification-icons-and-colors)
-    - [Deep Linking](#deep-linking)
-    - [Badge Count](#badge-count)
-  - [Generated Code](#generated-code)
-    - [Android Generated Code](#android-generated-code)
-    - [iOS Generated Code](#ios-generated-code)
+    - [Required Config Values](#required-config-values)
   - [Example App](#example-app)
   - [Troubleshooting](#troubleshooting)
-  - [Contributing](#contributing)
   - [License](#license)
 
 ## Introduction
@@ -37,18 +23,16 @@
 The Klaviyo Expo Plugin is a config plugin for Expo that automates the integration of Klaviyo's native SDKs into your Expo project. This plugin handles all the necessary native code modifications required for Klaviyo functionality, eliminating the need for manual native code changes.
 
 The plugin is designed to work with the [klaviyo-react-native-sdk](https://github.com/klaviyo/klaviyo-react-native-sdk) and automates the setup of:
-- Push notification handling
-- Deep linking configuration
-- Badge count management
-- Notification service extension
-- Icon / color notification configuration
+- Push notification open tracking and key:value data reading
+- Badge count management (iOS)
+- Notification service extension (iOS)
+- Icon / color notification configuration (Android)
 - Rich push support
 
 ## Requirements
 
 ### Expo
-- Expo SDK TODO or higher
-- Development build with custom native code
+- Development build (we do not support Expo Go)
 
 ### Android
 - `minSdkVersion` of `23+`
@@ -57,48 +41,6 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 ### iOS
 - Minimum Deployment Target `13.0+`
 - Apple Push Notification Service (APNs) set up
-
-## Expo Config Dependencies
-
-The Klaviyo Expo Plugin relies on and modifies several Expo config values to properly set up native functionality. Here's what you need to know:
-
-### Required Config Values
-
-The following config values must be present in your `app.json` or `app.config.js`:
-
-```json
-{
-  "expo": {
-    "android": {
-      "package": "your.package.name",  // Required for Android setup - must match FCM value
-      "googleServicesFile": "./google-services.json"  // Required for FCM
-    },
-    "ios": {
-      "bundleIdentifier": "your.bundle.identifier"  // Required for iOS setup
-    }
-  }
-}
-```
-
-### Modified Config Values
-
-The plugin will modify the following native properties:
-
-#### Android
-- Adds FCM service to `AndroidManifest.xml`
-- Adds notification channel configuration
-- Modifies `MainActivity.kt` for push handling (optional)
-- Adds notification icon and color resources
-- Updates `strings.xml` with plugin metadata
-
-#### iOS
-- Adds notification service extension target for rich push and badge count
-- Configures app groups for badge count support
-- Updates `Info.plist` with notification permissions
-- Modifies `AppDelegate` for push handling
-- Adds Klaviyo configuration plist
-- Updates Podfile with required dependencies
-
 
 ## Installation
 
@@ -115,7 +57,7 @@ npx expo install klaviyo-expo-plugin
 {
   "expo": {
     "plugins": [
-        //... other configs
+        //... other plugins
       [
         "klaviyo-expo-plugin",
         {
@@ -123,7 +65,7 @@ npx expo install klaviyo-expo-plugin
             "logLevel": 1,
             "openTracking": true,
             "notificationIconFilePath": "./your/notification/icon/path.png",
-            "notificationColor": "#FF0000" // hex code format
+            "notificationColor": "#00FF00"
           },
           "ios": {
             "badgeAutoclearing": true,
@@ -147,7 +89,7 @@ npx expo install klaviyo-expo-plugin
 
 | Plugin Prop | Required | Description |
 |-------------|----------|-------------|
-| `android.logLevel` | optional | Sets the logging level for Android. Default: `1` (DEBUG). Values: `0` (NONE), `1` (DEBUG), `2` (INFO), `3` (WARN), `4` (ERROR) |
+| `android.logLevel` | optional | Sets the logging level for the Klaviyo Android SDK. Default: `1` (DEBUG). Values: `0` (NONE), `1` (VERBOSE), `2` (DEBUG), `3` (INFO), `4` (WARNING), `5` (ERROR), `6` (ASSERT) |
 | `android.openTracking` | optional | Enables tracking when notifications are opened. Default: `true`. Note that this is considered to be a `dangerous` mod, as it directly modifies your MainActivity code. |
 | `android.notificationIconFilePath` | optional | Path to the notification icon file. Should be a white, transparent PNG. Default: none specified. Note that you should set this instead of the `expo-notifications` one, as they can conflict with eachother. |
 | `android.notificationColor` | optional | Hex color for notification accent. Must be a valid hex value, e.g: `"#FF0000"` |
@@ -158,7 +100,7 @@ npx expo install klaviyo-expo-plugin
 |`ios.swiftVersion`| optional| The version of Swift Language used in the project. Must be one of 4.0, 4.2, 5.0, or 6.0. Default: 5.0|
 
 
-### Versioning
+### Required Config Values
 
 In your configuration file, make sure you set:
 
@@ -167,45 +109,10 @@ In your configuration file, make sure you set:
 | `version` | Your app version. Corresponds to `CFBundleShortVersionString` on iOS. Format: "X.X.X" (e.g. "1.0" or "2.3.1") |
 | `ios.buildNumber` | Build number for your iOS app. Corresponds to `CFBundleVersion`. Format: "42" or "100" |
 | `ios.bundleIdentifier` | Bundle identifier for your iOS app. Format: "com.companyname.appname" |
-| `android.package` | Package name for your Android app. Format: "com.companyname.appname" |
+| `ios.infoPlist.UIBackgroundModes` | set this to `["remote-notification"]` to ensure you can receive background push notifications |
+| `android.package` | Package name for your Android app. Format: `"com.companyname.appname"` |
 
 These values are used in various native configuration files and must be properly set for the plugin to work correctly.
-
-## Features
-
-### Push Notifications
-
-The plugin automatically configures push notification handling for both platforms.
-
-#### Android Push Setup
-- Configures FCM service
-- Sets up notification channels
-- Handles notification icons and colors
-- Implements push open tracking
-
-#### iOS Push Setup
-- Configures APNs capabilities
-- Sets up notification service extension
-- Implements badge count management
-- Handles rich push notifications
-
-#### Notification Icons and Colors
-You can customize notification appearance:
-
-
-### Deep Linking
-
-The plugin automatically configures deep linking for both platforms:
-
-- Android: Sets up intent filters in AndroidManifest.xml
-- iOS: Configures URL schemes and associated domains
-
-### Badge Count
-
-The plugin handles badge count management:
-
-- iOS: Configures badge autoclearing
-- Android: Automatically manages badge counts
 
 ## Example App
 
