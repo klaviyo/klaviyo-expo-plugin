@@ -106,11 +106,11 @@ In your configuration file, make sure you set:
 
 | Property | Details |
 |----------|---------|
-| `version` | Your app version. Corresponds to `CFBundleShortVersionString` on iOS. Format: "X.X.X" (e.g. "1.0" or "2.3.1") |
-| `ios.buildNumber` | Build number for your iOS app. Corresponds to `CFBundleVersion`. Format: "42" or "100" |
-| `ios.bundleIdentifier` | Bundle identifier for your iOS app. Format: "com.companyname.appname" |
+| `version` | Your app version. Corresponds to `CFBundleShortVersionString` on iOS. Format: `"X.X.X"` (e.g. `"1.0"` or `"2.3.1"`) |
+| `ios.buildNumber` | Build number for your iOS app. Corresponds to `CFBundleVersion`. Format: `"42"`|
+| `ios.bundleIdentifier` | Bundle identifier for your iOS app. Format: `"com.companyname.appname"` |
 | `ios.infoPlist.UIBackgroundModes` | set this to `["remote-notification"]` to ensure you can receive background push notifications |
-| `android.package` | Package name for your Android app. Format: "com.companyname.appname" |
+| `android.package` | Package name for your Android app. Format: `"com.companyname.appname"` |
 
 These values are used in various native configuration files and must be properly set for the plugin to work correctly.
 
