@@ -116,7 +116,7 @@ These values are used in various native configuration files and must be properly
 
 ## Example App
 
-We created an example app to show how to use this plugin in coordination with the `klaviyo-react-native` SDK. Set this up and run based on whichever platform you'd like to test on:
+We created an example app to show how to use this plugin in coordination with the `klaviyo-react-native-sdk`. Set this up and run based on whichever platform you'd like to test on:
 ```sh
 // from repo directory
 cd example
