@@ -41,33 +41,6 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> 
         'android:value': logLevel.toString()
       }
     });
-
-    // Add KlaviyoPushService to the manifest
-    if (!application.service) {
-      application.service = [];
-    }
-
-    const pushServiceIndex = application.service.findIndex(
-      (item: any) => item.$['android:name'] === 'com.klaviyo.pushFcm.KlaviyoPushService'
-    );
-
-    if (pushServiceIndex === -1) {
-      KlaviyoLog.log('Adding KlaviyoPushService to manifest');
-      application.service.push({
-        $: {
-          'android:name': 'com.klaviyo.pushFcm.KlaviyoPushService',
-          'android:exported': 'false'
-        },
-        'intent-filter': [{
-          action: [{
-            $: {
-              'android:name': 'com.google.firebase.MESSAGING_EVENT'
-            }
-          }]
-        }]
-      });
-    }
-
     return config;
   });
 };
