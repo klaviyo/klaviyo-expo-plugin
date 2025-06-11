@@ -47,7 +47,7 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 1. Install the plugin in your Expo project. You need both `klaviyo-react-native` and `klaviyo-expo-plugin` for full functionality:
 
 ```sh
-npm install klaviyo-react-native
+npm install klaviyo-react-native-sdk
 npx expo install klaviyo-expo-plugin
 ```
 
