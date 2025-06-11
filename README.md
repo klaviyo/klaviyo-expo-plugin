@@ -87,17 +87,17 @@ npx expo install klaviyo-expo-plugin
 
 #### Plugin Props Table
 
-| Plugin Prop | Required | Description |
-|-------------|----------|-------------|
-| `android.logLevel` | optional | Sets the logging level for the Klaviyo Android SDK. Default: `1` (DEBUG). Values: `0` (NONE), `1` (VERBOSE), `2` (DEBUG), `3` (INFO), `4` (WARNING), `5` (ERROR), `6` (ASSERT) |
-| `android.openTracking` | optional | Enables tracking when notifications are opened. Default: `true`. Note that this is considered to be a `dangerous` mod, as it directly modifies your MainActivity code. |
-| `android.notificationIconFilePath` | optional | Path to the notification icon file. Should be a white, transparent PNG. Default: none specified. Note that you should set this instead of the `expo-notifications` one, as they can conflict with eachother. |
-| `android.notificationColor` | optional | Hex color for notification accent. Must be a valid hex value, e.g: `"#FF0000"` |
-| `ios.badgeAutoclearing` | optional | Enables automatic badge count clearing when app is opened. Default: `true` |
-|`ios.codeSigningStyle`| optional | Declares management style for Code Signing Identity, Entitlements, and Provisioning Profile handled through XCode. Must be either "Manual" or "Automatic". Default: "Automatic". Note: We highly recommend using the automatic signing style. If you select manual, you may need to go into your developer.apple.com console and import the appropriate files and enable capabilities yourself.|
-|`ios.projectVersion`| optional | The internal build number for version. Default: 1|
-|`ios.marketingVersion`| optional| The app version displayed in the App Store. Must be of the format Major.Minor or Major.Minor.Patch. Default: 1.0|
-|`ios.swiftVersion`| optional| The version of Swift Language used in the project. Must be one of 4.0, 4.2, 5.0, or 6.0. Default: 5.0|
+| Plugin Prop | Type | Required | Description |
+|-------------|------|----|-------------|
+| `android.logLevel` | int | optional | Sets the logging level for the Klaviyo Android SDK. Default: `1` (DEBUG). Values: `0` (NONE), `1` (VERBOSE), `2` (DEBUG), `3` (INFO), `4` (WARNING), `5` (ERROR), `6` (ASSERT) |
+| `android.openTracking` | boolean | optional | Enables tracking when notifications are opened. Default: `true`. Note that this is considered to be a `dangerous` mod, as it directly modifies your MainActivity code. |
+| `android.notificationIconFilePath` | string | optional | Path to the notification icon file. Should be a white, transparent PNG. Default: none specified. Note that you should set this instead of the `expo-notifications` one, as they can conflict with eachother. |
+| `android.notificationColor` | string | optional | Hex color for notification accent. Must be a valid hex value, e.g: `"#FF0000"` |
+| `ios.badgeAutoclearing` | boolean | optional | Enables automatic badge count clearing when app is opened. Default: `true` |
+|`ios.codeSigningStyle`| string | optional | Declares management style for Code Signing Identity, Entitlements, and Provisioning Profile handled through XCode. Must be either "Manual" or "Automatic". Default: "Automatic". Note: We highly recommend using the automatic signing style. If you select manual, you may need to go into your developer.apple.com console and import the appropriate files and enable capabilities yourself.|
+|`ios.projectVersion`| string | optional | The internal build number for version. Default: 1|
+|`ios.marketingVersion`| string | optional| The app version displayed in the App Store. Must be of the format Major.Minor or Major.Minor.Patch. Default: 1.0|
+|`ios.swiftVersion`| string | optional| The version of Swift Language used in the project. Must be one of 4.0, 4.2, 5.0, or 6.0. Default: 5.0|
 
 
 ### Required Config Values
