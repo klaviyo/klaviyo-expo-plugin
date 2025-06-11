@@ -24,8 +24,6 @@
       "useNextNotificationsApi": true,
       "googleServicesFile": "./google-services.json",
       "notification": {
-        "icon": "./assets/images/notification-icon.png",
-        "color": "#ffffff",
         "defaultChannelId": "default"
       }
     },
