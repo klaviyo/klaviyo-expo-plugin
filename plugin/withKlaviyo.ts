@@ -6,8 +6,6 @@ import { validateAndroidConfig, validateIosConfig } from './support/validateConf
 import * as path from 'path';
 
 const withKlaviyo: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
-  console.log('🔄 Klaviyo Expo Plugin: Running prebuild configuration...');
-
   const mergedProps = mergeProps(props);
   const projectRoot = path.resolve(process.cwd());
   
