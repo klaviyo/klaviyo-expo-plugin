@@ -73,7 +73,7 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> 
   });
 };
 
-const findMainActivity = async (projectRoot: string): Promise<string | null> => {
+const findMainActivity = async (projectRoot: string): Promise<{ path: string; isKotlin: boolean } | null> => {
   console.log('🔍 Searching for MainActivity in:', projectRoot);
   
   // First try Expo's built-in detection
@@ -82,7 +82,10 @@ const findMainActivity = async (projectRoot: string): Promise<string | null> => 
     const mainActivityPath = expoMainActivity?.toString();
     if (mainActivityPath && fs.existsSync(mainActivityPath)) {
       console.log('✅ Found MainActivity using Expo detection:', mainActivityPath);
-      return mainActivityPath;
+      return {
+        path: mainActivityPath,
+        isKotlin: mainActivityPath.endsWith('.kt')
+      };
     }
   } catch (e: unknown) {
     console.log('⚠️ Could not find main activity using Expo detection:', e instanceof Error ? e.message : String(e));
@@ -102,15 +105,28 @@ const findMainActivity = async (projectRoot: string): Promise<string | null> => 
       continue;
     }
 
-    const files = glob.sync('**/*.kt', { cwd: javaDir });
-    console.log(`📝 Found ${files.length} Kotlin files in ${javaDir}`);
+    // Search for both .kt and .java files
+    const kotlinFiles = glob.sync('**/*.kt', { cwd: javaDir });
+    const javaFiles = glob.sync('**/*.java', { cwd: javaDir });
+    console.log(`📝 Found ${kotlinFiles.length} Kotlin files and ${javaFiles.length} Java files in ${javaDir}`);
     
-    for (const file of files) {
+    // Check Kotlin files first
+    for (const file of kotlinFiles) {
       const filePath = path.join(javaDir, file);
       const content = fs.readFileSync(filePath, 'utf-8');
       if (content.includes('class') && (content.includes(': ReactActivity') || content.includes('extends ReactActivity'))) {
-        console.log('✅ Found ReactActivity in:', filePath);
-        return filePath;
+        console.log('✅ Found ReactActivity in Kotlin file:', filePath);
+        return { path: filePath, isKotlin: true };
+      }
+    }
+
+    // Then check Java files
+    for (const file of javaFiles) {
+      const filePath = path.join(javaDir, file);
+      const content = fs.readFileSync(filePath, 'utf-8');
+      if (content.includes('class') && content.includes('extends ReactActivity')) {
+        console.log('✅ Found ReactActivity in Java file:', filePath);
+        return { path: filePath, isKotlin: false };
       }
     }
   }
@@ -123,20 +139,22 @@ const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (
   return withDangerousMod(config, [
     'android',
     async (config) => {
-      console.log('🔄 Modifying MainActivity.kt...');
+      console.log('🔄 Modifying MainActivity...');
       console.log('📝 OpenTracking setting:', props.openTracking);
 
       if (!config.android?.package) {
         throw new Error('Android package not found in app config');
       }
 
-      const mainActivityPath = await findMainActivity(config.modRequest.platformProjectRoot);
+      const mainActivityInfo = await findMainActivity(config.modRequest.platformProjectRoot);
 
-      if (!mainActivityPath) {
+      if (!mainActivityInfo) {
         throw new Error('Could not find main activity file. Please ensure your app has a valid ReactActivity.');
       }
 
+      const { path: mainActivityPath, isKotlin } = mainActivityInfo;
       console.log('📝 MainActivity path:', mainActivityPath);
+      console.log('📝 MainActivity language:', isKotlin ? 'Kotlin' : 'Java');
 
       if (!fs.existsSync(mainActivityPath)) {
         throw new Error(`MainActivity not found at path: ${mainActivityPath}`);
@@ -144,16 +162,16 @@ const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (
 
       // Read the current content
       const mainActivityContent = fs.readFileSync(mainActivityPath, 'utf-8');
-      console.log('📝 Found MainActivity.kt, current size:', mainActivityContent.length, 'bytes');
+      console.log('📝 Found MainActivity, current size:', mainActivityContent.length, 'bytes');
 
       // Find the package declaration line to use as our anchor
       const packageMatch = mainActivityContent.match(/^package .+$/m);
       if (!packageMatch) {
-        throw new Error('Could not find package declaration in MainActivity.kt');
+        throw new Error('Could not find package declaration in MainActivity');
       }
 
       // Find the class declaration line to use as our anchor
-      const classMatch = mainActivityContent.match(/^class MainActivity.*\{/m);
+      const classMatch = mainActivityContent.match(/^(?:public\s+)?class\s+MainActivity\s+(?:extends|:)\s+ReactActivity\s*(?:\(\))?\s*\{/m);
       if (!classMatch) {
         throw new Error('Could not find MainActivity class declaration');
       }
@@ -206,9 +224,11 @@ const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (
         const importContents = mergeContents({
           tag: 'klaviyo-imports',
           src: contentWithoutGenerated,
-          newSrc: `
-import android.content.Intent
-import com.klaviyo.analytics.Klaviyo`,
+          newSrc: isKotlin ? 
+            `import android.content.Intent
+import com.klaviyo.analytics.Klaviyo` :
+            `import android.content.Intent;
+import com.klaviyo.analytics.Klaviyo;`,
           anchor: /^package .+$/m,
           offset: 1,
           comment: '//',
@@ -218,14 +238,25 @@ import com.klaviyo.analytics.Klaviyo`,
         const methodContents = mergeContents({
           tag: 'klaviyo-onNewIntent',
           src: importContents.contents,
-          newSrc: `
-    override fun onNewIntent(intent: Intent?) {
+          newSrc: isKotlin ?
+            `
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
 
         // Tracks when a system tray notification is opened
         Klaviyo.handlePush(intent)
+    }` :
+            `
+    @Override
+    public void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+
+        // Tracks when a system tray notification is opened
+        Klaviyo.handlePush(intent);
     }`,
-          anchor: /^class MainActivity : ReactActivity\(\) \{$/m,
+          anchor: isKotlin ? 
+            /^class MainActivity : ReactActivity\(\) \{$/m :
+            /^(?:public\s+)?class\s+MainActivity\s+(?:extends|:)\s+ReactActivity\s*(?:\(\))?\s*\{/m,
           offset: 1,
           comment: '//',
         });
