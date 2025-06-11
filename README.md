@@ -44,7 +44,7 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 
 ## Installation
 
-1. Install the plugin in your Expo project. You need both `klaviyo-react-native` and `klaviyo-expo-plugin` for full functionality:
+1. Install the plugin in your Expo project. You need both `klaviyo-react-native-sdk` and `klaviyo-expo-plugin` for full functionality:
 
 ```sh
 npm install klaviyo-react-native-sdk
@@ -90,14 +90,14 @@ npx expo install klaviyo-expo-plugin
 | Plugin Prop | Type | Required | Description |
 |-------------|------|----|-------------|
 | `android.logLevel` | int | optional | Sets the logging level for the Klaviyo Android SDK. Default: `1` (DEBUG). Values: `0` (NONE), `1` (VERBOSE), `2` (DEBUG), `3` (INFO), `4` (WARNING), `5` (ERROR), `6` (ASSERT) |
-| `android.openTracking` | boolean | optional | Enables tracking when notifications are opened. Default: `true`. Note that this is considered to be a `dangerous` mod, as it directly modifies your MainActivity code. |
+| `android.openTracking` | boolean | optional | Enables tracking when notifications are opened. Default: `true`. Note that this is considered to be a __dangerous__ mod, as it directly modifies your MainActivity code. |
 | `android.notificationIconFilePath` | string | optional | Path to the notification icon file. Should be a white, transparent PNG. Default: none specified. Note that you should set this instead of the `expo-notifications` one, as they can conflict with eachother. |
 | `android.notificationColor` | string | optional | Hex color for notification accent. Must be a valid hex value, e.g: `"#FF0000"` |
 | `ios.badgeAutoclearing` | boolean | optional | Enables automatic badge count clearing when app is opened. Default: `true` |
-|`ios.codeSigningStyle`| string | optional | Declares management style for Code Signing Identity, Entitlements, and Provisioning Profile handled through XCode. Must be either "Manual" or "Automatic". Default: "Automatic". Note: We highly recommend using the automatic signing style. If you select manual, you may need to go into your developer.apple.com console and import the appropriate files and enable capabilities yourself.|
-|`ios.projectVersion`| string | optional | The internal build number for version. Default: 1|
-|`ios.marketingVersion`| string | optional| The app version displayed in the App Store. Must be of the format Major.Minor or Major.Minor.Patch. Default: 1.0|
-|`ios.swiftVersion`| string | optional| The version of Swift Language used in the project. Must be one of 4.0, 4.2, 5.0, or 6.0. Default: 5.0|
+|`ios.codeSigningStyle`| string | optional | Declares management style for Code Signing Identity, Entitlements, and Provisioning Profile handled through XCode. Must be either "Manual" or "Automatic". Default: `"Automatic"`. Note: We highly recommend using the automatic signing style. If you select manual, you may need to go into your [developer.apple.com](https://developer.apple.com/) console and import the appropriate files and enable capabilities yourself.|
+|`ios.projectVersion`| string | optional | The internal build number for version. Default: `"1"`|
+|`ios.marketingVersion`| string | optional| The app version displayed in the App Store. Must be of the format "X.X" or "X.X.X". Default: `"1.0"`|
+|`ios.swiftVersion`| string | optional| The version of Swift Language used in the project. Must be one of 4.0, 4.2, 5.0, or 6.0. Default: `"5.0"`|
 
 
 ### Required Config Values
@@ -110,7 +110,7 @@ In your configuration file, make sure you set:
 | `ios.buildNumber` | Build number for your iOS app. Corresponds to `CFBundleVersion`. Format: "42" or "100" |
 | `ios.bundleIdentifier` | Bundle identifier for your iOS app. Format: "com.companyname.appname" |
 | `ios.infoPlist.UIBackgroundModes` | set this to `["remote-notification"]` to ensure you can receive background push notifications |
-| `android.package` | Package name for your Android app. Format: `"com.companyname.appname"` |
+| `android.package` | Package name for your Android app. Format: "com.companyname.appname" |
 
 These values are used in various native configuration files and must be properly set for the plugin to work correctly.
 
