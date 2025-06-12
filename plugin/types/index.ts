@@ -11,6 +11,7 @@ export interface KlaviyoPluginIosBaseProps  {
   projectVersion: string;
   marketingVersion: string;
   swiftVersion: string;
+  devTeam?: string;
 }
 
 export interface KlaviyoPluginProps {
@@ -26,7 +27,12 @@ export interface KlaviyoPluginAndroidProps extends KlaviyoPluginAndroidBaseProps
 }
 
 export interface KlaviyoPluginIosProps extends KlaviyoPluginIosBaseProps {
-  // Add any iOS-specific configuration here
+  badgeAutoclearing: boolean;
+  codeSigningStyle: string;
+  projectVersion: string;
+  marketingVersion: string;
+  swiftVersion: string;
+  devTeam: string | undefined;
 }
 
 export interface KlaviyoPluginPropsDefaultValues extends KlaviyoPluginProps {
@@ -46,7 +52,8 @@ const IOS_DEFAULTS: KlaviyoPluginIosProps = {
   codeSigningStyle: "Automatic",
   projectVersion: "1",
   marketingVersion: "1.0",
-  swiftVersion: "5.0"
+  swiftVersion: "5.0",
+  devTeam: undefined
 };
 
 export const mergeAndroidProps = (props?: KlaviyoPluginAndroidBaseProps): KlaviyoPluginAndroidProps => {
