@@ -82,4 +82,11 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
       );
     }
   }
+
+  // Validate devTeam
+  if (config.devTeam !== undefined) {
+    if (typeof config.devTeam !== 'string' || !/^[A-Z0-9]{10}$/.test(config.devTeam)) {
+      throw new KlaviyoConfigError('iOS devTeam must be a 10-digit alphanumeric string');
+    }
+  }
 };
