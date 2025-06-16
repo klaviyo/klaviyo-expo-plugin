@@ -6,13 +6,15 @@ import { getMainActivityAsync } from '@expo/config-plugins/build/android/Paths';
 import * as glob from 'glob';
 import { KlaviyoPluginAndroidProps } from './types';
 import * as xml2js from 'xml2js';
-
+import { KlaviyoLog } from './support/logger';
 
 const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withAndroidManifest(config, (config) => {
+    KlaviyoLog.log('Modifying Android Manifest');
     const androidManifest = config.modResults.manifest;
     
     if (!androidManifest.application) {
+      KlaviyoLog.log('Creating application tag in manifest');
       androidManifest.application = [{ $: { 'android:name': '.MainApplication' } }];
     }
 
@@ -20,10 +22,12 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> 
     
     // Add or update the log level meta-data
     if (!application['meta-data']) {
+      KlaviyoLog.log('No meta-data array found, creating one...');
       application['meta-data'] = [];
     }
 
     const logLevel = props.logLevel ?? 1; // Default to DEBUG (1) if not specified
+    KlaviyoLog.log(`Setting Klaviyo log level to ${logLevel}`);
 
     // Remove any existing log level meta-data entries
     application['meta-data'] = application['meta-data'].filter(
@@ -48,6 +52,7 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> 
     );
 
     if (pushServiceIndex === -1) {
+      KlaviyoLog.log('Adding KlaviyoPushService to manifest');
       application.service.push({
         $: {
           'android:name': 'com.klaviyo.pushFcm.KlaviyoPushService',
@@ -68,18 +73,21 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> 
 };
 
 const findMainActivity = async (projectRoot: string): Promise<{ path: string; isKotlin: boolean } | null> => {
+  KlaviyoLog.log(`Searching for MainActivity in: ${projectRoot}`);
+  
   // First try Expo's built-in detection
   try {
     const expoMainActivity = await getMainActivityAsync(projectRoot);
     const mainActivityPath = expoMainActivity?.toString();
     if (mainActivityPath && fs.existsSync(mainActivityPath)) {
+      KlaviyoLog.log(`Found MainActivity using Expo detection: ${mainActivityPath}`);
       return {
         path: mainActivityPath,
         isKotlin: mainActivityPath.endsWith('.kt')
       };
     }
   } catch (e: unknown) {
-    
+    KlaviyoLog.error('Could not find main activity using Expo detection: ' + (e instanceof Error ? e.message : String(e)));
   }
 
   // Fall back to searching for ReactActivity
@@ -90,19 +98,23 @@ const findMainActivity = async (projectRoot: string): Promise<{ path: string; is
   ];
 
   for (const javaDir of possibleJavaDirs) {
+    KlaviyoLog.log(`Checking directory: ${javaDir}`);
     if (!fs.existsSync(javaDir)) {
+      KlaviyoLog.log(`Directory does not exist: ${javaDir}`);
       continue;
     }
 
     // Search for both .kt and .java files
     const kotlinFiles = glob.sync('**/*.kt', { cwd: javaDir });
     const javaFiles = glob.sync('**/*.java', { cwd: javaDir });
+    KlaviyoLog.log(`Found ${kotlinFiles.length} Kotlin files and ${javaFiles.length} Java files in ${javaDir}`);
     
     // Check Kotlin files first
     for (const file of kotlinFiles) {
       const filePath = path.join(javaDir, file);
       const content = fs.readFileSync(filePath, 'utf-8');
       if (content.includes('class') && (content.includes(': ReactActivity') || content.includes('extends ReactActivity'))) {
+        KlaviyoLog.log(`Found ReactActivity in Kotlin file: ${filePath}`);
         return { path: filePath, isKotlin: true };
       }
     }
@@ -112,11 +124,13 @@ const findMainActivity = async (projectRoot: string): Promise<{ path: string; is
       const filePath = path.join(javaDir, file);
       const content = fs.readFileSync(filePath, 'utf-8');
       if (content.includes('class') && content.includes('extends ReactActivity')) {
+        KlaviyoLog.log(`Found ReactActivity in Java file: ${filePath}`);
         return { path: filePath, isKotlin: false };
       }
     }
   }
 
+  KlaviyoLog.error('Could not find MainActivity in any of the expected locations');
   return null;
 };
 
@@ -124,6 +138,9 @@ const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (
   return withDangerousMod(config, [
     'android',
     async (config) => {
+      KlaviyoLog.log('Modifying MainActivity');
+      KlaviyoLog.log(`OpenTracking setting: ${props.openTracking}`);
+      
       if (!config.android?.package) {
         throw new Error('Android package not found in app config');
       }
@@ -135,6 +152,8 @@ const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (
       }
 
       const { path: mainActivityPath, isKotlin } = mainActivityInfo;
+      KlaviyoLog.log(`MainActivity path: ${mainActivityPath}`);
+      KlaviyoLog.log(`MainActivity language: ${isKotlin ? 'Kotlin' : 'Java'}`);
 
       if (!fs.existsSync(mainActivityPath)) {
         throw new Error(`MainActivity not found at path: ${mainActivityPath}`);
@@ -142,6 +161,7 @@ const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (
 
       // Read the current content
       const mainActivityContent = fs.readFileSync(mainActivityPath, 'utf-8');
+      KlaviyoLog.log(`Found MainActivity, current size: ${mainActivityContent.length} bytes`);
 
       // Find the package declaration line to use as our anchor
       const packageMatch = mainActivityContent.match(/^package .+$/m);
@@ -191,6 +211,8 @@ const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (
 
       // Only add the code if openTracking is enabled
       if (props.openTracking) {
+        KlaviyoLog.log('Adding push tracking code to MainActivity...');
+        
         // First, remove any existing generated content
         let contentWithoutGenerated = cleanedContent.replace(
           /\/\/ @generated begin klaviyo-[\s\S]*?\/\/ @generated end klaviyo-/g,
@@ -241,6 +263,7 @@ import com.klaviyo.analytics.Klaviyo;`,
         // Write the modified content back to the file
         fs.writeFileSync(mainActivityPath, methodContents.contents);
       } else {
+        KlaviyoLog.log('Removing push tracking code from MainActivity...');
         // Write the cleaned content back
         fs.writeFileSync(mainActivityPath, cleanedContent);
       }
@@ -251,6 +274,7 @@ import com.klaviyo.analytics.Klaviyo;`,
 };
 
 const createColorResource = async (config: any, color: string | undefined) => {
+  KlaviyoLog.log(`Creating color resource for: ${color}`);
   const colorsDir = path.join(config.modRequest.platformProjectRoot, 'app', 'src', 'main', 'res', 'values');
   if (!fs.existsSync(colorsDir)) {
     fs.mkdirSync(colorsDir, { recursive: true });
@@ -280,12 +304,19 @@ const createColorResource = async (config: any, color: string | undefined) => {
   const newXml = builder.buildObject(colorsObj);
 
   fs.writeFileSync(colorsXmlPath, newXml);
+  KlaviyoLog.log('Merged colors.xml with notification color');
 };
 
 const withNotificationResources: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withDangerousMod(config, [
     'android',
     async (config) => {
+      KlaviyoLog.log('Adding notification resources to Android Manifest');
+      KlaviyoLog.log('Notification props:' + {
+        iconPath: props.notificationIconFilePath,
+        color: props.notificationColor
+      });
+
       // Always call createColorResource with the notificationColor (which may be undefined)
       await createColorResource(config, props.notificationColor);
 
@@ -299,6 +330,7 @@ const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (confi
     const androidManifest = config.modResults.manifest;
     
     if (!androidManifest.application) {
+      KlaviyoLog.log('No application tag found, creating one...');
       androidManifest.application = [{ $: { 'android:name': '.MainApplication' } }];
     }
 
@@ -310,6 +342,7 @@ const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (confi
 
     // Handle notification icon meta-data
     if (props.notificationIconFilePath) {
+      KlaviyoLog.log(`Adding notification icon meta-data: ${props.notificationIconFilePath}`);
       const iconMetaData = {
         $: {
           'android:name': 'com.klaviyo.push.default_notification_icon',
@@ -321,9 +354,13 @@ const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (confi
       );
       if (!iconExists) {
         application['meta-data'].push(iconMetaData);
+        KlaviyoLog.log(`Added icon meta-data: ${JSON.stringify(iconMetaData, null, 2)}`);
+      } else {
+        KlaviyoLog.log('Icon meta-data already exists, skipping');
       }
     } else {
       // Remove notification icon meta-data if it exists
+      KlaviyoLog.log('Removing notification icon meta-data');
       application['meta-data'] = application['meta-data'].filter(
         (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_icon'
       );
@@ -331,6 +368,7 @@ const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (confi
 
     // Add notification color if provided
     if (props.notificationColor) {
+      KlaviyoLog.log(`Adding notification color meta-data: ${props.notificationColor}`);
       const colorMetaData = {
         $: {
           'android:name': 'com.klaviyo.push.default_notification_color',
@@ -342,9 +380,13 @@ const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (confi
       );
       if (!colorExists) {
         application['meta-data'].push(colorMetaData);
+        KlaviyoLog.log(`Added color meta-data: ${JSON.stringify(colorMetaData, null, 2)}`);
+      } else {
+        KlaviyoLog.log('Color meta-data already exists, skipping');
       }
     } else {
       // Remove notification color meta-data if it exists
+      KlaviyoLog.log('Removing notification color meta-data');
       application['meta-data'] = application['meta-data'].filter(
         (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_color'
       );
@@ -355,9 +397,13 @@ const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (confi
 };
 
 const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
+  KlaviyoLog.log('Setting up notification icon handling...');
+  
   return withDangerousMod(config, [
     'android',
     async (config) => {
+      KlaviyoLog.log('Executing notification icon handling...');
+      
       // Get absolute paths
       const platformProjectRoot = path.resolve(config.modRequest.platformProjectRoot);
       const drawableDir = path.join(platformProjectRoot, 'app', 'src', 'main', 'res', 'drawable');
@@ -381,6 +427,7 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, p
         }
       } else {
         // Remove the notification icon file if it exists
+        KlaviyoLog.log('Removing notification icon from Android resources');
         if (fs.existsSync(destPath)) {
           try {
             // First try to remove the file
@@ -399,6 +446,8 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, p
               throw new Error(`Failed to remove notification icon: ${forceError}`);
             }
           }
+        } else {
+          KlaviyoLog.log('No notification icon found to remove');
         }
       }
 
@@ -408,14 +457,17 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, p
 };
 
 const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
+  KlaviyoLog.log('Starting Android plugin configuration...');
+  KlaviyoLog.log('Plugin props:' + JSON.stringify(props));
+
   return withPlugins(config, [
-    [withNotificationIcon, props],
-    [withNotificationManifest, props],
-    [withNotificationResources, props],
-    [withAndroidManifestModifications, props],
-    [withMainActivityModifications, props],
+    withNotificationIcon,
+    withNotificationManifest,
+    withNotificationResources,
+    withAndroidManifestModifications,
+    withMainActivityModifications,
     withKlaviyoPluginNameVersion,
-  ]);
+  ].map(plugin => [plugin, props]));
 };
 
 /**

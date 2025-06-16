@@ -101,6 +101,14 @@ npx expo install klaviyo-expo-plugin
 |`ios.swiftVersion`| string | optional| The version of Swift Language used in the project. Must be one of 4.0, 4.2, 5.0, or 6.0. Default: `"5.0"`|
 |`ios.devTeam`| string | optional| The 10-digit alphanumeric Apple Development Team ID associated with the necessary signing capabilites, provisioning profile, etc. Format: "XXXXXXXXXX" Default: `undefined`|
 
+#### Debug mode
+If you'd like to see debug logs of your prebuild, add the following to your build command:
+```
+$ EXPO_DEBUG=true npx expo prebuild
+or
+$ EXPO_DEBUG=true npx expo run:platform
+```
+Please attach these to any build issues you have to help the team debug.
 
 ### Required Config Values
 
