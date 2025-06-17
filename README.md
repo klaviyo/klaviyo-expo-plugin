@@ -1,6 +1,9 @@
 # klaviyo-expo-plugin
 
-#### todo link npm, maybe CI builds?
+### 🚧 Project Status: Under Development 🚧
+
+> **Note:**  
+> This repository is a work in progress. Breaking changes and incomplete features are expected.
 
 ## Contents
 
@@ -12,7 +15,7 @@
     - [iOS](#ios)
   - [Installation](#installation)
   - [Configuration](#configuration)
-    - [Plugin Props](#plugin-props)
+    - [Plugin Props](#plugin-props-table)
     - [Required Config Values](#required-config-values)
   - [Example App](#example-app)
   - [Troubleshooting](#troubleshooting)
@@ -103,10 +106,10 @@ npx expo install klaviyo-expo-plugin
 
 #### Debug mode
 If you'd like to see debug logs of your prebuild, add the following to your build command:
-```
-$ EXPO_DEBUG=true npx expo prebuild
-or
-$ EXPO_DEBUG=true npx expo run:platform
+```bash
+EXPO_DEBUG=true npx expo prebuild
+
+EXPO_DEBUG=true npx expo run:platform
 ```
 Please attach these to any build issues you have to help the team debug.
 
