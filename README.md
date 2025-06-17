@@ -72,7 +72,8 @@ npx expo install klaviyo-expo-plugin
             "codeSigningStyle": "Automatic",
             "projectVersion": "1",
             "marketingVersion": "1.0",
-            "swiftVersion": "5.0"
+            "swiftVersion": "5.0",
+            "devTeam": undefined
           }
         }
       ]
@@ -98,6 +99,7 @@ npx expo install klaviyo-expo-plugin
 |`ios.projectVersion`| string | optional | The internal build number for version. Default: `"1"`|
 |`ios.marketingVersion`| string | optional| The app version displayed in the App Store. Must be of the format "X.X" or "X.X.X". Default: `"1.0"`|
 |`ios.swiftVersion`| string | optional| The version of Swift Language used in the project. Must be one of 4.0, 4.2, 5.0, or 6.0. Default: `"5.0"`|
+|`ios.devTeam`| string | optional| The 10-digit alphanumeric Apple Development Team ID associated with the necessary signing capabilites, provisioning profile, etc. Format: "XXXXXXXXXX" Default: `undefined`|
 
 
 ### Required Config Values

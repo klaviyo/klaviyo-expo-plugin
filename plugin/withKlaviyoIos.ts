@@ -266,6 +266,11 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
         buildSettingsObj.CURRENT_PROJECT_VERSION = props.projectVersion;
         buildSettingsObj.MARKETING_VERSION = props.marketingVersion;
         buildSettingsObj.SWIFT_VERSION = props.swiftVersion;
+        if (props.devTeam != undefined) {
+          buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
+          xcodeProject.addTargetAttribute("DevelopmentTeam", props.devTeam, nseTarget);
+          xcodeProject.addTargetAttribute("DevelopmentTeam", props.devTeam);
+        }
         
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
           buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
