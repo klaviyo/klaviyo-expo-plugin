@@ -1,33 +1,24 @@
-import { ConfigPlugin, withDangerousMod, withEntitlementsPlist, withInfoPlist, withXcodeProject } from '@expo/config-plugins';
+import { ConfigPlugin, withPlugins, withDangerousMod, withEntitlementsPlist, withInfoPlist, withXcodeProject } from '@expo/config-plugins';
 import { KlaviyoPluginIosProps } from './types';
 import * as path from 'path';
 import * as fs from 'fs';
 import { FileManager } from './support/fileManager';
+import { KlaviyoLog } from './support/logger';
 
 const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
-  console.log('🔄 Starting iOS plugin configuration...');
-  console.log('📝 Plugin props:', JSON.stringify(props, null, 2));
+  KlaviyoLog.log('Starting iOS plugin configuration...');
+  KlaviyoLog.log('Plugin props:' + JSON.stringify(props));
 
-  config = withKlaviyoPluginConfigurationPlist(config);
-  console.log('✅ Plist configured');
-
-  config = withRemoteNotificationsPermissions(config, props);
-  console.log('✅ Remote notifications permissions set up');
-
-  config = withKlaviyoPodfile(config, props);
-  console.log('✅ Klaviyo Podfile modifications complete');
-
-  config = withKlaviyoXcodeProject(config, props);
-  console.log('✅ Notification Service Extension target added');
-  
-  config = withKlaviyoNSE(config, props);
-  console.log('✅ Notification Service Extension target setup with Klaviyo files');
-
-  config = withKlaviyoAppGroup(config, props);
-  console.log('✅ App group configured');
-
-  return config;
+  return withPlugins(config, [
+    withKlaviyoPluginConfigurationPlist,
+    withRemoteNotificationsPermissions,
+    withKlaviyoPodfile,
+    withKlaviyoXcodeProject,
+    withKlaviyoNSE,
+    withKlaviyoAppGroup,
+  ].map(plugin => [plugin, props]));
 };
+
 export default withKlaviyoIos;
 
 /**
@@ -38,7 +29,7 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
     const xcodeProject = config.modResults;
     const projectName = config.modRequest.projectName || config.name;
     if (!projectName) {
-      throw new Error('⚠️ Could not determine project name for iOS build');
+      throw new Error('Could not determine project name for iOS build');
     }
 
     // Get the plugin's root directory, accounting for the dist folder
@@ -53,13 +44,13 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
     if (fs.existsSync(srcPlistPath)) {
       // Copy the file
       fs.copyFileSync(srcPlistPath, destPlistPath);
-      console.log(`✅ Copied klaviyo-plugin-configuration.plist to ${destPlistPath}`);
+      KlaviyoLog.log(`Copied klaviyo-plugin-configuration.plist to ${destPlistPath}`);
 
       // Get the main group
       const mainGroupId = xcodeProject.findPBXGroupKey({ name: projectName });
       
       if (!mainGroupId) {
-        console.warn(`⚠️ Could not find main group for project ${projectName}, skipping Xcode project modification`);
+        KlaviyoLog.log(`Could not find main group for project ${projectName}, skipping Xcode project modification`);
         return config;
       }
 
@@ -71,14 +62,14 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
       );
 
       if (!fileRef) {
-        console.warn('⚠️ Failed to add file to Xcode project');
+        KlaviyoLog.log('Failed to add file to Xcode project');
         return config;
       }
 
       // Add the file to the "Copy Bundle Resources" build phase
       const target = xcodeProject.getFirstTarget();
       if (!target) {
-        console.warn('⚠️ Could not find target, skipping build phase modification');
+        KlaviyoLog.log('Could not find target, skipping build phase modification');
         return config;
       }
 
@@ -96,13 +87,13 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
           'Copy Bundle Resources',
           target.uuid
         );
-        console.log('✅ Created Copy Bundle Resources build phase');
+        KlaviyoLog.log('Created Copy Bundle Resources build phase');
       }
 
       if (buildPhase) {
         // Add the file as a resource
         xcodeProject.addResourceFile(destPlistPath, { target: target.uuid });
-        console.log('✅ Added klaviyo-plugin-configuration.plist to Xcode project');
+        KlaviyoLog.log('Added klaviyo-plugin-configuration.plist to Xcode project');
 
         // Ensure the file is included in the build phase
         const buildPhaseFiles = buildPhase.files || [];
@@ -117,13 +108,13 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
           // Add the file to the build phase
           xcodeProject.addToPbxBuildFileSection(fileRef);
           xcodeProject.addToPbxResourcesBuildPhase(fileRef);
-          console.log('✅ Added klaviyo-plugin-configuration.plist to Copy Bundle Resources build phase');
+          KlaviyoLog.log('Added klaviyo-plugin-configuration.plist to Copy Bundle Resources build phase');
         }
       } else {
-        console.warn('⚠️ Failed to create or find Copy Bundle Resources build phase');
+        KlaviyoLog.log('Failed to create or find Copy Bundle Resources build phase');
       }
     } else {
-      console.warn(`⚠️ Source plist not found at ${srcPlistPath}`);
+      KlaviyoLog.log(`Source plist not found at ${srcPlistPath}`);
     }
 
     return config;
@@ -145,6 +136,8 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
   config,
   props
 ) => {
+  KlaviyoLog.log('Setting up remote notifications permissions...');
+
   return withInfoPlist(config, (config) => {
     const infoPlist = config.modResults;
     infoPlist.klaviyo_app_group = appGroupName;
@@ -187,13 +180,13 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
           await FileManager.writeFile(`${iosRoot}/Podfile`, updatedPodfile);
         }
       } catch (err) {
-        console.log('⚠️ Could not write Klaviyo changes to Podfile:', err);
+        KlaviyoLog.log('Could not write Klaviyo changes to Podfile: ' + err);
       }
       
       return config;
     },
   ]);
-}
+};
 
 /**
  * Adds the Notification Service Extension target and build phases.
@@ -202,7 +195,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
   return withXcodeProject(config, async (config) => {
     const xcodeProject = config.modResults;
     if (!!xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
-      console.log(`⚠️ ${NSE_TARGET_NAME} already exists in project. Skipping...`);
+      KlaviyoLog.log(`⚠️ ${NSE_TARGET_NAME} already exists in project. Skipping...`);
       return config;
     }
 
@@ -303,7 +296,7 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
             path.join(nsePath, file)
           );
         } catch (error) {
-          console.error(`⚠️ Failed to copy ${file}:`, error);
+          KlaviyoLog.error(`Failed to copy ${file}: ${error}`);
           throw error;
         }
       }
