@@ -15,7 +15,7 @@
     - [iOS](#ios)
   - [Installation](#installation)
   - [Configuration](#configuration)
-    - [Plugin Props](#plugin-props)
+    - [Plugin Props](#plugin-props-table)
     - [Required Config Values](#required-config-values)
   - [Example App](#example-app)
   - [Troubleshooting](#troubleshooting)
