@@ -1,115 +1,57 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, TextInput, Alert } from 'react-native';
-import { Klaviyo } from 'klaviyo-react-native-sdk';
+import React from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
 
-export default function ProfileScreen() {
-  const [apiKey, setApiKey] = useState('');
-  const [profile, setProfile] = useState({
-    email: '',
-    firstName: '',
-    lastName: '',
-    phoneNumber: '',
-    externalId: ''
-  });
+const featuredPlants = [
+  {
+    id: 1,
+    name: 'Monstera Deliciosa',
+    price: '$45.99',
+    image: 'https://images.unsplash.com/photo-1525498128493-380d1990a112?w=500',
+    description: 'Popular tropical plant with distinctive leaf holes'
+  },
+  {
+    id: 2,
+    name: 'Snake Plant',
+    price: '$29.99',
+    image: 'https://images.unsplash.com/photo-1596547609652-9cf5d8c10d6e?w=500',
+    description: 'Low maintenance, air-purifying plant'
+  },
+  {
+    id: 3,
+    name: 'Fiddle Leaf Fig',
+    price: '$59.99',
+    image: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=500',
+    description: 'Trendy indoor tree with large violin-shaped leaves'
+  }
+];
 
-  const handleInitialize = () => {
-    if (apiKey.length !== 6) {
-      Alert.alert('Invalid API Key', 'Please enter a 6-character API key');
-      return;
-    }
-    Klaviyo.initialize(apiKey);
-  };
-
-  const handleTrackEvent = () => {
-    Klaviyo.createEvent({
-      name: 'Test Event',
-    });
-  };
-
-  const handleSaveProfile = () => {
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(profile.email)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address');
-      return;
-    }
-
-    // Phone validation (basic format check)
-    const phoneRegex = /^\+?[\d\s-]{10,}$/;
-    if (profile.phoneNumber && !phoneRegex.test(profile.phoneNumber)) {
-      Alert.alert('Invalid Phone', 'Please enter a valid phone number');
-      return;
-    }
-
-    Klaviyo.setProfile({
-      email: profile.email,
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      phoneNumber: profile.phoneNumber,
-      externalId: profile.externalId
-    });
-  };
-
+export default function PlantShopScreen() {
   return (
-    <View style={styles.container}>
-      <View style={styles.section}>
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.apiInput}
-            placeholder="Enter 6-char API key"
-            value={apiKey}
-            onChangeText={setApiKey}
-            maxLength={6}
-          />
-          <TouchableOpacity style={styles.button} onPress={handleInitialize}>
-            <Text style={styles.buttonText}>Initialize</Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={handleTrackEvent}>
-          <Text style={styles.buttonText}>Track Event</Text>
-        </TouchableOpacity>
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Featured Plants</Text>
+        <Text style={styles.headerSubtitle}>Discover our most popular plants</Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Profile Information</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={profile.email}
-          onChangeText={(text) => setProfile({ ...profile, email: text })}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="First Name"
-          value={profile.firstName}
-          onChangeText={(text) => setProfile({ ...profile, firstName: text })}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Last Name"
-          value={profile.lastName}
-          onChangeText={(text) => setProfile({ ...profile, lastName: text })}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Phone Number"
-          value={profile.phoneNumber}
-          onChangeText={(text) => setProfile({ ...profile, phoneNumber: text })}
-          keyboardType="phone-pad"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="External ID"
-          value={profile.externalId}
-          onChangeText={(text) => setProfile({ ...profile, externalId: text })}
-        />
-        <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={handleSaveProfile}>
-          <Text style={styles.buttonText}>Save Profile</Text>
-        </TouchableOpacity>
+      <View style={styles.plantsContainer}>
+        {featuredPlants.map((plant) => (
+          <TouchableOpacity key={plant.id} style={styles.plantCard}>
+            <Image
+              source={{ uri: plant.image }}
+              style={styles.plantImage}
+            />
+            <View style={styles.plantInfo}>
+              <Text style={styles.plantName}>{plant.name}</Text>
+              <Text style={styles.plantPrice}>{plant.price}</Text>
+              <Text style={styles.plantDescription}>{plant.description}</Text>
+              <TouchableOpacity style={styles.addToCartButton}>
+                <Text style={styles.buttonText}>Add to Cart</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        ))}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -118,44 +60,67 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  section: {
+  header: {
     padding: 20,
-    gap: 15,
+    backgroundColor: '#F1F8E9',
   },
-  sectionTitle: {
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    marginBottom: 5,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#666',
+  },
+  plantsContainer: {
+    padding: 15,
+  },
+  plantCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  plantImage: {
+    width: '100%',
+    height: 200,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  plantInfo: {
+    padding: 15,
+  },
+  plantName: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+    color: '#2E7D32',
+    marginBottom: 5,
   },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  plantPrice: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+  },
+  plantDescription: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 15,
   },
-  apiInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 10,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
+  addToCartButton: {
+    backgroundColor: '#2E7D32',
     paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 8,
     alignItems: 'center',
-  },
-  fullWidthButton: {
-    width: '100%',
   },
   buttonText: {
     color: '#fff',
