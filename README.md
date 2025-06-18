@@ -26,16 +26,17 @@
 The Klaviyo Expo Plugin is a config plugin for Expo that automates the integration of Klaviyo's native SDKs into your Expo project. This plugin handles all the necessary native code modifications required for Klaviyo functionality, eliminating the need for manual native code changes.
 
 The plugin is designed to work with the [klaviyo-react-native-sdk](https://github.com/klaviyo/klaviyo-react-native-sdk) and automates the setup of:
-- Push notification open tracking and key:value data reading
+- Push notification open tracking
+- Rich push notification support
 - Badge count management (iOS)
-- Notification service extension (iOS)
+- Key:value pair data reading
+- Notification service extension setup (iOS)
 - Icon / color notification configuration (Android)
-- Rich push support
 
 ## Requirements
 
 ### Expo
-- Development build (we do not support Expo Go)
+- Your expo app needs to be run as a [development build](https://docs.expo.dev/develop/development-builds/introduction/). This plugin will not work in Expo Go.
 
 ### Android
 - `minSdkVersion` of `23+`
@@ -76,7 +77,7 @@ npx expo install klaviyo-expo-plugin
             "projectVersion": "1",
             "marketingVersion": "1.0",
             "swiftVersion": "5.0",
-            "devTeam": undefined
+            "devTeam": undefined // your devTeam ID here
           }
         }
       ]
@@ -84,8 +85,11 @@ npx expo install klaviyo-expo-plugin
   }
 }
 ```
-
-3. (optional) We recommend using the `expo-notifications` library for push permissions, token retrieval, and reading push content. Check out our `/example` project for some ideas on how to use this.
+3. Run a prebuild to apply expo plugin to your project:
+```bash
+npx expo prebuild
+```
+4. (optional) We recommend using the `expo-notifications` library for push permissions, token retrieval, and reading push content. Check out our `/example` project for some ideas on how to use this.
 
 ## Configuration
 
