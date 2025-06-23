@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { Klaviyo, EventName } from 'klaviyo-react-native-sdk';
 
 const featuredPlants = [
   {
@@ -26,6 +27,18 @@ const featuredPlants = [
 ];
 
 export default function PlantShopScreen() {
+  const handleAddToCart = (plant: any) => {
+    Klaviyo.createEvent({
+      name: EventName.ADDED_TO_CART_METRIC,
+      properties: {
+        'Product Name': plant.name,
+        'Product Price': plant.price,
+        'Product Description': plant.description,
+        'Product ID': plant.id,
+      },
+    });
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -44,7 +57,10 @@ export default function PlantShopScreen() {
               <Text style={styles.plantName}>{plant.name}</Text>
               <Text style={styles.plantPrice}>{plant.price}</Text>
               <Text style={styles.plantDescription}>{plant.description}</Text>
-              <TouchableOpacity style={styles.addToCartButton}>
+              <TouchableOpacity 
+                style={styles.addToCartButton}
+                onPress={() => handleAddToCart(plant)}
+              >
                 <Text style={styles.buttonText}>Add to Cart</Text>
               </TouchableOpacity>
             </View>

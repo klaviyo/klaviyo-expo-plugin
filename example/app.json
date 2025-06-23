@@ -37,12 +37,6 @@
       [
         "klaviyo-expo-plugin",
         {
-          "android": {
-            "logLevel": 6,
-            "openTracking": true,
-            "notificationIconFilePath": "./assets/images/ic_notification.png",
-            "notificationColor": "#FF0000"
-          },
           "ios": {
             "badgeAutoclearing": true,
             "codeSigningStyle": "Automatic",
