@@ -1,9 +1,6 @@
 # klaviyo-expo-plugin
 
-### 🚧 Project Status: Under Development 🚧
-
-> **Note:**
-> This repository is a work in progress. Breaking changes and incomplete features are expected.
+### 🚧 Project Status: Release Candidate 🚧
 
 ## Contents
 
