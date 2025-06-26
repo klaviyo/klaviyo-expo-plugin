@@ -169,8 +169,6 @@ Common issues and solutions:
    - Verify Expo SDK version compatibility
    - Check native dependencies
 
-If you are unable to 
-
 ## License
 
 The Klaviyo Expo Plugin is available under the terms of the [MIT license](LICENSE).
