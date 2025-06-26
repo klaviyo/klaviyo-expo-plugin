@@ -1,9 +1,6 @@
 # klaviyo-expo-plugin
 
-### 🚧 Project Status: Under Development 🚧
-
-> **Note:**
-> This repository is a work in progress. Breaking changes and incomplete features are expected.
+### 🚧 Project Status: Release Candidate 🚧
 
 ## Contents
 
@@ -171,6 +168,8 @@ Common issues and solutions:
    - Clean and rebuild the project
    - Verify Expo SDK version compatibility
    - Check native dependencies
+
+If you are unable to 
 
 ## License
 
