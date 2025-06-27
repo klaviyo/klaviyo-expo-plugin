@@ -34,33 +34,26 @@ jest.mock('xml2js', () => ({
 
 // Mock @expo/config-plugins
 jest.mock('@expo/config-plugins', () => ({
-  withDangerousMod: jest.fn().mockImplementation((config, mod) => {
-    // Return a function that takes config and props
-    return (config: any, props: any) => {
-      // Return the config as-is for testing
-      return config;
-    };
+  withDangerousMod: jest.fn().mockImplementation((config, mod) => config),
+  withAndroidManifest: jest.fn().mockImplementation((config, mod) => config),
+  withStringsXml: jest.fn().mockImplementation((config, mod) => config),
+  withInfoPlist: jest.fn().mockImplementation((config, mod) => {
+    const modifiedConfig = { ...config };
+    const result = mod(modifiedConfig);
+    return result || modifiedConfig;
   }),
-  withAndroidManifest: jest.fn().mockImplementation((config, mod) => {
-    // Return a function that takes config and props
-    return (config: any, props: any) => {
-      // Return the config as-is for testing
-      return config;
-    };
+  withEntitlementsPlist: jest.fn().mockImplementation((config, mod) => {
+    const modifiedConfig = { ...config };
+    const result = mod(modifiedConfig);
+    return result || modifiedConfig;
   }),
-  withStringsXml: jest.fn().mockImplementation((config, mod) => {
-    // Return a function that takes config and props
-    return (config: any, props: any) => {
-      // Return the config as-is for testing
-      return config;
-    };
-  }),
+  withXcodeProject: jest.fn().mockImplementation((config, mod) => config),
   withPlugins: jest.fn().mockImplementation((config, plugins) => {
-    // Return a function that takes config and props
-    return (config: any, props: any) => {
-      // Return the config as-is for testing
-      return config;
-    };
+    let result = { ...config };
+    for (const [plugin, pluginProps] of plugins) {
+      result = plugin(result, pluginProps);
+    }
+    return result;
   }),
 }));
 
@@ -105,6 +98,35 @@ global.testUtils = {
     openTracking: true,
     notificationIconFilePath: './assets/icon.png',
     notificationColor: '#FF0000',
+    ...overrides,
+  }),
+
+  createMockIosConfig: (overrides = {}) => ({
+    name: 'TestApp',
+    ios: {
+      bundleIdentifier: 'com.test.app',
+    },
+    modRequest: {
+      projectName: 'TestApp',
+      platformProjectRoot: '/test/project/ios',
+      projectRoot: '/test/project',
+    },
+    modResults: {
+      CFBundleDisplayName: 'TestApp',
+      CFBundleIdentifier: 'com.test.app',
+      CFBundleVersion: '1',
+      CFBundleShortVersionString: '1.0',
+    },
+    ...overrides,
+  }),
+
+  createMockIosProps: (overrides = {}) => ({
+    badgeAutoclearing: true,
+    codeSigningStyle: 'Automatic',
+    projectVersion: '1',
+    marketingVersion: '1.0',
+    swiftVersion: '5.0',
+    devTeam: 'XXXXXXXXXX',
     ...overrides,
   }),
 }; 
