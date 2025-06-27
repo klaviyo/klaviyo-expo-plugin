@@ -12,7 +12,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:coverage:html": "jest --coverage --coverageReporters=html --coverageReporters=text && open coverage/lcov-report/index.html"
+    "test:coverage:html": "jest --coverage --coverageReporters=html --coverageReporters=text && open coverage/index.html"
   },
   "keywords": [
     "expo",

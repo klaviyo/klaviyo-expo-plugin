@@ -1,4 +1,5 @@
-import { findMainActivity, withMainActivityModifications, withNotificationIcon, withKlaviyoPluginNameVersion } from '../plugin/withKlaviyoAndroid';
+import { findMainActivity, withMainActivityModifications, withNotificationIcon, withKlaviyoPluginNameVersion, modifyMainActivity } from '../plugin/withKlaviyoAndroid';
+import { executePlugin } from './utils/testHelpers';
 
 // Mock file system operations
 jest.mock('fs', () => ({
@@ -145,6 +146,172 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       
       const result = withMainActivityModifications(config, props);
       expect(typeof result).toBe('function');
+    });
+
+    // Error condition tests
+    describe('error conditions', () => {
+      it('should handle missing android package in config', () => {
+        const config = global.testUtils.createMockConfig({ android: undefined });
+        const props = global.testUtils.createMockProps({ openTracking: true });
+        
+        const result = withMainActivityModifications(config, props);
+        expect(typeof result).toBe('function');
+      });
+
+      it('should handle null android package in config', () => {
+        const config = global.testUtils.createMockConfig({ android: null });
+        const props = global.testUtils.createMockProps({ openTracking: true });
+        
+        const result = withMainActivityModifications(config, props);
+        expect(typeof result).toBe('function');
+      });
+
+      it('should handle empty android object in config', () => {
+        const config = global.testUtils.createMockConfig({ android: {} });
+        const props = global.testUtils.createMockProps({ openTracking: true });
+        
+        const result = withMainActivityModifications(config, props);
+        expect(typeof result).toBe('function');
+      });
+
+      it('should handle missing MainActivity detection', () => {
+        const fs = require('fs');
+        const { getMainActivityAsync } = require('@expo/config-plugins/build/android/Paths');
+        
+        // Mock that no MainActivity is found
+        getMainActivityAsync.mockRejectedValue(new Error('Not found'));
+        fs.existsSync.mockReturnValue(false);
+        
+        const config = global.testUtils.createMockConfig();
+        const props = global.testUtils.createMockProps({ openTracking: true });
+        
+        const result = withMainActivityModifications(config, props);
+        expect(typeof result).toBe('function');
+      });
+
+      it('should handle MainActivity file not existing', () => {
+        const fs = require('fs');
+        const { getMainActivityAsync } = require('@expo/config-plugins/build/android/Paths');
+        
+        // Mock that MainActivity is found but file doesn't exist
+        getMainActivityAsync.mockResolvedValue('/test/path/MainActivity.java');
+        fs.existsSync.mockImplementation((path: string) => {
+          // Return true for directory checks, false for file checks
+          return path.includes('java') && !path.includes('MainActivity');
+        });
+        
+        const config = global.testUtils.createMockConfig();
+        const props = global.testUtils.createMockProps({ openTracking: true });
+        
+        const result = withMainActivityModifications(config, props);
+        expect(typeof result).toBe('function');
+      });
+
+      it('should handle MainActivity without package declaration', () => {
+        const fs = require('fs');
+        const { getMainActivityAsync } = require('@expo/config-plugins/build/android/Paths');
+        
+        // Mock that MainActivity is found and exists
+        getMainActivityAsync.mockResolvedValue('/test/path/MainActivity.java');
+        fs.existsSync.mockReturnValue(true);
+        
+        // Mock file content without package declaration
+        fs.readFileSync.mockReturnValue(`
+          import com.facebook.react.ReactActivity;
+          
+          public class MainActivity extends ReactActivity {
+            @Override
+            protected String getMainComponentName() {
+              return "main";
+            }
+          }
+        `);
+        
+        const config = global.testUtils.createMockConfig();
+        const props = global.testUtils.createMockProps({ openTracking: true });
+        
+        const result = withMainActivityModifications(config, props);
+        expect(typeof result).toBe('function');
+      });
+
+      it('should handle MainActivity without class declaration', () => {
+        const fs = require('fs');
+        const { getMainActivityAsync } = require('@expo/config-plugins/build/android/Paths');
+        
+        // Mock that MainActivity is found and exists
+        getMainActivityAsync.mockResolvedValue('/test/path/MainActivity.java');
+        fs.existsSync.mockReturnValue(true);
+        
+        // Mock file content with package but no class declaration
+        fs.readFileSync.mockReturnValue(`
+          package com.example.test;
+          
+          import com.facebook.react.ReactActivity;
+          
+          // No class declaration here
+        `);
+        
+        const config = global.testUtils.createMockConfig();
+        const props = global.testUtils.createMockProps({ openTracking: true });
+        
+        const result = withMainActivityModifications(config, props);
+        expect(typeof result).toBe('function');
+      });
+
+      it('should handle MainActivity with different class name', () => {
+        const fs = require('fs');
+        const { getMainActivityAsync } = require('@expo/config-plugins/build/android/Paths');
+        
+        // Mock that MainActivity is found and exists
+        getMainActivityAsync.mockResolvedValue('/test/path/MainActivity.java');
+        fs.existsSync.mockReturnValue(true);
+        
+        // Mock file content with different class name
+        fs.readFileSync.mockReturnValue(`
+          package com.example.test;
+          
+          import com.facebook.react.ReactActivity;
+          
+          public class MyActivity extends ReactActivity {
+            @Override
+            protected String getMainComponentName() {
+              return "main";
+            }
+          }
+        `);
+        
+        const config = global.testUtils.createMockConfig();
+        const props = global.testUtils.createMockProps({ openTracking: true });
+        
+        const result = withMainActivityModifications(config, props);
+        expect(typeof result).toBe('function');
+      });
+
+      it('should handle MainActivity not extending ReactActivity', () => {
+        const fs = require('fs');
+        const { getMainActivityAsync } = require('@expo/config-plugins/build/android/Paths');
+        
+        // Mock that MainActivity is found and exists
+        getMainActivityAsync.mockResolvedValue('/test/path/MainActivity.java');
+        fs.existsSync.mockReturnValue(true);
+        
+        // Mock file content where MainActivity doesn't extend ReactActivity
+        fs.readFileSync.mockReturnValue(`
+          package com.example.test;
+          
+          import com.facebook.react.ReactActivity;
+          
+          public class MainActivity {
+            // Does not extend ReactActivity
+          }
+        `);
+        
+        const config = global.testUtils.createMockConfig();
+        const props = global.testUtils.createMockProps({ openTracking: true });
+        
+        const result = withMainActivityModifications(config, props);
+        expect(typeof result).toBe('function');
+      });
     });
   });
 
@@ -306,6 +473,47 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       
       const result = await findMainActivity('/test/project/root');
       expect(result).toBeDefined();
+    });
+  });
+
+  describe('modifyMainActivity error handling', () => {
+    const fs = require('fs');
+    const baseConfig = global.testUtils.createMockConfig();
+    const baseProps = global.testUtils.createMockProps({ openTracking: true });
+
+    beforeEach(() => {
+      jest.resetAllMocks();
+      fs.existsSync.mockReturnValue(true);
+      fs.readFileSync.mockReturnValue(`package com.example.test;\npublic class MainActivity extends ReactActivity {}`);
+    });
+
+    it('throws if android.package is missing', async () => {
+      const config = { ...baseConfig, android: undefined };
+      await expect(modifyMainActivity(config, baseProps)).rejects.toThrow('Android package not found in app config');
+    });
+
+    it('throws if mainActivityInfo is null', async () => {
+      const mockFindMainActivity = jest.fn().mockResolvedValue(null);
+      const config = { ...baseConfig };
+      await expect(modifyMainActivity(config, baseProps, mockFindMainActivity)).rejects.toThrow('Could not find main activity file. Please ensure your app has a valid ReactActivity.');
+    });
+
+    it('throws if MainActivity file does not exist', async () => {
+      const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/path/MainActivity.java', isKotlin: false });
+      fs.existsSync.mockReturnValue(false);
+      await expect(modifyMainActivity(baseConfig, baseProps, mockFindMainActivity)).rejects.toThrow('MainActivity not found at path: /test/path/MainActivity.java');
+    });
+
+    it('throws if MainActivity has no package declaration', async () => {
+      const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/path/MainActivity.java', isKotlin: false });
+      fs.readFileSync.mockReturnValue(`public class MainActivity extends ReactActivity {}`);
+      await expect(modifyMainActivity(baseConfig, baseProps, mockFindMainActivity)).rejects.toThrow('Could not find package declaration in MainActivity');
+    });
+
+    it('throws if MainActivity has no class declaration', async () => {
+      const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/path/MainActivity.java', isKotlin: false });
+      fs.readFileSync.mockReturnValue(`package com.example.test;\n// no class here`);
+      await expect(modifyMainActivity(baseConfig, baseProps, mockFindMainActivity)).rejects.toThrow('Could not find MainActivity class declaration');
     });
   });
 }); 

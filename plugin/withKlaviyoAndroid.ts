@@ -107,140 +107,128 @@ const findMainActivity = async (projectRoot: string): Promise<{ path: string; is
   return null;
 };
 
+export async function modifyMainActivity(config: any, props: any, findMainActivityImpl = findMainActivity) {
+  KlaviyoLog.log('Modifying MainActivity');
+  KlaviyoLog.log(`OpenTracking setting: ${props.openTracking}`);
+  
+  if (!config.android?.package) {
+    throw new Error('Android package not found in app config');
+  }
+
+  const mainActivityInfo = await findMainActivityImpl(config.modRequest.platformProjectRoot);
+
+  if (!mainActivityInfo) {
+    throw new Error('Could not find main activity file. Please ensure your app has a valid ReactActivity.');
+  }
+
+  const { path: mainActivityPath, isKotlin } = mainActivityInfo;
+  KlaviyoLog.log(`MainActivity path: ${mainActivityPath}`);
+  KlaviyoLog.log(`MainActivity language: ${isKotlin ? 'Kotlin' : 'Java'}`);
+
+  if (!fs.existsSync(mainActivityPath)) {
+    throw new Error(`MainActivity not found at path: ${mainActivityPath}`);
+  }
+
+  // Read the current content
+  const mainActivityContent = fs.readFileSync(mainActivityPath, 'utf-8');
+  KlaviyoLog.log(`Found MainActivity, current size: ${mainActivityContent.length} bytes`);
+
+  // Find the package declaration line to use as our anchor
+  const packageMatch = mainActivityContent.match(/^package .+$/m);
+  if (!packageMatch) {
+    throw new Error('Could not find package declaration in MainActivity');
+  }
+
+  // Find the class declaration line to use as our anchor
+  const classMatch = mainActivityContent.match(/^(?:public\s+)?class\s+MainActivity\s+(?:extends|:)\s+ReactActivity\s*(?:\(\))?\s*\{/m);
+  if (!classMatch) {
+    throw new Error('Could not find MainActivity class declaration');
+  }
+
+  // Split the content into lines for more precise manipulation
+  let lines = mainActivityContent.split('\n');
+
+  // Remove Klaviyo-related imports and generated blocks
+  let newLines: string[] = [];
+  let skipLines = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Skip Klaviyo-related imports
+    if (line.trim().startsWith('import') && 
+        (line.includes('android.content.Intent') || 
+         line.includes('com.klaviyo.analytics.Klaviyo'))) {
+      continue;
+    }
+
+    // Handle generated blocks
+    if (line.includes('// @generated begin klaviyo-')) {
+      skipLines = true;
+      continue;
+    }
+    if (line.includes('// @generated end klaviyo-')) {
+      skipLines = false;
+      continue;
+    }
+    if (!skipLines) {
+      newLines.push(line);
+    }
+  }
+
+  // Clean up multiple empty lines
+  let cleanedContent = newLines.join('\n').replace(/\n{3,}/g, '\n\n');
+
+  // Only add the code if openTracking is enabled
+  if (props.openTracking) {
+    KlaviyoLog.log('Adding push tracking code to MainActivity...');
+    
+    // First, remove any existing generated content
+    let contentWithoutGenerated = cleanedContent.replace(
+      /\/\/ @generated begin klaviyo-[\s\S]*?\/\/ @generated end klaviyo-/g,
+      ''
+    ).trim();
+
+    // Add imports right after the package declaration
+    const importContents = mergeContents({
+      tag: 'klaviyo-imports',
+      src: contentWithoutGenerated,
+      newSrc: isKotlin ? 
+        `import android.content.Intent\nimport com.klaviyo.analytics.Klaviyo` :
+        `import android.content.Intent;\nimport com.klaviyo.analytics.Klaviyo;`,
+      anchor: /^package .+$/m,
+      offset: 1,
+      comment: '//',
+    });
+
+    // Add the onNewIntent override right after the class declaration
+    const methodContents = mergeContents({
+      tag: 'klaviyo-onNewIntent',
+      src: importContents.contents,
+      newSrc: isKotlin ?
+        `\n    override fun onNewIntent(intent: Intent) {\n        super.onNewIntent(intent)\n\n        // Tracks when a system tray notification is opened\n        Klaviyo.handlePush(intent)\n    }` :
+        `\n    @Override\n    public void onNewIntent(Intent intent) {\n        super.onNewIntent(intent);\n\n        // Tracks when a system tray notification is opened\n        Klaviyo.handlePush(intent);\n    }`,
+      anchor: isKotlin ? 
+        /^class MainActivity : ReactActivity\(\) \{$/m :
+        /^(?:public\s+)?class\s+MainActivity\s+(?:extends|:)\s+ReactActivity\s*(?:\(\))?\s*\{/m,
+      offset: 1,
+      comment: '//',
+    });
+
+    // Write the modified content back to the file
+    fs.writeFileSync(mainActivityPath, methodContents.contents);
+  } else {
+    KlaviyoLog.log('Removing push tracking code from MainActivity...');
+    // Write the cleaned content back
+    fs.writeFileSync(mainActivityPath, cleanedContent);
+  }
+}
+
 const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withDangerousMod(config, [
     'android',
     async (config) => {
-      KlaviyoLog.log('Modifying MainActivity');
-      KlaviyoLog.log(`OpenTracking setting: ${props.openTracking}`);
-      
-      if (!config.android?.package) {
-        throw new Error('Android package not found in app config');
-      }
-
-      const mainActivityInfo = await findMainActivity(config.modRequest.platformProjectRoot);
-
-      if (!mainActivityInfo) {
-        throw new Error('Could not find main activity file. Please ensure your app has a valid ReactActivity.');
-      }
-
-      const { path: mainActivityPath, isKotlin } = mainActivityInfo;
-      KlaviyoLog.log(`MainActivity path: ${mainActivityPath}`);
-      KlaviyoLog.log(`MainActivity language: ${isKotlin ? 'Kotlin' : 'Java'}`);
-
-      if (!fs.existsSync(mainActivityPath)) {
-        throw new Error(`MainActivity not found at path: ${mainActivityPath}`);
-      }
-
-      // Read the current content
-      const mainActivityContent = fs.readFileSync(mainActivityPath, 'utf-8');
-      KlaviyoLog.log(`Found MainActivity, current size: ${mainActivityContent.length} bytes`);
-
-      // Find the package declaration line to use as our anchor
-      const packageMatch = mainActivityContent.match(/^package .+$/m);
-      if (!packageMatch) {
-        throw new Error('Could not find package declaration in MainActivity');
-      }
-
-      // Find the class declaration line to use as our anchor
-      const classMatch = mainActivityContent.match(/^(?:public\s+)?class\s+MainActivity\s+(?:extends|:)\s+ReactActivity\s*(?:\(\))?\s*\{/m);
-      if (!classMatch) {
-        throw new Error('Could not find MainActivity class declaration');
-      }
-
-      // Split the content into lines for more precise manipulation
-      let lines = mainActivityContent.split('\n');
-
-      // Remove Klaviyo-related imports and generated blocks
-      let newLines: string[] = [];
-      let skipLines = false;
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        
-        // Skip Klaviyo-related imports
-        if (line.trim().startsWith('import') && 
-            (line.includes('android.content.Intent') || 
-             line.includes('com.klaviyo.analytics.Klaviyo'))) {
-          continue;
-        }
-
-        // Handle generated blocks
-        if (line.includes('// @generated begin klaviyo-')) {
-          skipLines = true;
-          continue;
-        }
-        if (line.includes('// @generated end klaviyo-')) {
-          skipLines = false;
-          continue;
-        }
-        if (!skipLines) {
-          newLines.push(line);
-        }
-      }
-
-      // Clean up multiple empty lines
-      let cleanedContent = newLines.join('\n').replace(/\n{3,}/g, '\n\n');
-
-      // Only add the code if openTracking is enabled
-      if (props.openTracking) {
-        KlaviyoLog.log('Adding push tracking code to MainActivity...');
-        
-        // First, remove any existing generated content
-        let contentWithoutGenerated = cleanedContent.replace(
-          /\/\/ @generated begin klaviyo-[\s\S]*?\/\/ @generated end klaviyo-/g,
-          ''
-        ).trim();
-
-        // Add imports right after the package declaration
-        const importContents = mergeContents({
-          tag: 'klaviyo-imports',
-          src: contentWithoutGenerated,
-          newSrc: isKotlin ? 
-            `import android.content.Intent
-import com.klaviyo.analytics.Klaviyo` :
-            `import android.content.Intent;
-import com.klaviyo.analytics.Klaviyo;`,
-          anchor: /^package .+$/m,
-          offset: 1,
-          comment: '//',
-        });
-
-        // Add the onNewIntent override right after the class declaration
-        const methodContents = mergeContents({
-          tag: 'klaviyo-onNewIntent',
-          src: importContents.contents,
-          newSrc: isKotlin ?
-            `
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-
-        // Tracks when a system tray notification is opened
-        Klaviyo.handlePush(intent)
-    }` :
-            `
-    @Override
-    public void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-
-        // Tracks when a system tray notification is opened
-        Klaviyo.handlePush(intent);
-    }`,
-          anchor: isKotlin ? 
-            /^class MainActivity : ReactActivity\(\) \{$/m :
-            /^(?:public\s+)?class\s+MainActivity\s+(?:extends|:)\s+ReactActivity\s*(?:\(\))?\s*\{/m,
-          offset: 1,
-          comment: '//',
-        });
-
-        // Write the modified content back to the file
-        fs.writeFileSync(mainActivityPath, methodContents.contents);
-      } else {
-        KlaviyoLog.log('Removing push tracking code from MainActivity...');
-        // Write the cleaned content back
-        fs.writeFileSync(mainActivityPath, cleanedContent);
-      }
-
+      await modifyMainActivity(config, props);
       return config;
     },
   ]);
