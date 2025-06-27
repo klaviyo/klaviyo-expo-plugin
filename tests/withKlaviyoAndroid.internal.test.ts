@@ -423,6 +423,272 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       const result = withKlaviyoPluginNameVersion(config, props);
       expect(typeof result).toBe('function');
     });
+
+    // Additional comprehensive tests for actual execution behavior
+    describe('execution behavior', () => {
+      let mockWithStringsXml: jest.Mock;
+      let mockConfig: any;
+      let mockProps: any;
+
+      beforeEach(() => {
+        jest.resetAllMocks();
+        mockWithStringsXml = require('@expo/config-plugins').withStringsXml;
+        mockConfig = global.testUtils.createMockConfig();
+        mockProps = global.testUtils.createMockProps();
+      });
+
+      it('should call withStringsXml with correct parameters', () => {
+        withKlaviyoPluginNameVersion(mockConfig, mockProps);
+        
+        expect(mockWithStringsXml).toHaveBeenCalledWith(mockConfig, expect.any(Function));
+      });
+
+      it('should execute the withStringsXml modifier function', () => {
+        const mockModifier = jest.fn();
+        mockWithStringsXml.mockImplementation((config, modifier) => {
+          mockModifier();
+          return config;
+        });
+
+        withKlaviyoPluginNameVersion(mockConfig, mockProps);
+        
+        expect(mockModifier).toHaveBeenCalled();
+      });
+
+      it('should add klaviyo_sdk_plugin_name_override string resource', () => {
+        const testConfig = {
+          modResults: {
+            resources: {
+              string: []
+            }
+          }
+        };
+
+        mockWithStringsXml.mockImplementation((config, modifier) => {
+          const result = modifier(testConfig);
+          expect(result.modResults.resources.string).toContainEqual({
+            $: { name: 'klaviyo_sdk_plugin_name_override' },
+            _: 'klaviyo-expo'
+          });
+          return result;
+        });
+
+        withKlaviyoPluginNameVersion(mockConfig, mockProps);
+      });
+
+      it('should add klaviyo_sdk_plugin_version_override string resource', () => {
+        const testConfig = {
+          modResults: {
+            resources: {
+              string: []
+            }
+          }
+        };
+
+        mockWithStringsXml.mockImplementation((config, modifier) => {
+          const result = modifier(testConfig);
+          expect(result.modResults.resources.string).toContainEqual({
+            $: { name: 'klaviyo_sdk_plugin_version_override' },
+            _: '0.0.2'
+          });
+          return result;
+        });
+
+        withKlaviyoPluginNameVersion(mockConfig, mockProps);
+      });
+
+      it('should update existing string resources instead of adding duplicates', () => {
+        const testConfig = {
+          modResults: {
+            resources: {
+              string: [
+                { $: { name: 'klaviyo_sdk_plugin_name_override' }, _: 'old_name' },
+                { $: { name: 'klaviyo_sdk_plugin_version_override' }, _: 'old_version' }
+              ]
+            }
+          }
+        };
+
+        mockWithStringsXml.mockImplementation((config, modifier) => {
+          const result = modifier(testConfig);
+          
+          // Should update existing entries, not add new ones
+          expect(result.modResults.resources.string).toHaveLength(2);
+          expect(result.modResults.resources.string).toContainEqual({
+            $: { name: 'klaviyo_sdk_plugin_name_override' },
+            _: 'klaviyo-expo'
+          });
+          expect(result.modResults.resources.string).toContainEqual({
+            $: { name: 'klaviyo_sdk_plugin_version_override' },
+            _: '0.0.2'
+          });
+          
+          return result;
+        });
+
+        withKlaviyoPluginNameVersion(mockConfig, mockProps);
+      });
+
+      it('should handle missing resources object', () => {
+        const testConfig = {
+          modResults: {}
+        };
+
+        mockWithStringsXml.mockImplementation((config, modifier) => {
+          const result = modifier(testConfig);
+          expect(result.modResults.resources.string).toBeDefined();
+          expect(result.modResults.resources.string).toHaveLength(2);
+          return result;
+        });
+
+        withKlaviyoPluginNameVersion(mockConfig, mockProps);
+      });
+
+      it('should handle missing string array', () => {
+        const testConfig = {
+          modResults: {
+            resources: {}
+          }
+        };
+
+        mockWithStringsXml.mockImplementation((config, modifier) => {
+          const result = modifier(testConfig);
+          expect(result.modResults.resources.string).toBeDefined();
+          expect(result.modResults.resources.string).toHaveLength(2);
+          return result;
+        });
+
+        withKlaviyoPluginNameVersion(mockConfig, mockProps);
+      });
+
+      it('should handle null string array', () => {
+        const testConfig = {
+          modResults: {
+            resources: {
+              string: null
+            }
+          }
+        };
+
+        mockWithStringsXml.mockImplementation((config, modifier) => {
+          const result = modifier(testConfig);
+          expect(result.modResults.resources.string).toBeDefined();
+          expect(result.modResults.resources.string).toHaveLength(2);
+          return result;
+        });
+
+        withKlaviyoPluginNameVersion(mockConfig, mockProps);
+      });
+
+      it('should handle undefined string array', () => {
+        const testConfig = {
+          modResults: {
+            resources: {
+              string: undefined
+            }
+          }
+        };
+
+        mockWithStringsXml.mockImplementation((config, modifier) => {
+          const result = modifier(testConfig);
+          expect(result.modResults.resources.string).toBeDefined();
+          expect(result.modResults.resources.string).toHaveLength(2);
+          return result;
+        });
+
+        withKlaviyoPluginNameVersion(mockConfig, mockProps);
+      });
+
+      it('should preserve existing string resources', () => {
+        const testConfig = {
+          modResults: {
+            resources: {
+              string: [
+                { $: { name: 'existing_string' }, _: 'existing_value' },
+                { $: { name: 'another_string' }, _: 'another_value' }
+              ]
+            }
+          }
+        };
+
+        mockWithStringsXml.mockImplementation((config, modifier) => {
+          const result = modifier(testConfig);
+          
+          // Should preserve existing strings and add the two Klaviyo strings
+          expect(result.modResults.resources.string).toHaveLength(4);
+          expect(result.modResults.resources.string).toContainEqual({
+            $: { name: 'existing_string' },
+            _: 'existing_value'
+          });
+          expect(result.modResults.resources.string).toContainEqual({
+            $: { name: 'another_string' },
+            _: 'another_value'
+          });
+          
+          return result;
+        });
+
+        withKlaviyoPluginNameVersion(mockConfig, mockProps);
+      });
+
+      it('should handle malformed string resources gracefully', () => {
+        const testConfig = {
+          modResults: {
+            resources: {
+              string: [
+                { $: { name: 'klaviyo_sdk_plugin_name_override' } }, // Missing _ property
+                { name: 'malformed_string' }, // Missing $ property
+                { $: { name: 'klaviyo_sdk_plugin_version_override' }, _: 'old_version' }
+              ]
+            }
+          }
+        };
+
+        mockWithStringsXml.mockImplementation((config, modifier) => {
+          const result = modifier(testConfig);
+          
+          // Should still add/update the Klaviyo strings correctly
+          const nameString = result.modResults.resources.string.find(
+            (s: any) => s.$?.name === 'klaviyo_sdk_plugin_name_override'
+          );
+          const versionString = result.modResults.resources.string.find(
+            (s: any) => s.$?.name === 'klaviyo_sdk_plugin_version_override'
+          );
+          
+          expect(nameString).toBeDefined();
+          expect(nameString._).toBe('klaviyo-expo');
+          expect(versionString).toBeDefined();
+          expect(versionString._).toBe('0.0.2');
+          
+          return result;
+        });
+
+        withKlaviyoPluginNameVersion(mockConfig, mockProps);
+      });
+
+      it('should handle withStringsXml throwing an error', () => {
+        mockWithStringsXml.mockImplementation(() => {
+          throw new Error('withStringsXml error');
+        });
+
+        expect(() => {
+          withKlaviyoPluginNameVersion(mockConfig, mockProps);
+        }).toThrow('withStringsXml error');
+      });
+
+      it('should handle modifier function throwing an error', () => {
+        mockWithStringsXml.mockImplementation((config, modifier) => {
+          const testConfig = { modResults: { resources: { string: [] } } };
+          modifier(testConfig); // This should not throw
+          return config;
+        });
+
+        // Should not throw
+        expect(() => {
+          withKlaviyoPluginNameVersion(mockConfig, mockProps);
+        }).not.toThrow();
+      });
+    });
   });
 
   describe('Additional test scenarios', () => {

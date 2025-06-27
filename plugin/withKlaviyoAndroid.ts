@@ -439,14 +439,19 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
   return withStringsXml(config, config => {
     let strings = config.modResults;
 
+    // Ensure resources and string array exist
+    if (!strings.resources) strings.resources = {};
+    if (!Array.isArray(strings.resources.string)) strings.resources.string = [];
+    const stringArray = strings.resources.string;
+
     function setStringResource(name: string, value: string) {
-      const existing = strings.resources.string?.find((item: any) => item.$.name === name);
+      const existing = stringArray.find((item: any) => item?.$?.name === name);
       if (existing) {
         existing._ = value;
       } else {
-        if (!strings.resources.string) strings.resources.string = [];
-        strings.resources.string.push({ $: { name }, _: value });
-      }    }
+        stringArray.push({ $: { name }, _: value });
+      }
+    }
 
     setStringResource('klaviyo_sdk_plugin_name_override', 'klaviyo-expo');
     setStringResource('klaviyo_sdk_plugin_version_override', '0.0.2');
@@ -456,6 +461,6 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
 };
 
 // TEST ONLY exports
-export { findMainActivity, withMainActivityModifications, withNotificationIcon, withKlaviyoPluginNameVersion };
+export { findMainActivity, withMainActivityModifications, withNotificationIcon };
 
 export default withKlaviyoAndroid; 
