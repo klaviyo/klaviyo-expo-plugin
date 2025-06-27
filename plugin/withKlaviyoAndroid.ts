@@ -286,74 +286,78 @@ const withNotificationResources: ConfigPlugin<KlaviyoPluginAndroidProps> = (conf
   ]);
 };
 
+const mutateNotificationManifest = (config: any, props: KlaviyoPluginAndroidProps) => {
+  const androidManifest = config.modResults.manifest;
+  
+  if (!androidManifest.application) {
+    KlaviyoLog.log('No application tag found, creating one...');
+    androidManifest.application = [{ $: { 'android:name': '.MainApplication' } }];
+  }
+
+  const application = androidManifest.application[0];
+  
+  if (!application['meta-data']) {
+    application['meta-data'] = [];
+  }
+
+  // Handle notification icon meta-data
+  if (props.notificationIconFilePath) {
+    KlaviyoLog.log(`Adding notification icon meta-data: ${props.notificationIconFilePath}`);
+    const iconMetaData = {
+      $: {
+        'android:name': 'com.klaviyo.push.default_notification_icon',
+        'android:resource': '@drawable/notification_icon'
+      }
+    };
+    const iconExists = application['meta-data'].some(
+      (item: any) => item.$['android:name'] === 'com.klaviyo.push.default_notification_icon'
+    );
+    if (!iconExists) {
+      application['meta-data'].push(iconMetaData);
+      KlaviyoLog.log(`Added icon meta-data: ${JSON.stringify(iconMetaData, null, 2)}`);
+    } else {
+      KlaviyoLog.log('Icon meta-data already exists, skipping');
+    }
+  } else {
+    // Remove notification icon meta-data if it exists
+    KlaviyoLog.log('Removing notification icon meta-data');
+    application['meta-data'] = application['meta-data'].filter(
+      (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_icon'
+    );
+  }
+
+  // Add notification color if provided
+  if (props.notificationColor) {
+    KlaviyoLog.log(`Adding notification color meta-data: ${props.notificationColor}`);
+    const colorMetaData = {
+      $: {
+        'android:name': 'com.klaviyo.push.default_notification_color',
+        'android:resource': '@color/klaviyo_notification_color'
+      }
+    };
+    const colorExists = application['meta-data'].some(
+      (item: any) => item.$['android:name'] === 'com.klaviyo.push.default_notification_color'
+    );
+    if (!colorExists) {
+      application['meta-data'].push(colorMetaData);
+      KlaviyoLog.log(`Added color meta-data: ${JSON.stringify(colorMetaData, null, 2)}`);
+    } else {
+      KlaviyoLog.log('Color meta-data already exists, skipping');
+    }
+  } else {
+    // Remove notification color meta-data if it exists
+    KlaviyoLog.log('Removing notification color meta-data');
+    application['meta-data'] = application['meta-data'].filter(
+      (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_color'
+    );
+  }
+
+  return config;
+};
+
 const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withAndroidManifest(config, (config) => {
-    const androidManifest = config.modResults.manifest;
-    
-    if (!androidManifest.application) {
-      KlaviyoLog.log('No application tag found, creating one...');
-      androidManifest.application = [{ $: { 'android:name': '.MainApplication' } }];
-    }
-
-    const application = androidManifest.application[0];
-    
-    if (!application['meta-data']) {
-      application['meta-data'] = [];
-    }
-
-    // Handle notification icon meta-data
-    if (props.notificationIconFilePath) {
-      KlaviyoLog.log(`Adding notification icon meta-data: ${props.notificationIconFilePath}`);
-      const iconMetaData = {
-        $: {
-          'android:name': 'com.klaviyo.push.default_notification_icon',
-          'android:resource': '@drawable/notification_icon'
-        }
-      };
-      const iconExists = application['meta-data'].some(
-        (item: any) => item.$['android:name'] === 'com.klaviyo.push.default_notification_icon'
-      );
-      if (!iconExists) {
-        application['meta-data'].push(iconMetaData);
-        KlaviyoLog.log(`Added icon meta-data: ${JSON.stringify(iconMetaData, null, 2)}`);
-      } else {
-        KlaviyoLog.log('Icon meta-data already exists, skipping');
-      }
-    } else {
-      // Remove notification icon meta-data if it exists
-      KlaviyoLog.log('Removing notification icon meta-data');
-      application['meta-data'] = application['meta-data'].filter(
-        (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_icon'
-      );
-    }
-
-    // Add notification color if provided
-    if (props.notificationColor) {
-      KlaviyoLog.log(`Adding notification color meta-data: ${props.notificationColor}`);
-      const colorMetaData = {
-        $: {
-          'android:name': 'com.klaviyo.push.default_notification_color',
-          'android:resource': '@color/klaviyo_notification_color'
-        }
-      };
-      const colorExists = application['meta-data'].some(
-        (item: any) => item.$['android:name'] === 'com.klaviyo.push.default_notification_color'
-      );
-      if (!colorExists) {
-        application['meta-data'].push(colorMetaData);
-        KlaviyoLog.log(`Added color meta-data: ${JSON.stringify(colorMetaData, null, 2)}`);
-      } else {
-        KlaviyoLog.log('Color meta-data already exists, skipping');
-      }
-    } else {
-      // Remove notification color meta-data if it exists
-      KlaviyoLog.log('Removing notification color meta-data');
-      application['meta-data'] = application['meta-data'].filter(
-        (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_color'
-      );
-    }
-
-    return config;
+    return mutateNotificationManifest(config, props);
   });
 };
 
@@ -461,6 +465,6 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
 };
 
 // TEST ONLY exports
-export { findMainActivity, withMainActivityModifications, withNotificationIcon };
+export { findMainActivity, withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest };
 
 export default withKlaviyoAndroid; 

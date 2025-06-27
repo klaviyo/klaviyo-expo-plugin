@@ -848,4 +848,174 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       await expect(modifyMainActivity(baseConfig, baseProps, mockFindMainActivity)).rejects.toThrow('Could not find MainActivity class declaration');
     });
   });
+
+  describe('mutateNotificationManifest', () => {
+    const { mutateNotificationManifest } = require('../plugin/withKlaviyoAndroid');
+    const logger = require('../plugin/support/logger').KlaviyoLog;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('adds notification icon meta-data when icon path is provided', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: './icon.png', notificationColor: undefined });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(true);
+      expect(logger.log).toHaveBeenCalledWith('Adding notification icon meta-data: ./icon.png');
+    });
+
+    it('removes notification icon meta-data when icon path is not provided', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_icon' } }] }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined, notificationColor: undefined });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(false);
+      expect(logger.log).toHaveBeenCalledWith('Removing notification icon meta-data');
+    });
+
+    it('does not duplicate icon meta-data if already present', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_icon' } }] }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: './icon.png', notificationColor: undefined });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.filter(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon').length).toBe(1);
+      expect(logger.log).toHaveBeenCalledWith('Icon meta-data already exists, skipping');
+    });
+
+    it('adds notification color meta-data when color is provided', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined, notificationColor: '#FF0000' });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(true);
+      expect(logger.log).toHaveBeenCalledWith('Adding notification color meta-data: #FF0000');
+    });
+
+    it('removes notification color meta-data when color is not provided', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_color' } }] }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined, notificationColor: undefined });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(false);
+      expect(logger.log).toHaveBeenCalledWith('Removing notification color meta-data');
+    });
+
+    it('does not duplicate color meta-data if already present', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_color' } }] }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined, notificationColor: '#FF0000' });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.filter(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color').length).toBe(1);
+      expect(logger.log).toHaveBeenCalledWith('Color meta-data already exists, skipping');
+    });
+
+    it('creates application and meta-data if missing', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {}
+        }
+      });
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
+      mutateNotificationManifest(config, props);
+      expect(config.modResults.manifest.application).toBeDefined();
+      expect(config.modResults.manifest.application[0]['meta-data']).toBeDefined();
+      expect(logger.log).toHaveBeenCalledWith('No application tag found, creating one...');
+    });
+
+    it('handles both icon and color meta-data together', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(true);
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(true);
+      expect(metaData.length).toBe(2);
+    });
+
+    it('preserves existing meta-data when adding new ones', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ 
+              $: { 'android:name': '.MainApplication' }, 
+              'meta-data': [{ $: { 'android:name': 'existing_meta' } }] 
+            }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'existing_meta')).toBe(true);
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(true);
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(true);
+      expect(metaData.length).toBe(3);
+    });
+
+    it('handles empty string values for icon path and color', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ 
+              $: { 'android:name': '.MainApplication' }, 
+              'meta-data': [
+                { $: { 'android:name': 'com.klaviyo.push.default_notification_icon' } },
+                { $: { 'android:name': 'com.klaviyo.push.default_notification_color' } }
+              ] 
+            }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: '', notificationColor: '' });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(false);
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(false);
+      expect(metaData.length).toBe(0);
+    });
+  });
 }); 
