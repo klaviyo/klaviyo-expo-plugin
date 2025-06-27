@@ -1,3 +1,13 @@
+// Mock xml2js module
+jest.mock('xml2js', () => ({
+  parseStringPromise: jest.fn().mockResolvedValue({
+    resources: { color: [] }
+  }),
+  Builder: jest.fn().mockImplementation(() => ({
+    buildObject: jest.fn().mockReturnValue('<resources><color name="klaviyo_notification_color">#FF0000</color></resources>')
+  }))
+}));
+
 import { findMainActivity, withMainActivityModifications, withNotificationIcon, withKlaviyoPluginNameVersion, modifyMainActivity } from '../plugin/withKlaviyoAndroid';
 import { executePlugin } from './utils/testHelpers';
 
@@ -1016,6 +1026,237 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(false);
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(false);
       expect(metaData.length).toBe(0);
+    });
+  });
+
+  describe('mutateAndroidManifest', () => {
+    const { mutateAndroidManifest } = require('../plugin/withKlaviyoAndroid');
+    const logger = require('../plugin/support/logger').KlaviyoLog;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('creates application tag if missing', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {}
+        }
+      });
+      const props = global.testUtils.createMockProps({ logLevel: 2 });
+      mutateAndroidManifest(config, props);
+      expect(config.modResults.manifest.application).toBeDefined();
+      expect(config.modResults.manifest.application[0].$['android:name']).toBe('.MainApplication');
+      expect(logger.log).toHaveBeenCalledWith('Creating application tag in manifest');
+    });
+
+    it('creates meta-data array if missing', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' } }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ logLevel: 2 });
+      mutateAndroidManifest(config, props);
+      expect(config.modResults.manifest.application[0]['meta-data']).toBeDefined();
+      expect(logger.log).toHaveBeenCalledWith('No meta-data array found, creating one...');
+    });
+
+    it('sets log level with provided value', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ logLevel: 3 });
+      mutateAndroidManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '3')).toBe(true);
+      expect(logger.log).toHaveBeenCalledWith('Setting Klaviyo log level to 3');
+    });
+
+    it('uses default log level when not provided', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ logLevel: undefined });
+      mutateAndroidManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '1')).toBe(true);
+      expect(logger.log).toHaveBeenCalledWith('Setting Klaviyo log level to 1');
+    });
+
+    it('removes existing log level entries before adding new one', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ 
+              $: { 'android:name': '.MainApplication' }, 
+              'meta-data': [
+                { $: { 'android:name': 'com.klaviyo.core.log_level', 'android:value': '2' } },
+                { $: { 'android:name': 'com.klaviyo.android.log_level', 'android:value': '3' } },
+                { $: { 'android:name': 'other_meta', 'android:value': 'other_value' } }
+              ] 
+            }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ logLevel: 4 });
+      mutateAndroidManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.filter(m => m.$['android:name'] === 'com.klaviyo.core.log_level').length).toBe(1);
+      expect(metaData.filter(m => m.$['android:name'] === 'com.klaviyo.android.log_level').length).toBe(0);
+      expect(metaData.some(m => m.$['android:name'] === 'other_meta')).toBe(true);
+    });
+
+    it('creates service array if missing', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ logLevel: 2 });
+      mutateAndroidManifest(config, props);
+      expect(config.modResults.manifest.application[0].service).toBeDefined();
+    });
+
+    it('adds KlaviyoPushService if not present', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [], service: [] }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ logLevel: 2 });
+      mutateAndroidManifest(config, props);
+      const services = config.modResults.manifest.application[0].service;
+      expect(services.some(s => s.$['android:name'] === 'com.klaviyo.pushFcm.KlaviyoPushService')).toBe(true);
+      expect(logger.log).toHaveBeenCalledWith('Adding KlaviyoPushService to manifest');
+    });
+
+    it('does not duplicate KlaviyoPushService if already present', () => {
+      const existingService = {
+        $: {
+          'android:name': 'com.klaviyo.pushFcm.KlaviyoPushService',
+          'android:exported': 'false'
+        },
+        'intent-filter': [{
+          action: [{
+            $: {
+              'android:name': 'com.google.firebase.MESSAGING_EVENT'
+            }
+          }]
+        }]
+      };
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ 
+              $: { 'android:name': '.MainApplication' }, 
+              'meta-data': [], 
+              service: [existingService] 
+            }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ logLevel: 2 });
+      mutateAndroidManifest(config, props);
+      const services = config.modResults.manifest.application[0].service;
+      expect(services.filter(s => s.$['android:name'] === 'com.klaviyo.pushFcm.KlaviyoPushService').length).toBe(1);
+    });
+
+    it('preserves existing services when adding KlaviyoPushService', () => {
+      const existingService = {
+        $: {
+          'android:name': 'com.example.OtherService',
+          'android:exported': 'true'
+        }
+      };
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ 
+              $: { 'android:name': '.MainApplication' }, 
+              'meta-data': [], 
+              service: [existingService] 
+            }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ logLevel: 2 });
+      mutateAndroidManifest(config, props);
+      const services = config.modResults.manifest.application[0].service;
+      expect(services.some(s => s.$['android:name'] === 'com.example.OtherService')).toBe(true);
+      expect(services.some(s => s.$['android:name'] === 'com.klaviyo.pushFcm.KlaviyoPushService')).toBe(true);
+      expect(services.length).toBe(2);
+    });
+
+    it('handles complete manifest modification with all features', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {}
+        }
+      });
+      const props = global.testUtils.createMockProps({ logLevel: 5 });
+      mutateAndroidManifest(config, props);
+      
+      const application = config.modResults.manifest.application[0];
+      expect(application.$['android:name']).toBe('.MainApplication');
+      expect(application['meta-data']).toBeDefined();
+      expect(application.service).toBeDefined();
+      
+      const metaData = application['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '5')).toBe(true);
+      
+      const services = application.service;
+      expect(services.some(s => s.$['android:name'] === 'com.klaviyo.pushFcm.KlaviyoPushService')).toBe(true);
+      
+      expect(logger.log).toHaveBeenCalledWith('Modifying Android Manifest');
+      expect(logger.log).toHaveBeenCalledWith('Creating application tag in manifest');
+      expect(logger.log).toHaveBeenCalledWith('No meta-data array found, creating one...');
+      expect(logger.log).toHaveBeenCalledWith('Setting Klaviyo log level to 5');
+      expect(logger.log).toHaveBeenCalledWith('Adding KlaviyoPushService to manifest');
+    });
+
+    it('handles zero log level', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ logLevel: 0 });
+      mutateAndroidManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '0')).toBe(true);
+      expect(logger.log).toHaveBeenCalledWith('Setting Klaviyo log level to 0');
+    });
+
+    it('handles null log level', () => {
+      const config = global.testUtils.createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
+          }
+        }
+      });
+      const props = global.testUtils.createMockProps({ logLevel: null });
+      mutateAndroidManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '1')).toBe(true);
+      expect(logger.log).toHaveBeenCalledWith('Setting Klaviyo log level to 1');
     });
   });
 }); 

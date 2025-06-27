@@ -8,40 +8,71 @@ import { KlaviyoPluginAndroidProps } from './types';
 import * as xml2js from 'xml2js';
 import { KlaviyoLog } from './support/logger';
 
+const mutateAndroidManifest = (config: any, props: KlaviyoPluginAndroidProps) => {
+  KlaviyoLog.log('Modifying Android Manifest');
+  const androidManifest = config.modResults.manifest;
+  
+  if (!androidManifest.application) {
+    KlaviyoLog.log('Creating application tag in manifest');
+    androidManifest.application = [{ $: { 'android:name': '.MainApplication' } }];
+  }
+
+  const application = androidManifest.application[0];
+  
+  // Add or update the log level meta-data
+  if (!application['meta-data']) {
+    KlaviyoLog.log('No meta-data array found, creating one...');
+    application['meta-data'] = [];
+  }
+
+  const logLevel = props.logLevel ?? 1; // Default to DEBUG (1) if not specified
+  KlaviyoLog.log(`Setting Klaviyo log level to ${logLevel}`);
+
+  // Remove any existing log level meta-data entries
+  application['meta-data'] = application['meta-data'].filter(
+    (item: any) => !['com.klaviyo.core.log_level', 'com.klaviyo.android.log_level'].includes(item.$['android:name'])
+  );
+
+  // Add the correct log level meta-data
+  application['meta-data'].push({
+    $: {
+      'android:name': 'com.klaviyo.core.log_level',
+      'android:value': logLevel.toString()
+    }
+  });
+
+  // Add KlaviyoPushService to the manifest
+  if (!application.service) {
+    application.service = [];
+  }
+
+  const pushServiceIndex = application.service.findIndex(
+    (item: any) => item.$['android:name'] === 'com.klaviyo.pushFcm.KlaviyoPushService'
+  );
+
+  if (pushServiceIndex === -1) {
+    KlaviyoLog.log('Adding KlaviyoPushService to manifest');
+    application.service.push({
+      $: {
+        'android:name': 'com.klaviyo.pushFcm.KlaviyoPushService',
+        'android:exported': 'false'
+      },
+      'intent-filter': [{
+        action: [{
+          $: {
+            'android:name': 'com.google.firebase.MESSAGING_EVENT'
+          }
+        }]
+      }]
+    });
+  }
+
+  return config;
+};
+
 const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withAndroidManifest(config, (config) => {
-    KlaviyoLog.log('Modifying Android Manifest');
-    const androidManifest = config.modResults.manifest;
-    
-    if (!androidManifest.application) {
-      KlaviyoLog.log('Creating application tag in manifest');
-      androidManifest.application = [{ $: { 'android:name': '.MainApplication' } }];
-    }
-
-    const application = androidManifest.application[0];
-    
-    // Add or update the log level meta-data
-    if (!application['meta-data']) {
-      KlaviyoLog.log('No meta-data array found, creating one...');
-      application['meta-data'] = [];
-    }
-
-    const logLevel = props.logLevel ?? 1; // Default to DEBUG (1) if not specified
-    KlaviyoLog.log(`Setting Klaviyo log level to ${logLevel}`);
-
-    // Remove any existing log level meta-data entries
-    application['meta-data'] = application['meta-data'].filter(
-      (item: any) => !['com.klaviyo.core.log_level', 'com.klaviyo.android.log_level'].includes(item.$['android:name'])
-    );
-
-    // Add the correct log level meta-data
-    application['meta-data'].push({
-      $: {
-        'android:name': 'com.klaviyo.core.log_level',
-        'android:value': logLevel.toString()
-      }
-    });
-    return config;
+    return mutateAndroidManifest(config, props);
   });
 };
 
@@ -465,6 +496,6 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
 };
 
 // TEST ONLY exports
-export { findMainActivity, withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest };
+export { findMainActivity, withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest, createColorResource, mutateAndroidManifest };
 
 export default withKlaviyoAndroid; 
