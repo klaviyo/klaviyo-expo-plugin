@@ -467,4 +467,7 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
   });
 };
 
+// TEST ONLY exports
+export { findMainActivity, withMainActivityModifications, withNotificationIcon, withKlaviyoPluginNameVersion };
+
 export default withKlaviyoAndroid; 
