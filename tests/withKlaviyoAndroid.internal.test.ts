@@ -9,6 +9,7 @@ jest.mock('fs', () => ({
   mkdirSync: jest.fn(),
   copyFileSync: jest.fn(),
   unlinkSync: jest.fn(),
+  rmSync: jest.fn(),
 }));
 
 jest.mock('glob', () => ({
@@ -17,6 +18,12 @@ jest.mock('glob', () => ({
 
 jest.mock('@expo/config-plugins/build/android/Paths', () => ({
   getMainActivityAsync: jest.fn(() => Promise.resolve('/test/path/MainActivity.java')),
+}));
+
+// Mock path module to return predictable paths
+jest.mock('path', () => ({
+  resolve: jest.fn((...args) => args.join('/')),
+  join: jest.fn((...args) => args.join('/')),
 }));
 
 // Mock the logger to avoid console output
@@ -57,7 +64,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       const props = global.testUtils.createMockProps({ openTracking: true });
       
       const result = withMainActivityModifications(config, props);
-      expect(typeof result).toBe('function');
+      expect(result).toHaveProperty('mods.android');
     });
 
     it('should handle missing android package', () => {
@@ -65,7 +72,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       const props = global.testUtils.createMockProps({ openTracking: true });
       
       const result = withMainActivityModifications(config, props);
-      expect(typeof result).toBe('function');
+      expect(result).toHaveProperty('mods.android');
     });
 
     it('should handle missing MainActivity', () => {
@@ -76,7 +83,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       const props = global.testUtils.createMockProps({ openTracking: true });
       
       const result = withMainActivityModifications(config, props);
-      expect(typeof result).toBe('function');
+      expect(result).toHaveProperty('mods.android');
     });
 
     it('should handle MainActivity with package declaration', () => {
@@ -98,7 +105,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       const props = global.testUtils.createMockProps({ openTracking: true });
       
       const result = withMainActivityModifications(config, props);
-      expect(typeof result).toBe('function');
+      expect(result).toHaveProperty('mods.android');
     });
 
     it('should handle Kotlin MainActivity', () => {
@@ -119,7 +126,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       const props = global.testUtils.createMockProps({ openTracking: true });
       
       const result = withMainActivityModifications(config, props);
-      expect(typeof result).toBe('function');
+      expect(result).toHaveProperty('mods.android');
     });
 
     it('should handle MainActivity without package declaration', () => {
@@ -137,7 +144,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       const props = global.testUtils.createMockProps({ openTracking: true });
       
       const result = withMainActivityModifications(config, props);
-      expect(typeof result).toBe('function');
+      expect(result).toHaveProperty('mods.android');
     });
 
     it('should handle openTracking disabled', () => {
@@ -145,7 +152,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       const props = global.testUtils.createMockProps({ openTracking: false });
       
       const result = withMainActivityModifications(config, props);
-      expect(typeof result).toBe('function');
+      expect(result).toHaveProperty('mods.android');
     });
 
     // Error condition tests
@@ -155,7 +162,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         const props = global.testUtils.createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
-        expect(typeof result).toBe('function');
+        expect(result).toHaveProperty('mods.android');
       });
 
       it('should handle null android package in config', () => {
@@ -163,7 +170,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         const props = global.testUtils.createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
-        expect(typeof result).toBe('function');
+        expect(result).toHaveProperty('mods.android');
       });
 
       it('should handle empty android object in config', () => {
@@ -171,7 +178,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         const props = global.testUtils.createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
-        expect(typeof result).toBe('function');
+        expect(result).toHaveProperty('mods.android');
       });
 
       it('should handle missing MainActivity detection', () => {
@@ -186,7 +193,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         const props = global.testUtils.createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
-        expect(typeof result).toBe('function');
+        expect(result).toHaveProperty('mods.android');
       });
 
       it('should handle MainActivity file not existing', () => {
@@ -195,16 +202,13 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         
         // Mock that MainActivity is found but file doesn't exist
         getMainActivityAsync.mockResolvedValue('/test/path/MainActivity.java');
-        fs.existsSync.mockImplementation((path: string) => {
-          // Return true for directory checks, false for file checks
-          return path.includes('java') && !path.includes('MainActivity');
-        });
+        fs.existsSync.mockImplementation((path) => path && !path.includes('MainActivity'));
         
         const config = global.testUtils.createMockConfig();
         const props = global.testUtils.createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
-        expect(typeof result).toBe('function');
+        expect(result).toHaveProperty('mods.android');
       });
 
       it('should handle MainActivity without package declaration', () => {
@@ -231,7 +235,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         const props = global.testUtils.createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
-        expect(typeof result).toBe('function');
+        expect(result).toHaveProperty('mods.android');
       });
 
       it('should handle MainActivity without class declaration', () => {
@@ -255,7 +259,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         const props = global.testUtils.createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
-        expect(typeof result).toBe('function');
+        expect(result).toHaveProperty('mods.android');
       });
 
       it('should handle MainActivity with different class name', () => {
@@ -284,7 +288,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         const props = global.testUtils.createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
-        expect(typeof result).toBe('function');
+        expect(result).toHaveProperty('mods.android');
       });
 
       it('should handle MainActivity not extending ReactActivity', () => {
@@ -310,70 +314,132 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         const props = global.testUtils.createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
-        expect(typeof result).toBe('function');
+        expect(result).toHaveProperty('mods.android');
       });
     });
   });
 
   describe('withNotificationIcon', () => {
-    it('should return a function', () => {
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: './assets/icon.png' });
-      
-      const result = withNotificationIcon(config, props);
-      expect(typeof result).toBe('function');
-    });
-
-    it('should handle missing notification icon file', () => {
+    beforeEach(() => {
       const fs = require('fs');
-      fs.existsSync.mockReturnValue(false);
-      
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: './notfound.png' });
-      
-      const result = withNotificationIcon(config, props);
-      expect(typeof result).toBe('function');
+      fs.rmSync = jest.fn(); // Ensure rmSync is always mocked
     });
 
-    it('should handle file copy operations', () => {
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: './assets/icon.png' });
-      
-      const result = withNotificationIcon(config, props);
-      expect(typeof result).toBe('function');
-    });
+    async function runMod(config, props) {
+      const result = withNotificationIcon(config, props) as any;
+      return await result.mods.android(result);
+    }
 
-    it('should handle file copy errors', () => {
+    it('should copy the notification icon file', async () => {
       const fs = require('fs');
       fs.existsSync.mockReturnValue(true);
-      fs.copyFileSync.mockImplementation(() => {
-        throw new Error('Copy failed');
-      });
-      
       const config = global.testUtils.createMockConfig();
       const props = global.testUtils.createMockProps({ notificationIconFilePath: './assets/icon.png' });
-      
-      const result = withNotificationIcon(config, props);
-      expect(typeof result).toBe('function');
+      await runMod(config, props);
+      expect(fs.copyFileSync).toHaveBeenCalled();
     });
 
-    it('should handle missing notification icon path', () => {
+    it('should throw if notification icon file does not exist', async () => {
+      const fs = require('fs');
+      fs.existsSync.mockReturnValue(false);
+      const config = global.testUtils.createMockConfig();
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: './notfound.png' });
+      await expect(runMod(config, props)).rejects.toThrow('Notification icon file not found');
+    });
+
+    it('should create drawable directory if it does not exist', async () => {
+      const fs = require('fs');
+      // fs.existsSync returns true for the source path, false for drawable dir
+      fs.existsSync.mockImplementation((path) => {
+        if (!path) return false;
+        if (path === '/test/project/./assets/icon.png') return true;
+        if (path === '/test/project/root/app/src/main/res/drawable') return false;
+        return false;
+      });
+      fs.mkdirSync.mockReset();
+      fs.copyFileSync.mockReset();
+      const config = global.testUtils.createMockConfig();
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: './assets/icon.png' });
+      await runMod(config, props);
+      expect(fs.mkdirSync).toHaveBeenCalledWith('/test/project/root/app/src/main/res/drawable', { recursive: true });
+    });
+
+    it('should throw if copyFileSync fails', async () => {
+      const fs = require('fs');
+      fs.existsSync.mockReturnValue(true);
+      fs.copyFileSync.mockImplementation(() => { throw new Error('Copy failed'); });
+      const config = global.testUtils.createMockConfig();
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: './assets/icon.png' });
+      await expect(runMod(config, props)).rejects.toThrow('Failed to copy notification icon: Error: Copy failed');
+    });
+
+    it('should remove the notification icon file if no path is provided', async () => {
+      const fs = require('fs');
+      fs.existsSync.mockImplementation((path) => {
+        if (!path) return false;
+        if (path === '/test/project/root/app/src/main/res/drawable/notification_icon.png') return true;
+        return false;
+      });
+      fs.unlinkSync.mockReset();
       const config = global.testUtils.createMockConfig();
       const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined });
-      
-      const result = withNotificationIcon(config, props);
-      expect(typeof result).toBe('function');
+      await runMod(config, props);
+      expect(fs.unlinkSync).toHaveBeenCalledWith('/test/project/root/app/src/main/res/drawable/notification_icon.png');
     });
 
-    it('should handle different icon file extensions', () => {
-      const config = global.testUtils.createMockConfig();
-      const extensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
-      
-      extensions.forEach(ext => {
-        const props = global.testUtils.createMockProps({ notificationIconFilePath: `./assets/icon${ext}` });
-        const result = withNotificationIcon(config, props);
-        expect(typeof result).toBe('function');
+    it('should call rmSync if file still exists after unlinkSync', async () => {
+      const fs = require('fs');
+      let exists = true;
+      fs.existsSync.mockImplementation((path) => {
+        if (!path) return false;
+        if (path === '/test/project/root/app/src/main/res/drawable/notification_icon.png') return exists;
+        return false;
       });
+      fs.unlinkSync.mockImplementation(() => { exists = true; });
+      fs.rmSync.mockImplementation(() => { exists = false; });
+      const config = global.testUtils.createMockConfig();
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined });
+      await runMod(config, props);
+      expect(fs.rmSync).toHaveBeenCalledWith('/test/project/root/app/src/main/res/drawable/notification_icon.png', { force: true });
+    });
+
+    it('should throw if both unlinkSync and rmSync fail', async () => {
+      const fs = require('fs');
+      fs.existsSync.mockImplementation((path) => {
+        if (!path) return false;
+        if (path === '/test/project/root/app/src/main/res/drawable/notification_icon.png') return true;
+        return false;
+      });
+      fs.unlinkSync.mockImplementation(() => { throw new Error('unlink failed'); });
+      fs.rmSync.mockImplementation(() => { throw new Error('rm failed'); });
+      const config = global.testUtils.createMockConfig();
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined });
+      await expect(runMod(config, props)).rejects.toThrow('Failed to remove notification icon: Error: rm failed');
+    });
+
+    it('should log when no notification icon is found to remove', async () => {
+      const fs = require('fs');
+      const logger = require('../plugin/support/logger').KlaviyoLog;
+      fs.existsSync.mockReturnValue(false);
+      const config = global.testUtils.createMockConfig();
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined });
+      await runMod(config, props);
+      expect(logger.log).toHaveBeenCalledWith('No notification icon found to remove');
+    });
+
+    it('should log expected messages', async () => {
+      const logger = require('../plugin/support/logger').KlaviyoLog;
+      logger.log.mockClear();
+      const fs = require('fs');
+      fs.existsSync.mockReturnValue(true);
+      fs.copyFileSync.mockReset();
+      fs.copyFileSync.mockImplementation(() => {}); // Ensure it does not throw
+      fs.rmSync = jest.fn();
+      const config = global.testUtils.createMockConfig();
+      const props = global.testUtils.createMockProps({ notificationIconFilePath: './assets/icon.png' });
+      await runMod(config, props);
+      expect(logger.log).toHaveBeenCalledWith('Setting up notification icon handling...');
+      expect(logger.log).toHaveBeenCalledWith('Executing notification icon handling...');
     });
   });
 
