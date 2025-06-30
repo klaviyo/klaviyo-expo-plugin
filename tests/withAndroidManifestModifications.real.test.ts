@@ -30,20 +30,27 @@ describe('withAndroidManifestModifications (real file)', () => {
   it('should add log level meta-data to manifest', () => {
     // Simulate the config structure expected by the plugin
     const config = {
+      name: 'test-app',
+      slug: 'test-app',
       modResults: {
         manifest: {
-          application: [{
-            $: { 'android:name': '.MainApplication' },
-            'meta-data': [],
-          }],
+          application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [], service: [] }],
+        },
+        resources: {
+          string: [],
+          color: [],
         },
       },
     };
-    const props = { logLevel: 2 };
+    const props = {
+      logLevel: 2,
+      openTracking: true,
+      notificationIconFilePath: './assets/icon.png',
+      notificationColor: '#FF0000',
+    };
 
     // Run the plugin
-    const plugin = withKlaviyoAndroid(config, props);
-    const modifiedConfig = plugin(config, props);
+    const modifiedConfig = withKlaviyoAndroid(config, props) as any;
 
     // Check the in-memory config
     const metaData = modifiedConfig.modResults.manifest.application[0]['meta-data'];
