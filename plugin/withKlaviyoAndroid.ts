@@ -8,40 +8,71 @@ import { KlaviyoPluginAndroidProps } from './types';
 import * as xml2js from 'xml2js';
 import { KlaviyoLog } from './support/logger';
 
+const mutateAndroidManifest = (config: any, props: KlaviyoPluginAndroidProps) => {
+  KlaviyoLog.log('Modifying Android Manifest');
+  const androidManifest = config.modResults.manifest;
+  
+  if (!androidManifest.application) {
+    KlaviyoLog.log('Creating application tag in manifest');
+    androidManifest.application = [{ $: { 'android:name': '.MainApplication' } }];
+  }
+
+  const application = androidManifest.application[0];
+  
+  // Add or update the log level meta-data
+  if (!application['meta-data']) {
+    KlaviyoLog.log('No meta-data array found, creating one...');
+    application['meta-data'] = [];
+  }
+
+  const logLevel = props.logLevel ?? 1; // Default to DEBUG (1) if not specified
+  KlaviyoLog.log(`Setting Klaviyo log level to ${logLevel}`);
+
+  // Remove any existing log level meta-data entries
+  application['meta-data'] = application['meta-data'].filter(
+    (item: any) => !['com.klaviyo.core.log_level', 'com.klaviyo.android.log_level'].includes(item.$['android:name'])
+  );
+
+  // Add the correct log level meta-data
+  application['meta-data'].push({
+    $: {
+      'android:name': 'com.klaviyo.core.log_level',
+      'android:value': logLevel.toString()
+    }
+  });
+
+  // Add KlaviyoPushService to the manifest
+  if (!application.service) {
+    application.service = [];
+  }
+
+  const pushServiceIndex = application.service.findIndex(
+    (item: any) => item.$['android:name'] === 'com.klaviyo.pushFcm.KlaviyoPushService'
+  );
+
+  if (pushServiceIndex === -1) {
+    KlaviyoLog.log('Adding KlaviyoPushService to manifest');
+    application.service.push({
+      $: {
+        'android:name': 'com.klaviyo.pushFcm.KlaviyoPushService',
+        'android:exported': 'false'
+      },
+      'intent-filter': [{
+        action: [{
+          $: {
+            'android:name': 'com.google.firebase.MESSAGING_EVENT'
+          }
+        }]
+      }]
+    });
+  }
+
+  return config;
+};
+
 const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withAndroidManifest(config, (config) => {
-    KlaviyoLog.log('Modifying Android Manifest');
-    const androidManifest = config.modResults.manifest;
-    
-    if (!androidManifest.application) {
-      KlaviyoLog.log('Creating application tag in manifest');
-      androidManifest.application = [{ $: { 'android:name': '.MainApplication' } }];
-    }
-
-    const application = androidManifest.application[0];
-    
-    // Add or update the log level meta-data
-    if (!application['meta-data']) {
-      KlaviyoLog.log('No meta-data array found, creating one...');
-      application['meta-data'] = [];
-    }
-
-    const logLevel = props.logLevel ?? 1; // Default to DEBUG (1) if not specified
-    KlaviyoLog.log(`Setting Klaviyo log level to ${logLevel}`);
-
-    // Remove any existing log level meta-data entries
-    application['meta-data'] = application['meta-data'].filter(
-      (item: any) => !['com.klaviyo.core.log_level', 'com.klaviyo.android.log_level'].includes(item.$['android:name'])
-    );
-
-    // Add the correct log level meta-data
-    application['meta-data'].push({
-      $: {
-        'android:name': 'com.klaviyo.core.log_level',
-        'android:value': logLevel.toString()
-      }
-    });
-    return config;
+    return mutateAndroidManifest(config, props);
   });
 };
 
@@ -107,140 +138,128 @@ const findMainActivity = async (projectRoot: string): Promise<{ path: string; is
   return null;
 };
 
+export async function modifyMainActivity(config: any, props: any, findMainActivityImpl = findMainActivity) {
+  KlaviyoLog.log('Modifying MainActivity');
+  KlaviyoLog.log(`OpenTracking setting: ${props.openTracking}`);
+  
+  if (!config.android?.package) {
+    throw new Error('Android package not found in app config');
+  }
+
+  const mainActivityInfo = await findMainActivityImpl(config.modRequest.platformProjectRoot);
+
+  if (!mainActivityInfo) {
+    throw new Error('Could not find main activity file. Please ensure your app has a valid ReactActivity.');
+  }
+
+  const { path: mainActivityPath, isKotlin } = mainActivityInfo;
+  KlaviyoLog.log(`MainActivity path: ${mainActivityPath}`);
+  KlaviyoLog.log(`MainActivity language: ${isKotlin ? 'Kotlin' : 'Java'}`);
+
+  if (!fs.existsSync(mainActivityPath)) {
+    throw new Error(`MainActivity not found at path: ${mainActivityPath}`);
+  }
+
+  // Read the current content
+  const mainActivityContent = fs.readFileSync(mainActivityPath, 'utf-8');
+  KlaviyoLog.log(`Found MainActivity, current size: ${mainActivityContent.length} bytes`);
+
+  // Find the package declaration line to use as our anchor
+  const packageMatch = mainActivityContent.match(/^package .+$/m);
+  if (!packageMatch) {
+    throw new Error('Could not find package declaration in MainActivity');
+  }
+
+  // Find the class declaration line to use as our anchor
+  const classMatch = mainActivityContent.match(/^(?:public\s+)?class\s+MainActivity\s+(?:extends|:)\s+ReactActivity\s*(?:\(\))?\s*\{/m);
+  if (!classMatch) {
+    throw new Error('Could not find MainActivity class declaration');
+  }
+
+  // Split the content into lines for more precise manipulation
+  let lines = mainActivityContent.split('\n');
+
+  // Remove Klaviyo-related imports and generated blocks
+  let newLines: string[] = [];
+  let skipLines = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Skip Klaviyo-related imports
+    if (line.trim().startsWith('import') && 
+        (line.includes('android.content.Intent') || 
+         line.includes('com.klaviyo.analytics.Klaviyo'))) {
+      continue;
+    }
+
+    // Handle generated blocks
+    if (line.includes('// @generated begin klaviyo-')) {
+      skipLines = true;
+      continue;
+    }
+    if (line.includes('// @generated end klaviyo-')) {
+      skipLines = false;
+      continue;
+    }
+    if (!skipLines) {
+      newLines.push(line);
+    }
+  }
+
+  // Clean up multiple empty lines
+  let cleanedContent = newLines.join('\n').replace(/\n{3,}/g, '\n\n');
+
+  // Only add the code if openTracking is enabled
+  if (props.openTracking) {
+    KlaviyoLog.log('Adding push tracking code to MainActivity...');
+    
+    // First, remove any existing generated content
+    let contentWithoutGenerated = cleanedContent.replace(
+      /\/\/ @generated begin klaviyo-[\s\S]*?\/\/ @generated end klaviyo-/g,
+      ''
+    ).trim();
+
+    // Add imports right after the package declaration
+    const importContents = mergeContents({
+      tag: 'klaviyo-imports',
+      src: contentWithoutGenerated,
+      newSrc: isKotlin ? 
+        `import android.content.Intent\nimport com.klaviyo.analytics.Klaviyo` :
+        `import android.content.Intent;\nimport com.klaviyo.analytics.Klaviyo;`,
+      anchor: /^package .+$/m,
+      offset: 1,
+      comment: '//',
+    });
+
+    // Add the onNewIntent override right after the class declaration
+    const methodContents = mergeContents({
+      tag: 'klaviyo-onNewIntent',
+      src: importContents.contents,
+      newSrc: isKotlin ?
+        `\n    override fun onNewIntent(intent: Intent) {\n        super.onNewIntent(intent)\n\n        // Tracks when a system tray notification is opened\n        Klaviyo.handlePush(intent)\n    }` :
+        `\n    @Override\n    public void onNewIntent(Intent intent) {\n        super.onNewIntent(intent);\n\n        // Tracks when a system tray notification is opened\n        Klaviyo.handlePush(intent);\n    }`,
+      anchor: isKotlin ? 
+        /^class MainActivity : ReactActivity\(\) \{$/m :
+        /^(?:public\s+)?class\s+MainActivity\s+(?:extends|:)\s+ReactActivity\s*(?:\(\))?\s*\{/m,
+      offset: 1,
+      comment: '//',
+    });
+
+    // Write the modified content back to the file
+    fs.writeFileSync(mainActivityPath, methodContents.contents);
+  } else {
+    KlaviyoLog.log('Removing push tracking code from MainActivity...');
+    // Write the cleaned content back
+    fs.writeFileSync(mainActivityPath, cleanedContent);
+  }
+}
+
 const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withDangerousMod(config, [
     'android',
     async (config) => {
-      KlaviyoLog.log('Modifying MainActivity');
-      KlaviyoLog.log(`OpenTracking setting: ${props.openTracking}`);
-      
-      if (!config.android?.package) {
-        throw new Error('Android package not found in app config');
-      }
-
-      const mainActivityInfo = await findMainActivity(config.modRequest.platformProjectRoot);
-
-      if (!mainActivityInfo) {
-        throw new Error('Could not find main activity file. Please ensure your app has a valid ReactActivity.');
-      }
-
-      const { path: mainActivityPath, isKotlin } = mainActivityInfo;
-      KlaviyoLog.log(`MainActivity path: ${mainActivityPath}`);
-      KlaviyoLog.log(`MainActivity language: ${isKotlin ? 'Kotlin' : 'Java'}`);
-
-      if (!fs.existsSync(mainActivityPath)) {
-        throw new Error(`MainActivity not found at path: ${mainActivityPath}`);
-      }
-
-      // Read the current content
-      const mainActivityContent = fs.readFileSync(mainActivityPath, 'utf-8');
-      KlaviyoLog.log(`Found MainActivity, current size: ${mainActivityContent.length} bytes`);
-
-      // Find the package declaration line to use as our anchor
-      const packageMatch = mainActivityContent.match(/^package .+$/m);
-      if (!packageMatch) {
-        throw new Error('Could not find package declaration in MainActivity');
-      }
-
-      // Find the class declaration line to use as our anchor
-      const classMatch = mainActivityContent.match(/^(?:public\s+)?class\s+MainActivity\s+(?:extends|:)\s+ReactActivity\s*(?:\(\))?\s*\{/m);
-      if (!classMatch) {
-        throw new Error('Could not find MainActivity class declaration');
-      }
-
-      // Split the content into lines for more precise manipulation
-      let lines = mainActivityContent.split('\n');
-
-      // Remove Klaviyo-related imports and generated blocks
-      let newLines: string[] = [];
-      let skipLines = false;
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        
-        // Skip Klaviyo-related imports
-        if (line.trim().startsWith('import') && 
-            (line.includes('android.content.Intent') || 
-             line.includes('com.klaviyo.analytics.Klaviyo'))) {
-          continue;
-        }
-
-        // Handle generated blocks
-        if (line.includes('// @generated begin klaviyo-')) {
-          skipLines = true;
-          continue;
-        }
-        if (line.includes('// @generated end klaviyo-')) {
-          skipLines = false;
-          continue;
-        }
-        if (!skipLines) {
-          newLines.push(line);
-        }
-      }
-
-      // Clean up multiple empty lines
-      let cleanedContent = newLines.join('\n').replace(/\n{3,}/g, '\n\n');
-
-      // Only add the code if openTracking is enabled
-      if (props.openTracking) {
-        KlaviyoLog.log('Adding push tracking code to MainActivity...');
-        
-        // First, remove any existing generated content
-        let contentWithoutGenerated = cleanedContent.replace(
-          /\/\/ @generated begin klaviyo-[\s\S]*?\/\/ @generated end klaviyo-/g,
-          ''
-        ).trim();
-
-        // Add imports right after the package declaration
-        const importContents = mergeContents({
-          tag: 'klaviyo-imports',
-          src: contentWithoutGenerated,
-          newSrc: isKotlin ? 
-            `import android.content.Intent
-import com.klaviyo.analytics.Klaviyo` :
-            `import android.content.Intent;
-import com.klaviyo.analytics.Klaviyo;`,
-          anchor: /^package .+$/m,
-          offset: 1,
-          comment: '//',
-        });
-
-        // Add the onNewIntent override right after the class declaration
-        const methodContents = mergeContents({
-          tag: 'klaviyo-onNewIntent',
-          src: importContents.contents,
-          newSrc: isKotlin ?
-            `
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-
-        // Tracks when a system tray notification is opened
-        Klaviyo.handlePush(intent)
-    }` :
-            `
-    @Override
-    public void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-
-        // Tracks when a system tray notification is opened
-        Klaviyo.handlePush(intent);
-    }`,
-          anchor: isKotlin ? 
-            /^class MainActivity : ReactActivity\(\) \{$/m :
-            /^(?:public\s+)?class\s+MainActivity\s+(?:extends|:)\s+ReactActivity\s*(?:\(\))?\s*\{/m,
-          offset: 1,
-          comment: '//',
-        });
-
-        // Write the modified content back to the file
-        fs.writeFileSync(mainActivityPath, methodContents.contents);
-      } else {
-        KlaviyoLog.log('Removing push tracking code from MainActivity...');
-        // Write the cleaned content back
-        fs.writeFileSync(mainActivityPath, cleanedContent);
-      }
-
+      await modifyMainActivity(config, props);
       return config;
     },
   ]);
@@ -298,74 +317,78 @@ const withNotificationResources: ConfigPlugin<KlaviyoPluginAndroidProps> = (conf
   ]);
 };
 
+const mutateNotificationManifest = (config: any, props: KlaviyoPluginAndroidProps) => {
+  const androidManifest = config.modResults.manifest;
+  
+  if (!androidManifest.application) {
+    KlaviyoLog.log('No application tag found, creating one...');
+    androidManifest.application = [{ $: { 'android:name': '.MainApplication' } }];
+  }
+
+  const application = androidManifest.application[0];
+  
+  if (!application['meta-data']) {
+    application['meta-data'] = [];
+  }
+
+  // Handle notification icon meta-data
+  if (props.notificationIconFilePath) {
+    KlaviyoLog.log(`Adding notification icon meta-data: ${props.notificationIconFilePath}`);
+    const iconMetaData = {
+      $: {
+        'android:name': 'com.klaviyo.push.default_notification_icon',
+        'android:resource': '@drawable/notification_icon'
+      }
+    };
+    const iconExists = application['meta-data'].some(
+      (item: any) => item.$['android:name'] === 'com.klaviyo.push.default_notification_icon'
+    );
+    if (!iconExists) {
+      application['meta-data'].push(iconMetaData);
+      KlaviyoLog.log(`Added icon meta-data: ${JSON.stringify(iconMetaData, null, 2)}`);
+    } else {
+      KlaviyoLog.log('Icon meta-data already exists, skipping');
+    }
+  } else {
+    // Remove notification icon meta-data if it exists
+    KlaviyoLog.log('Removing notification icon meta-data');
+    application['meta-data'] = application['meta-data'].filter(
+      (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_icon'
+    );
+  }
+
+  // Add notification color if provided
+  if (props.notificationColor) {
+    KlaviyoLog.log(`Adding notification color meta-data: ${props.notificationColor}`);
+    const colorMetaData = {
+      $: {
+        'android:name': 'com.klaviyo.push.default_notification_color',
+        'android:resource': '@color/klaviyo_notification_color'
+      }
+    };
+    const colorExists = application['meta-data'].some(
+      (item: any) => item.$['android:name'] === 'com.klaviyo.push.default_notification_color'
+    );
+    if (!colorExists) {
+      application['meta-data'].push(colorMetaData);
+      KlaviyoLog.log(`Added color meta-data: ${JSON.stringify(colorMetaData, null, 2)}`);
+    } else {
+      KlaviyoLog.log('Color meta-data already exists, skipping');
+    }
+  } else {
+    // Remove notification color meta-data if it exists
+    KlaviyoLog.log('Removing notification color meta-data');
+    application['meta-data'] = application['meta-data'].filter(
+      (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_color'
+    );
+  }
+
+  return config;
+};
+
 const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withAndroidManifest(config, (config) => {
-    const androidManifest = config.modResults.manifest;
-    
-    if (!androidManifest.application) {
-      KlaviyoLog.log('No application tag found, creating one...');
-      androidManifest.application = [{ $: { 'android:name': '.MainApplication' } }];
-    }
-
-    const application = androidManifest.application[0];
-    
-    if (!application['meta-data']) {
-      application['meta-data'] = [];
-    }
-
-    // Handle notification icon meta-data
-    if (props.notificationIconFilePath) {
-      KlaviyoLog.log(`Adding notification icon meta-data: ${props.notificationIconFilePath}`);
-      const iconMetaData = {
-        $: {
-          'android:name': 'com.klaviyo.push.default_notification_icon',
-          'android:resource': '@drawable/notification_icon'
-        }
-      };
-      const iconExists = application['meta-data'].some(
-        (item: any) => item.$['android:name'] === 'com.klaviyo.push.default_notification_icon'
-      );
-      if (!iconExists) {
-        application['meta-data'].push(iconMetaData);
-        KlaviyoLog.log(`Added icon meta-data: ${JSON.stringify(iconMetaData, null, 2)}`);
-      } else {
-        KlaviyoLog.log('Icon meta-data already exists, skipping');
-      }
-    } else {
-      // Remove notification icon meta-data if it exists
-      KlaviyoLog.log('Removing notification icon meta-data');
-      application['meta-data'] = application['meta-data'].filter(
-        (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_icon'
-      );
-    }
-
-    // Add notification color if provided
-    if (props.notificationColor) {
-      KlaviyoLog.log(`Adding notification color meta-data: ${props.notificationColor}`);
-      const colorMetaData = {
-        $: {
-          'android:name': 'com.klaviyo.push.default_notification_color',
-          'android:resource': '@color/klaviyo_notification_color'
-        }
-      };
-      const colorExists = application['meta-data'].some(
-        (item: any) => item.$['android:name'] === 'com.klaviyo.push.default_notification_color'
-      );
-      if (!colorExists) {
-        application['meta-data'].push(colorMetaData);
-        KlaviyoLog.log(`Added color meta-data: ${JSON.stringify(colorMetaData, null, 2)}`);
-      } else {
-        KlaviyoLog.log('Color meta-data already exists, skipping');
-      }
-    } else {
-      // Remove notification color meta-data if it exists
-      KlaviyoLog.log('Removing notification color meta-data');
-      application['meta-data'] = application['meta-data'].filter(
-        (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_color'
-      );
-    }
-
-    return config;
+    return mutateNotificationManifest(config, props);
   });
 };
 
@@ -451,14 +474,19 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
   return withStringsXml(config, config => {
     let strings = config.modResults;
 
+    // Ensure resources and string array exist
+    if (!strings.resources) strings.resources = {};
+    if (!Array.isArray(strings.resources.string)) strings.resources.string = [];
+    const stringArray = strings.resources.string;
+
     function setStringResource(name: string, value: string) {
-      const existing = strings.resources.string?.find((item: any) => item.$.name === name);
+      const existing = stringArray.find((item: any) => item?.$?.name === name);
       if (existing) {
         existing._ = value;
       } else {
-        if (!strings.resources.string) strings.resources.string = [];
-        strings.resources.string.push({ $: { name }, _: value });
-      }    }
+        stringArray.push({ $: { name }, _: value });
+      }
+    }
 
     setStringResource('klaviyo_sdk_plugin_name_override', 'klaviyo-expo');
     setStringResource('klaviyo_sdk_plugin_version_override', '0.0.2');
@@ -466,5 +494,8 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
     return config;
   });
 };
+
+// TEST ONLY exports
+export { findMainActivity, withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest, createColorResource, mutateAndroidManifest };
 
 export default withKlaviyoAndroid; 
