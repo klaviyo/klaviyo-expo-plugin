@@ -9,7 +9,7 @@ jest.mock('xml2js', () => ({
 }));
 
 import { findMainActivity, withMainActivityModifications, withNotificationIcon, withKlaviyoPluginNameVersion, modifyMainActivity } from '../plugin/withKlaviyoAndroid';
-import { executePlugin } from './utils/testHelpers';
+import { executePlugin, createMockConfig, createMockProps, testPluginFunction } from './utils/testHelpers';
 
 // Mock file system operations
 jest.mock('fs', () => ({
@@ -49,7 +49,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
   describe('findMainActivity', () => {
     it('should find MainActivity using Expo detection', async () => {
       // Ensure the test config has a valid platformProjectRoot
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modRequest: { platformProjectRoot: '/test/project/root' }
       });
 
@@ -70,18 +70,12 @@ describe('withKlaviyoAndroid Internal Functions', () => {
 
   describe('withMainActivityModifications', () => {
     it('should return a function', () => {
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ openTracking: true });
-      
-      const result = withMainActivityModifications(config, props);
+      const { result } = testPluginFunction(withMainActivityModifications, {}, { openTracking: true }, 'mods.android');
       expect(result).toHaveProperty('mods.android');
     });
 
     it('should handle missing android package', () => {
-      const config = global.testUtils.createMockConfig({ android: {} });
-      const props = global.testUtils.createMockProps({ openTracking: true });
-      
-      const result = withMainActivityModifications(config, props);
+      const { result } = testPluginFunction(withMainActivityModifications, { android: {} }, { openTracking: true }, 'mods.android');
       expect(result).toHaveProperty('mods.android');
     });
 
@@ -89,10 +83,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       const fs = require('fs');
       fs.existsSync.mockReturnValue(false);
       
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ openTracking: true });
-      
-      const result = withMainActivityModifications(config, props);
+      const { result } = testPluginFunction(withMainActivityModifications, {}, { openTracking: true }, 'mods.android');
       expect(result).toHaveProperty('mods.android');
     });
 
@@ -111,10 +102,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         }
       `);
       
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ openTracking: true });
-      
-      const result = withMainActivityModifications(config, props);
+      const { result } = testPluginFunction(withMainActivityModifications, {}, { openTracking: true }, 'mods.android');
       expect(result).toHaveProperty('mods.android');
     });
 
@@ -132,10 +120,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         }
       `);
       
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ openTracking: true });
-      
-      const result = withMainActivityModifications(config, props);
+      const { result } = testPluginFunction(withMainActivityModifications, {}, { openTracking: true }, 'mods.android');
       expect(result).toHaveProperty('mods.android');
     });
 
@@ -150,44 +135,29 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         }
       `);
       
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ openTracking: true });
-      
-      const result = withMainActivityModifications(config, props);
+      const { result } = testPluginFunction(withMainActivityModifications, {}, { openTracking: true }, 'mods.android');
       expect(result).toHaveProperty('mods.android');
     });
 
     it('should handle openTracking disabled', () => {
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ openTracking: false });
-      
-      const result = withMainActivityModifications(config, props);
+      const { result } = testPluginFunction(withMainActivityModifications, {}, { openTracking: false }, 'mods.android');
       expect(result).toHaveProperty('mods.android');
     });
 
     // Error condition tests
     describe('error conditions', () => {
       it('should handle missing android package in config', () => {
-        const config = global.testUtils.createMockConfig({ android: undefined });
-        const props = global.testUtils.createMockProps({ openTracking: true });
-        
-        const result = withMainActivityModifications(config, props);
+        const { result } = testPluginFunction(withMainActivityModifications, { android: undefined }, { openTracking: true }, 'mods.android');
         expect(result).toHaveProperty('mods.android');
       });
 
       it('should handle null android package in config', () => {
-        const config = global.testUtils.createMockConfig({ android: null });
-        const props = global.testUtils.createMockProps({ openTracking: true });
-        
-        const result = withMainActivityModifications(config, props);
+        const { result } = testPluginFunction(withMainActivityModifications, { android: null }, { openTracking: true }, 'mods.android');
         expect(result).toHaveProperty('mods.android');
       });
 
       it('should handle empty android object in config', () => {
-        const config = global.testUtils.createMockConfig({ android: {} });
-        const props = global.testUtils.createMockProps({ openTracking: true });
-        
-        const result = withMainActivityModifications(config, props);
+        const { result } = testPluginFunction(withMainActivityModifications, { android: {} }, { openTracking: true }, 'mods.android');
         expect(result).toHaveProperty('mods.android');
       });
 
@@ -199,8 +169,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         getMainActivityAsync.mockRejectedValue(new Error('Not found'));
         fs.existsSync.mockReturnValue(false);
         
-        const config = global.testUtils.createMockConfig();
-        const props = global.testUtils.createMockProps({ openTracking: true });
+        const config = createMockConfig();
+        const props = createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
         expect(result).toHaveProperty('mods.android');
@@ -214,8 +184,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         getMainActivityAsync.mockResolvedValue('/test/path/MainActivity.java');
         fs.existsSync.mockImplementation((path) => path && !path.includes('MainActivity'));
         
-        const config = global.testUtils.createMockConfig();
-        const props = global.testUtils.createMockProps({ openTracking: true });
+        const config = createMockConfig();
+        const props = createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
         expect(result).toHaveProperty('mods.android');
@@ -241,8 +211,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           }
         `);
         
-        const config = global.testUtils.createMockConfig();
-        const props = global.testUtils.createMockProps({ openTracking: true });
+        const config = createMockConfig();
+        const props = createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
         expect(result).toHaveProperty('mods.android');
@@ -265,8 +235,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           // No class declaration here
         `);
         
-        const config = global.testUtils.createMockConfig();
-        const props = global.testUtils.createMockProps({ openTracking: true });
+        const config = createMockConfig();
+        const props = createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
         expect(result).toHaveProperty('mods.android');
@@ -294,8 +264,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           }
         `);
         
-        const config = global.testUtils.createMockConfig();
-        const props = global.testUtils.createMockProps({ openTracking: true });
+        const config = createMockConfig();
+        const props = createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
         expect(result).toHaveProperty('mods.android');
@@ -320,8 +290,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           }
         `);
         
-        const config = global.testUtils.createMockConfig();
-        const props = global.testUtils.createMockProps({ openTracking: true });
+        const config = createMockConfig();
+        const props = createMockProps({ openTracking: true });
         
         const result = withMainActivityModifications(config, props);
         expect(result).toHaveProperty('mods.android');
@@ -343,8 +313,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     it('should copy the notification icon file', async () => {
       const fs = require('fs');
       fs.existsSync.mockReturnValue(true);
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: './assets/icon.png' });
+      const config = createMockConfig();
+      const props = createMockProps({ notificationIconFilePath: './assets/icon.png' });
       await runMod(config, props);
       expect(fs.copyFileSync).toHaveBeenCalled();
     });
@@ -352,8 +322,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     it('should throw if notification icon file does not exist', async () => {
       const fs = require('fs');
       fs.existsSync.mockReturnValue(false);
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: './notfound.png' });
+      const config = createMockConfig();
+      const props = createMockProps({ notificationIconFilePath: './notfound.png' });
       await expect(runMod(config, props)).rejects.toThrow('Notification icon file not found');
     });
 
@@ -368,8 +338,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       });
       fs.mkdirSync.mockReset();
       fs.copyFileSync.mockReset();
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: './assets/icon.png' });
+      const config = createMockConfig();
+      const props = createMockProps({ notificationIconFilePath: './assets/icon.png' });
       await runMod(config, props);
       expect(fs.mkdirSync).toHaveBeenCalledWith('/test/project/root/app/src/main/res/drawable', { recursive: true });
     });
@@ -378,8 +348,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       const fs = require('fs');
       fs.existsSync.mockReturnValue(true);
       fs.copyFileSync.mockImplementation(() => { throw new Error('Copy failed'); });
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: './assets/icon.png' });
+      const config = createMockConfig();
+      const props = createMockProps({ notificationIconFilePath: './assets/icon.png' });
       await expect(runMod(config, props)).rejects.toThrow('Failed to copy notification icon: Error: Copy failed');
     });
 
@@ -391,8 +361,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         return false;
       });
       fs.unlinkSync.mockReset();
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined });
+      const config = createMockConfig();
+      const props = createMockProps({ notificationIconFilePath: undefined });
       await runMod(config, props);
       expect(fs.unlinkSync).toHaveBeenCalledWith('/test/project/root/app/src/main/res/drawable/notification_icon.png');
     });
@@ -407,8 +377,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       });
       fs.unlinkSync.mockImplementation(() => { exists = true; });
       fs.rmSync.mockImplementation(() => { exists = false; });
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined });
+      const config = createMockConfig();
+      const props = createMockProps({ notificationIconFilePath: undefined });
       await runMod(config, props);
       expect(fs.rmSync).toHaveBeenCalledWith('/test/project/root/app/src/main/res/drawable/notification_icon.png', { force: true });
     });
@@ -422,8 +392,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       });
       fs.unlinkSync.mockImplementation(() => { throw new Error('unlink failed'); });
       fs.rmSync.mockImplementation(() => { throw new Error('rm failed'); });
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined });
+      const config = createMockConfig();
+      const props = createMockProps({ notificationIconFilePath: undefined });
       await expect(runMod(config, props)).rejects.toThrow('Failed to remove notification icon: Error: rm failed');
     });
 
@@ -431,8 +401,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       const fs = require('fs');
       const logger = require('../plugin/support/logger').KlaviyoLog;
       fs.existsSync.mockReturnValue(false);
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined });
+      const config = createMockConfig();
+      const props = createMockProps({ notificationIconFilePath: undefined });
       await runMod(config, props);
       expect(logger.log).toHaveBeenCalledWith('No notification icon found to remove');
     });
@@ -445,8 +415,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       fs.copyFileSync.mockReset();
       fs.copyFileSync.mockImplementation(() => {}); // Ensure it does not throw
       fs.rmSync = jest.fn();
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: './assets/icon.png' });
+      const config = createMockConfig();
+      const props = createMockProps({ notificationIconFilePath: './assets/icon.png' });
       await runMod(config, props);
       expect(logger.log).toHaveBeenCalledWith('Setting up notification icon handling...');
       expect(logger.log).toHaveBeenCalledWith('Executing notification icon handling...');
@@ -455,38 +425,32 @@ describe('withKlaviyoAndroid Internal Functions', () => {
 
   describe('withKlaviyoPluginNameVersion', () => {
     it('should return a function', () => {
-      const config = global.testUtils.createMockConfig();
-      const props = global.testUtils.createMockProps();
-      
-      const result = withKlaviyoPluginNameVersion(config, props);
+      const { result } = testPluginFunction(withKlaviyoPluginNameVersion);
       expect(typeof result).toBe('function');
     });
 
     it('should handle different config structures', () => {
       const configs = [
-        global.testUtils.createMockConfig(),
-        global.testUtils.createMockConfig({ android: {} }),
-        global.testUtils.createMockConfig({ android: { package: 'com.example.test', manifest: {} } }),
+        createMockConfig(),
+        createMockConfig({ android: {} }),
+        createMockConfig({ android: { package: 'com.example.test', manifest: {} } }),
       ];
       
       configs.forEach(config => {
-        const props = global.testUtils.createMockProps();
+        const props = createMockProps();
         const result = withKlaviyoPluginNameVersion(config, props);
         expect(typeof result).toBe('function');
       });
     });
 
     it('should handle missing android config', () => {
-      const config = global.testUtils.createMockConfig({ android: undefined });
-      const props = global.testUtils.createMockProps();
-      
-      const result = withKlaviyoPluginNameVersion(config, props);
+      const { result } = testPluginFunction(withKlaviyoPluginNameVersion, { android: undefined });
       expect(typeof result).toBe('function');
     });
 
     it('should handle null config', () => {
       const config = null as any;
-      const props = global.testUtils.createMockProps();
+      const props = createMockProps();
       
       const result = withKlaviyoPluginNameVersion(config, props);
       expect(typeof result).toBe('function');
@@ -494,7 +458,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
 
     it('should handle undefined config', () => {
       const config = undefined as any;
-      const props = global.testUtils.createMockProps();
+      const props = createMockProps();
       
       const result = withKlaviyoPluginNameVersion(config, props);
       expect(typeof result).toBe('function');
@@ -509,8 +473,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       beforeEach(() => {
         jest.resetAllMocks();
         mockWithStringsXml = require('@expo/config-plugins').withStringsXml;
-        mockConfig = global.testUtils.createMockConfig();
-        mockProps = global.testUtils.createMockProps();
+        mockConfig = createMockConfig();
+        mockProps = createMockProps();
       });
 
       it('should call withStringsXml with correct parameters', () => {
@@ -820,8 +784,8 @@ describe('withKlaviyoAndroid Internal Functions', () => {
 
   describe('modifyMainActivity error handling', () => {
     const fs = require('fs');
-    const baseConfig = global.testUtils.createMockConfig();
-    const baseProps = global.testUtils.createMockProps({ openTracking: true });
+    const baseConfig = createMockConfig();
+    const baseProps = createMockProps({ openTracking: true });
 
     beforeEach(() => {
       jest.resetAllMocks();
@@ -868,14 +832,14 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('adds notification icon meta-data when icon path is provided', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: './icon.png', notificationColor: undefined });
+      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: undefined });
       mutateNotificationManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(true);
@@ -883,14 +847,14 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('removes notification icon meta-data when icon path is not provided', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_icon' } }] }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined, notificationColor: undefined });
+      const props = createMockProps({ notificationIconFilePath: undefined, notificationColor: undefined });
       mutateNotificationManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(false);
@@ -898,14 +862,14 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('does not duplicate icon meta-data if already present', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_icon' } }] }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: './icon.png', notificationColor: undefined });
+      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: undefined });
       mutateNotificationManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.filter(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon').length).toBe(1);
@@ -913,14 +877,14 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('adds notification color meta-data when color is provided', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined, notificationColor: '#FF0000' });
+      const props = createMockProps({ notificationIconFilePath: undefined, notificationColor: '#FF0000' });
       mutateNotificationManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(true);
@@ -928,14 +892,14 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('removes notification color meta-data when color is not provided', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_color' } }] }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined, notificationColor: undefined });
+      const props = createMockProps({ notificationIconFilePath: undefined, notificationColor: undefined });
       mutateNotificationManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(false);
@@ -943,14 +907,14 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('does not duplicate color meta-data if already present', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_color' } }] }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: undefined, notificationColor: '#FF0000' });
+      const props = createMockProps({ notificationIconFilePath: undefined, notificationColor: '#FF0000' });
       mutateNotificationManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.filter(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color').length).toBe(1);
@@ -958,12 +922,12 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('creates application and meta-data if missing', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {}
         }
       });
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
+      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
       mutateNotificationManifest(config, props);
       expect(config.modResults.manifest.application).toBeDefined();
       expect(config.modResults.manifest.application[0]['meta-data']).toBeDefined();
@@ -971,14 +935,14 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('handles both icon and color meta-data together', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
+      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
       mutateNotificationManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(true);
@@ -987,7 +951,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('preserves existing meta-data when adding new ones', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ 
@@ -997,7 +961,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           }
         }
       });
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
+      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
       mutateNotificationManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'existing_meta')).toBe(true);
@@ -1007,7 +971,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('handles empty string values for icon path and color', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ 
@@ -1020,7 +984,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           }
         }
       });
-      const props = global.testUtils.createMockProps({ notificationIconFilePath: '', notificationColor: '' });
+      const props = createMockProps({ notificationIconFilePath: '', notificationColor: '' });
       mutateNotificationManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(false);
@@ -1038,12 +1002,12 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('creates application tag if missing', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {}
         }
       });
-      const props = global.testUtils.createMockProps({ logLevel: 2 });
+      const props = createMockProps({ logLevel: 2 });
       mutateAndroidManifest(config, props);
       expect(config.modResults.manifest.application).toBeDefined();
       expect(config.modResults.manifest.application[0].$['android:name']).toBe('.MainApplication');
@@ -1051,28 +1015,28 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('creates meta-data array if missing', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' } }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ logLevel: 2 });
+      const props = createMockProps({ logLevel: 2 });
       mutateAndroidManifest(config, props);
       expect(config.modResults.manifest.application[0]['meta-data']).toBeDefined();
       expect(logger.log).toHaveBeenCalledWith('No meta-data array found, creating one...');
     });
 
     it('sets log level with provided value', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ logLevel: 3 });
+      const props = createMockProps({ logLevel: 3 });
       mutateAndroidManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '3')).toBe(true);
@@ -1080,14 +1044,14 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('uses default log level when not provided', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ logLevel: undefined });
+      const props = createMockProps({ logLevel: undefined });
       mutateAndroidManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '1')).toBe(true);
@@ -1095,7 +1059,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('removes existing log level entries before adding new one', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ 
@@ -1109,7 +1073,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           }
         }
       });
-      const props = global.testUtils.createMockProps({ logLevel: 4 });
+      const props = createMockProps({ logLevel: 4 });
       mutateAndroidManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.filter(m => m.$['android:name'] === 'com.klaviyo.core.log_level').length).toBe(1);
@@ -1118,27 +1082,27 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('creates service array if missing', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ logLevel: 2 });
+      const props = createMockProps({ logLevel: 2 });
       mutateAndroidManifest(config, props);
       expect(config.modResults.manifest.application[0].service).toBeDefined();
     });
 
     it('adds KlaviyoPushService if not present', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [], service: [] }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ logLevel: 2 });
+      const props = createMockProps({ logLevel: 2 });
       mutateAndroidManifest(config, props);
       const services = config.modResults.manifest.application[0].service;
       expect(services.some(s => s.$['android:name'] === 'com.klaviyo.pushFcm.KlaviyoPushService')).toBe(true);
@@ -1159,7 +1123,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           }]
         }]
       };
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ 
@@ -1170,7 +1134,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           }
         }
       });
-      const props = global.testUtils.createMockProps({ logLevel: 2 });
+      const props = createMockProps({ logLevel: 2 });
       mutateAndroidManifest(config, props);
       const services = config.modResults.manifest.application[0].service;
       expect(services.filter(s => s.$['android:name'] === 'com.klaviyo.pushFcm.KlaviyoPushService').length).toBe(1);
@@ -1183,7 +1147,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           'android:exported': 'true'
         }
       };
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ 
@@ -1194,7 +1158,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           }
         }
       });
-      const props = global.testUtils.createMockProps({ logLevel: 2 });
+      const props = createMockProps({ logLevel: 2 });
       mutateAndroidManifest(config, props);
       const services = config.modResults.manifest.application[0].service;
       expect(services.some(s => s.$['android:name'] === 'com.example.OtherService')).toBe(true);
@@ -1203,12 +1167,12 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('handles complete manifest modification with all features', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {}
         }
       });
-      const props = global.testUtils.createMockProps({ logLevel: 5 });
+      const props = createMockProps({ logLevel: 5 });
       mutateAndroidManifest(config, props);
       
       const application = config.modResults.manifest.application[0];
@@ -1230,14 +1194,14 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('handles zero log level', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ logLevel: 0 });
+      const props = createMockProps({ logLevel: 0 });
       mutateAndroidManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '0')).toBe(true);
@@ -1245,14 +1209,14 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
 
     it('handles null log level', () => {
-      const config = global.testUtils.createMockConfig({
+      const config = createMockConfig({
         modResults: {
           manifest: {
             application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
           }
         }
       });
-      const props = global.testUtils.createMockProps({ logLevel: null });
+      const props = createMockProps({ logLevel: null });
       mutateAndroidManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '1')).toBe(true);

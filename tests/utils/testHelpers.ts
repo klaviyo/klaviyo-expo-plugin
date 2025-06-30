@@ -110,7 +110,7 @@ export const executePlugin = async <T>(
 ): Promise<any> => {
   const pluginFunction = plugin(config, props);
   if (typeof pluginFunction === 'function') {
-    return await pluginFunction(config);
+    return await (pluginFunction as (config: any) => Promise<any>)(config);
   }
   return pluginFunction;
 };
@@ -139,4 +139,54 @@ export const mockXml2js = {
   Builder: jest.fn().mockImplementation(() => ({
     buildObject: jest.fn().mockReturnValue('<xml>test</xml>'),
   })),
+};
+
+/**
+ * Helper function to test plugin functions with a common pattern
+ */
+export const testPluginFunction = <T>(
+  plugin: ConfigPlugin<T>,
+  configOptions: MockConfigOptions = {},
+  propsOptions: MockPropsOptions = {},
+  expectedProperty?: string
+) => {
+  const config = createMockConfig(configOptions);
+  const props = createMockProps(propsOptions);
+  
+  const result = plugin(config, props);
+  
+  expect(result).toBeDefined();
+  if (expectedProperty) {
+    expect(result).toHaveProperty(expectedProperty);
+  }
+  
+  return { config, props, result };
+};
+
+/**
+ * Helper function for integration tests that have a different config structure
+ */
+export const testIntegrationPluginFunction = <T>(
+  plugin: ConfigPlugin<T>,
+  manifestContents: string,
+  propsOptions: MockPropsOptions = {}
+) => {
+  const config: any = {
+    name: 'test-app',
+    slug: 'test-app',
+    android: {
+      manifest: {
+        contents: manifestContents
+      }
+    }
+  };
+  
+  const props = createMockProps(propsOptions);
+  
+  const result = plugin(config, props);
+  
+  expect(result).toBeDefined();
+  expect(typeof result).toBe('function');
+  
+  return { config, props, result };
 }; 

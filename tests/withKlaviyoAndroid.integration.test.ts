@@ -1,5 +1,6 @@
 import withKlaviyoAndroid from '../plugin/withKlaviyoAndroid';
 import { KlaviyoPluginAndroidProps } from '../plugin/types';
+import { testIntegrationPluginFunction } from './utils/testHelpers';
 
 // Mock file system operations
 jest.mock('fs', () => ({
@@ -20,7 +21,7 @@ jest.mock('@expo/config-plugins/build/android/Paths', () => ({
 }));
 
 describe('withKlaviyoAndroid Integration Tests', () => {
-  const createMockConfig = () => ({
+  const createMockConfig = (): any => ({
     name: 'test-app',
     slug: 'test-app',
     android: {
@@ -67,13 +68,34 @@ describe('withKlaviyoAndroid Integration Tests', () => {
 
   describe('withAndroidManifestModifications', () => {
     it('should add log level meta-data with default value', () => {
-      const config = createMockConfig();
-      const props = createMockProps();
-      
-      const result = withKlaviyoAndroid(config, props);
-      
-      expect(result).toBeDefined();
-      expect(typeof result).toBe('function');
+      testIntegrationPluginFunction(withKlaviyoAndroid, `
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+          <application
+            android:allowBackup="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:supportsRtl="true"
+            android:theme="@style/AppTheme">
+            <activity
+              android:name=".MainActivity"
+              android:exported="true"
+              android:launchMode="singleTop"
+              android:theme="@style/LaunchTheme"
+              android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+              android:hardwareAccelerated="true"
+              android:windowSoftInputMode="adjustResize">
+              <meta-data
+                android:name="io.expo.client.arguments"
+                android:value="exp://192.168.1.100:8081" />
+              <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+              </intent-filter>
+            </activity>
+          </application>
+        </manifest>
+      `);
     });
 
     it('should add log level meta-data with custom value', () => {
@@ -117,7 +139,7 @@ describe('withKlaviyoAndroid Integration Tests', () => {
     });
 
     it('should create application tag if missing', () => {
-      const config = {
+      const config: any = {
         name: 'test-app',
         slug: 'test-app',
         android: {
@@ -138,7 +160,7 @@ describe('withKlaviyoAndroid Integration Tests', () => {
     });
 
     it('should create meta-data array if missing', () => {
-      const config = {
+      const config: any = {
         name: 'test-app',
         slug: 'test-app',
         android: {
@@ -161,7 +183,7 @@ describe('withKlaviyoAndroid Integration Tests', () => {
     });
 
     it('should handle existing meta-data array', () => {
-      const config = {
+      const config: any = {
         name: 'test-app',
         slug: 'test-app',
         android: {
@@ -185,7 +207,7 @@ describe('withKlaviyoAndroid Integration Tests', () => {
     });
 
     it('should handle existing service array', () => {
-      const config = {
+      const config: any = {
         name: 'test-app',
         slug: 'test-app',
         android: {
@@ -261,7 +283,7 @@ describe('withKlaviyoAndroid Integration Tests', () => {
     });
 
     it('should handle existing notification icon meta-data', () => {
-      const config = {
+      const config: any = {
         name: 'test-app',
         slug: 'test-app',
         android: {
@@ -285,7 +307,7 @@ describe('withKlaviyoAndroid Integration Tests', () => {
     });
 
     it('should handle existing notification color meta-data', () => {
-      const config = {
+      const config: any = {
         name: 'test-app',
         slug: 'test-app',
         android: {
@@ -455,7 +477,7 @@ describe('withKlaviyoAndroid Integration Tests', () => {
 
   describe('Error handling and edge cases', () => {
     it('should handle missing android config', () => {
-      const config = { name: 'test-app', slug: 'test-app' };
+      const config: any = { name: 'test-app', slug: 'test-app' };
       const props = createMockProps();
       
       const result = withKlaviyoAndroid(config, props);
@@ -465,7 +487,7 @@ describe('withKlaviyoAndroid Integration Tests', () => {
     });
 
     it('should handle missing manifest config', () => {
-      const config = { 
+      const config: any = { 
         name: 'test-app', 
         slug: 'test-app',
         android: {} 
@@ -479,7 +501,7 @@ describe('withKlaviyoAndroid Integration Tests', () => {
     });
 
     it('should handle empty manifest contents', () => {
-      const config = {
+      const config: any = {
         name: 'test-app',
         slug: 'test-app',
         android: {
@@ -515,7 +537,7 @@ describe('withKlaviyoAndroid Integration Tests', () => {
     });
 
     it('should handle complex nested manifest structure', () => {
-      const config = {
+      const config: any = {
         name: 'test-app',
         slug: 'test-app',
         android: {

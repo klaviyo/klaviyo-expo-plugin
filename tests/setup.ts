@@ -75,39 +75,4 @@ jest.mock('@expo/config-plugins/build/utils/generateCode', () => ({
 // Mock @expo/config-plugins/build/android/Paths
 jest.mock('@expo/config-plugins/build/android/Paths', () => ({
   getMainActivityAsync: jest.fn(),
-}));
-
-// Global test utilities
-global.testUtils = {
-  createMockConfig: (overrides = {}) => ({
-    android: {
-      package: 'com.example.test',
-    },
-    modRequest: {
-      platformProjectRoot: '/test/project/root',
-      projectRoot: '/test/project',
-    },
-    modResults: {
-      manifest: {
-        application: [{
-          $: { 'android:name': '.MainApplication' },
-          'meta-data': [],
-          service: [],
-        }],
-      },
-      resources: {
-        string: [],
-        color: [],
-      },
-    },
-    ...overrides,
-  }),
-  
-  createMockProps: (overrides = {}) => ({
-    logLevel: 1,
-    openTracking: true,
-    notificationIconFilePath: './assets/icon.png',
-    notificationColor: '#FF0000',
-    ...overrides,
-  }),
-}; 
+})); 
