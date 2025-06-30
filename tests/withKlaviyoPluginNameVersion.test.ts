@@ -34,6 +34,8 @@ describe('withKlaviyoPluginNameVersion', () => {
 
   it('should handle empty strings array', () => {
     const configWithEmptyStrings = {
+      name: 'test-app',
+      slug: 'test-app',
       modResults: {
         resources: {
           string: []
@@ -47,6 +49,8 @@ describe('withKlaviyoPluginNameVersion', () => {
 
   it('should handle missing strings array', () => {
     const configWithoutStrings = {
+      name: 'test-app',
+      slug: 'test-app',
       modResults: {
         resources: {}
       }
@@ -58,6 +62,8 @@ describe('withKlaviyoPluginNameVersion', () => {
 
   it('should update existing strings if they already exist', () => {
     const configWithExistingStrings = {
+      name: 'test-app',
+      slug: 'test-app',
       modResults: {
         resources: {
           string: [

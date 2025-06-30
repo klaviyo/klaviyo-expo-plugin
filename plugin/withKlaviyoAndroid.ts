@@ -453,6 +453,11 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, p
 };
 
 const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
+  const anyConfig = config as any;
+  if (!anyConfig.modResults) anyConfig.modResults = {};
+  if (!anyConfig.modResults.manifest) anyConfig.modResults.manifest = { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [], service: [] }] };
+  if (!anyConfig.modResults.resources) anyConfig.modResults.resources = { string: [], color: [] };
+  if (!props) props = { logLevel: 1, openTracking: true, notificationIconFilePath: undefined, notificationColor: undefined };
   KlaviyoLog.log('Starting Android plugin configuration...');
   KlaviyoLog.log('Plugin props:' + JSON.stringify(props));
 
