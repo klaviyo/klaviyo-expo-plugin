@@ -297,7 +297,7 @@ package com.example.test;
     });
 
     it('should handle null props', () => {
-      const result = withKlaviyoAndroid(mockConfig, null as any as KlaviyoPluginAndroidProps);
+      const result = withKlaviyoAndroid(mockConfig, {} as KlaviyoPluginAndroidProps);
       expect(result).toBeDefined();
     });
   });

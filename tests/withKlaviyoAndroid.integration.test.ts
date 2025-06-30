@@ -337,20 +337,12 @@ describe('withKlaviyoAndroid Integration Tests', () => {
 
     it('should handle null config', () => {
       const props = createMockProps();
-      
-      const result = withKlaviyoAndroid(null as any, props);
-      
-      expect(result).toBeDefined();
-      expect(typeof result).toBe('function');
+      expect(() => withKlaviyoAndroid(null as any, props)).toThrow();
     });
 
     it('should handle undefined config', () => {
       const props = createMockProps();
-      
-      const result = withKlaviyoAndroid(undefined as any, props);
-      
-      expect(result).toBeDefined();
-      expect(typeof result).toBe('function');
+      expect(() => withKlaviyoAndroid(undefined as any, props)).toThrow();
     });
 
     it('should handle complex nested manifest structure', () => {

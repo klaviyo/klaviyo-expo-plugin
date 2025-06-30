@@ -34,7 +34,8 @@ describe('withKlaviyoIos', () => {
 
   describe('withRemoteNotificationsPermissions', () => {
     it('should add klaviyo_app_group and klaviyo_badge_autoclearing to existing Info.plist', () => {
-      const modifiedConfig = withKlaviyoIos(mockConfig, mockProps);
+      const modifiedConfig = withKlaviyoIos(mockConfig, mockProps) as any;
+      expect(modifiedConfig.modResults).toBeDefined();
       expect(modifiedConfig.modResults.klaviyo_app_group).toBe('group.$(PRODUCT_BUNDLE_IDENTIFIER).KlaviyoNotificationServiceExtension.shared');
       expect(modifiedConfig.modResults.klaviyo_badge_autoclearing).toBe(true);
     });
@@ -43,7 +44,8 @@ describe('withKlaviyoIos', () => {
       const propsWithBadgeClearingDisabled = global.testUtils.createMockIosProps({
         badgeAutoclearing: false,
       });
-      const modifiedConfig = withKlaviyoIos(mockConfig, propsWithBadgeClearingDisabled);
+      const modifiedConfig = withKlaviyoIos(mockConfig, propsWithBadgeClearingDisabled) as any;
+      expect(modifiedConfig.modResults).toBeDefined();
       expect(modifiedConfig.modResults.klaviyo_app_group).toBe('group.$(PRODUCT_BUNDLE_IDENTIFIER).KlaviyoNotificationServiceExtension.shared');
       expect(modifiedConfig.modResults.klaviyo_badge_autoclearing).toBe(false);
     });
@@ -54,7 +56,8 @@ describe('withKlaviyoIos', () => {
           CFBundleIdentifier: 'com.test.app',
         },
       });
-      const modifiedConfig = withKlaviyoIos(minimalConfig, mockProps);
+      const modifiedConfig = withKlaviyoIos(minimalConfig, mockProps) as any;
+      expect(modifiedConfig.modResults).toBeDefined();
       expect(modifiedConfig.modResults.klaviyo_app_group).toBe('group.$(PRODUCT_BUNDLE_IDENTIFIER).KlaviyoNotificationServiceExtension.shared');
       expect(modifiedConfig.modResults.klaviyo_badge_autoclearing).toBe(true);
       expect(modifiedConfig.modResults.CFBundleIdentifier).toBe('com.test.app');
@@ -68,7 +71,8 @@ describe('withKlaviyoIos', () => {
           klaviyo_badge_autoclearing: false,
         },
       });
-      const modifiedConfig = withKlaviyoIos(configWithExistingFlags, mockProps);
+      const modifiedConfig = withKlaviyoIos(configWithExistingFlags, mockProps) as any;
+      expect(modifiedConfig.modResults).toBeDefined();
       expect(modifiedConfig.modResults.klaviyo_app_group).toBe('group.$(PRODUCT_BUNDLE_IDENTIFIER).KlaviyoNotificationServiceExtension.shared');
       expect(modifiedConfig.modResults.klaviyo_badge_autoclearing).toBe(true);
     });
@@ -77,7 +81,8 @@ describe('withKlaviyoIos', () => {
       const configWithoutBundleId = global.testUtils.createMockIosConfig({
         ios: {},
       });
-      const modifiedConfig = withKlaviyoIos(configWithoutBundleId, mockProps);
+      const modifiedConfig = withKlaviyoIos(configWithoutBundleId, mockProps) as any;
+      expect(modifiedConfig.modResults).toBeDefined();
       expect(modifiedConfig.modResults.klaviyo_app_group).toBe('group.$(PRODUCT_BUNDLE_IDENTIFIER).KlaviyoNotificationServiceExtension.shared');
       expect(modifiedConfig.modResults.klaviyo_badge_autoclearing).toBe(true);
     });
@@ -86,7 +91,8 @@ describe('withKlaviyoIos', () => {
       const configWithEmptyResults = global.testUtils.createMockIosConfig({
         modResults: {},
       });
-      const modifiedConfig = withKlaviyoIos(configWithEmptyResults, mockProps);
+      const modifiedConfig = withKlaviyoIos(configWithEmptyResults, mockProps) as any;
+      expect(modifiedConfig.modResults).toBeDefined();
       expect(modifiedConfig.modResults.klaviyo_app_group).toBe('group.$(PRODUCT_BUNDLE_IDENTIFIER).KlaviyoNotificationServiceExtension.shared');
       expect(modifiedConfig.modResults.klaviyo_badge_autoclearing).toBe(true);
     });
@@ -114,7 +120,8 @@ describe('withKlaviyoIos', () => {
 
   describe('plugin integration', () => {
     it('should apply all plugins in the correct order', () => {
-      const modifiedConfig = withKlaviyoIos(mockConfig, mockProps);
+      const modifiedConfig = withKlaviyoIos(mockConfig, mockProps) as any;
+      expect(modifiedConfig.modResults).toBeDefined();
       expect(modifiedConfig.modResults.klaviyo_app_group).toBe('group.$(PRODUCT_BUNDLE_IDENTIFIER).KlaviyoNotificationServiceExtension.shared');
       expect(modifiedConfig.modResults.klaviyo_badge_autoclearing).toBe(true);
     });
@@ -126,7 +133,8 @@ describe('withKlaviyoIos', () => {
           projectName: undefined,
         },
       });
-      const modifiedConfig = withKlaviyoIos(configWithoutProjectName, mockProps);
+      const modifiedConfig = withKlaviyoIos(configWithoutProjectName, mockProps) as any;
+      expect(modifiedConfig.modResults).toBeDefined();
       expect(modifiedConfig.modResults.klaviyo_app_group).toBe('group.$(PRODUCT_BUNDLE_IDENTIFIER).KlaviyoNotificationServiceExtension.shared');
       expect(modifiedConfig.modResults.klaviyo_badge_autoclearing).toBe(true);
     });
