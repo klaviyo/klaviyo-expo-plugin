@@ -66,7 +66,7 @@ jobs:
       matrix:
         include:
           # Test React 18.x with React Native 0.70.x
-          - react-version: "18.2.0"
+          - react-version: "18.1.0"
             react-native-version: "0.70.0"
             expo-version: "~48.0.0"
           # Test React 18.x with React Native 0.71.x
@@ -86,7 +86,7 @@ jobs:
             react-native-version: "0.79.0"
             expo-version: "~52.0.0"
           # Test React 19.x with React Native 0.80.x
-          - react-version: "19.0.0"
+          - react-version: "19.1.0"
             react-native-version: "0.80.0"
             expo-version: "~53.0.0"
     

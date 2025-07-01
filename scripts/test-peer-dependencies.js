@@ -7,13 +7,13 @@ const path = require('path');
 // Test matrix - same as CI
 const testMatrix = [
   // React 18.x with various React Native versions
-  { react: "18.2.0", reactNative: "0.70.0", expo: "~48.0.0" },
+  { react: "18.1.0", reactNative: "0.70.0", expo: "~48.0.0" },
   { react: "18.2.0", reactNative: "0.71.0", expo: "~49.0.0" },
   { react: "18.2.0", reactNative: "0.72.0", expo: "~50.0.0" },
   { react: "18.2.0", reactNative: "0.73.0", expo: "~51.0.0" },
   // React 19.x with various React Native versions
   { react: "19.0.0", reactNative: "0.79.0", expo: "~52.0.0" },
-  { react: "19.0.0", reactNative: "0.80.0", expo: "~53.0.0" },
+  { react: "19.1.0", reactNative: "0.80.0", expo: "~53.0.0" },
 ];
 
 function runCommand(command, description) {
