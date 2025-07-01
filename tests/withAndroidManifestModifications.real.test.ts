@@ -50,7 +50,8 @@ describe('withAndroidManifestModifications (real file)', () => {
     };
 
     // Run the plugin
-    const modifiedConfig = withKlaviyoAndroid(config, props) as any;
+    const pluginFunction = withKlaviyoAndroid(config, props) as any;
+    const modifiedConfig = pluginFunction(config, props);
 
     // Check the in-memory config
     const metaData = modifiedConfig.modResults.manifest.application[0]['meta-data'];
