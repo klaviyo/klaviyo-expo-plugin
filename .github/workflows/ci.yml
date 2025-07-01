@@ -59,9 +59,65 @@ jobs:
     - name: Run tests with coverage
       run: npm run test:coverage
 
+  test-peer-dependencies:
+    runs-on: ubuntu-22.04
+    
+    strategy:
+      matrix:
+        include:
+          # Test React 18.x with React Native 0.70.x
+          - react-version: "18.2.0"
+            react-native-version: "0.70.0"
+            expo-version: "~48.0.0"
+          # Test React 18.x with React Native 0.71.x
+          - react-version: "18.2.0"
+            react-native-version: "0.71.0"
+            expo-version: "~49.0.0"
+          # Test React 18.x with React Native 0.72.x
+          - react-version: "18.2.0"
+            react-native-version: "0.72.0"
+            expo-version: "~50.0.0"
+          # Test React 18.x with React Native 0.73.x
+          - react-version: "18.2.0"
+            react-native-version: "0.73.0"
+            expo-version: "~51.0.0"
+          # Test React 19.x with React Native 0.79.x
+          - react-version: "19.0.0"
+            react-native-version: "0.79.0"
+            expo-version: "~52.0.0"
+          # Test React 19.x with React Native 0.80.x
+          - react-version: "19.0.0"
+            react-native-version: "0.80.0"
+            expo-version: "~53.0.0"
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: Install dependencies with specific peer dependency versions
+      run: |
+        npm ci
+        npm install --no-save react@${{ matrix.react-version }} react-native@${{ matrix.react-native-version }} expo@${{ matrix.expo-version }}
+        
+    - name: Run tests with specific versions
+      run: |
+        echo "Testing with React ${{ matrix.react-version }}, React Native ${{ matrix.react-native-version }}, Expo ${{ matrix.expo-version }}"
+        npm test
+        
+    - name: Build with specific versions
+      run: |
+        echo "Building with React ${{ matrix.react-version }}, React Native ${{ matrix.react-native-version }}, Expo ${{ matrix.expo-version }}"
+        npm run build
+
   build:
     runs-on: ubuntu-22.04
-    needs: [lint-and-type-check, test]
+    needs: [lint-and-type-check, test, test-peer-dependencies]
     
     steps:
     - name: Checkout code

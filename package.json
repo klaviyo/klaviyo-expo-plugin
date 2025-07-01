@@ -12,7 +12,10 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:coverage:html": "jest --coverage --coverageReporters=html --coverageReporters=text && open coverage/index.html"
+    "test:coverage:html": "jest --coverage --coverageReporters=html --coverageReporters=text && open coverage/index.html",
+    "test:peer-deps": "node scripts/test-peer-dependencies.js",
+    "test:peer-deps:react18": "npm install --no-save react@18.2.0 react-native@0.73.0 expo@~51.0.0 && npm test",
+    "test:peer-deps:react19": "npm install --no-save react@19.0.0 react-native@0.79.0 expo@~52.0.0 && npm test"
   },
   "keywords": [
     "expo",
