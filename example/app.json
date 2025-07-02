@@ -12,8 +12,7 @@
       "bundleIdentifier": "com.klaviyo.expoexample",
       "infoPlist": {
         "UIBackgroundModes": [
-          "remote-notification",
-          "remote-notification"
+          "remote-notification"        
         ],
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -53,7 +52,7 @@
             "projectVersion": "1",
             "marketingVersion": "1.0",
             "swiftVersion": "5.0",
-            "devTeam": "G3793W2RJ2"
+            "devTeam": "XXXXXXXXXX"
           }
         }
       ]
