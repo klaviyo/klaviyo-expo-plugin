@@ -55,6 +55,54 @@ export const createMockProps = (options: MockPropsOptions = {}): any => ({
   ...options,
 });
 
+export const createMockMainActivityContent = (isKotlin: boolean = false): string => {
+  if (isKotlin) {
+    return `
+package com.example.test
+
+import com.facebook.react.ReactActivity
+
+class MainActivity : ReactActivity() {
+    override fun getMainComponentName(): String {
+        return "main"
+    }
+}
+    `;
+  } else {
+    return `
+package com.example.test;
+
+import com.facebook.react.ReactActivity;
+
+public class MainActivity extends ReactActivity {
+  @Override
+  protected String getMainComponentName() {
+    return "main";
+  }
+}
+    `;
+  }
+};
+
+export const createMockAndroidManifest = (overrides: any = {}): any => ({
+  manifest: {
+    application: [{
+      $: { 'android:name': '.MainApplication' },
+      'meta-data': [],
+      service: [],
+      ...overrides,
+    }],
+  },
+});
+
+export const createMockStringsXml = (overrides: any = {}): any => ({
+  resources: {
+    string: [],
+    color: [],
+    ...overrides,
+  },
+});
+
 export const executePlugin = async <T>(
   plugin: ConfigPlugin<T>,
   config: any,
@@ -67,9 +115,6 @@ export const executePlugin = async <T>(
   return pluginFunction;
 };
 
-/**
- * Helper function to test plugin functions with a common pattern
- */
 export const testPluginFunction = <T>(
   plugin: ConfigPlugin<T>,
   configOptions: MockConfigOptions = {},
@@ -89,9 +134,6 @@ export const testPluginFunction = <T>(
   return { config, props, result };
 };
 
-/**
- * Helper function for integration tests that have a different config structure
- */
 export const testIntegrationPluginFunction = <T>(
   plugin: ConfigPlugin<T>,
   manifestContents: string,
@@ -104,7 +146,16 @@ export const testIntegrationPluginFunction = <T>(
       manifest: {
         contents: manifestContents
       }
-    }
+    },
+    modResults: {
+      manifest: {
+        application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [], service: [] }]
+      },
+      resources: {
+        string: [],
+        color: [],
+      },
+    },
   };
   
   const props = createMockProps(propsOptions);
@@ -113,11 +164,9 @@ export const testIntegrationPluginFunction = <T>(
   
   expect(result).toBeDefined();
   expect(typeof result).toBe('function');
+  return config;
 };
 
-/**
- * Helper function for simple integration tests that just verify the plugin returns a function
- */
 export const testSimpleIntegration = <T>(
   plugin: ConfigPlugin<T>,
   propsOptions: MockPropsOptions = {}
@@ -156,7 +205,16 @@ export const testSimpleIntegration = <T>(
           </manifest>
         `
       }
-    }
+    },
+    modResults: {
+      manifest: {
+        application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [], service: [] }]
+      },
+      resources: {
+        string: [],
+        color: [],
+      },
+    },
   };
   
   const props = createMockProps(propsOptions);
@@ -165,4 +223,71 @@ export const testSimpleIntegration = <T>(
   
   expect(result).toBeDefined();
   expect(typeof result).toBe('function');
-}; 
+  return config;
+};
+
+// iOS-specific mock functions
+export interface MockIosConfigOptions {
+  ios?: {
+    bundleIdentifier?: string;
+  };
+  modRequest?: {
+    projectName?: string;
+    platformProjectRoot?: string;
+    projectRoot?: string;
+  };
+  modResults?: {
+    CFBundleDisplayName?: string;
+    CFBundleIdentifier?: string;
+    CFBundleVersion?: string;
+    CFBundleShortVersionString?: string;
+    [key: string]: any;
+  };
+}
+
+export interface MockIosPropsOptions {
+  badgeAutoclearing?: boolean;
+  codeSigningStyle?: string;
+  projectVersion?: string;
+  marketingVersion?: string;
+  swiftVersion?: string;
+  devTeam?: string;
+}
+
+export const createMockIosConfig = (options: MockIosConfigOptions = {}): any => {
+  const defaultModResults = {
+    CFBundleDisplayName: 'TestApp',
+    CFBundleIdentifier: 'com.test.app',
+    CFBundleVersion: '1',
+    CFBundleShortVersionString: '1.0',
+  };
+  const hasModResults = options && typeof options === 'object' && 'modResults' in options;
+  const mergedModResults = hasModResults
+    ? { ...defaultModResults, ...options.modResults }
+    : defaultModResults;
+  return {
+    name: 'TestApp',
+    ios: {
+      bundleIdentifier: 'com.test.app',
+      ...options.ios,
+    },
+    modRequest: {
+      projectName: 'TestApp',
+      platformProjectRoot: '/test/project/ios',
+      projectRoot: '/test/project',
+      ...options.modRequest,
+    },
+    modResults: mergedModResults,
+    ...options,
+  };
+};
+
+export const createMockIosProps = (options: MockIosPropsOptions = {}): any => ({
+  badgeAutoclearing: true,
+  codeSigningStyle: 'Automatic',
+  projectVersion: '1',
+  marketingVersion: '1.0',
+  swiftVersion: '5.0',
+  devTeam: 'XXXXXXXXXX',
+  ...options,
+}); 

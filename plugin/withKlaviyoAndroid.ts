@@ -4,20 +4,31 @@ import * as path from 'path';
 import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
 import { getMainActivityAsync } from '@expo/config-plugins/build/android/Paths';
 import * as glob from 'glob';
-import { KlaviyoPluginAndroidProps } from './types';
+import {
+  KlaviyoPluginAndroidProps,
+  AndroidMetaData,
+  AndroidService,
+  KlaviyoAndroidModResults
+} from './types';
 import * as xml2js from 'xml2js';
 import { KlaviyoLog } from './support/logger';
+import { ExportedConfigWithProps } from '@expo/config-plugins';
+import {
+  AndroidManifest,
+  ManifestApplication,
+  ManifestMetaData
+} from '@expo/config-plugins/build/android/Manifest';
 
-const mutateAndroidManifest = (config: any, props: KlaviyoPluginAndroidProps) => {
+const mutateAndroidManifest = (config: ExportedConfigWithProps<AndroidManifest>, props: KlaviyoPluginAndroidProps) => {
   KlaviyoLog.log('Modifying Android Manifest');
   const androidManifest = config.modResults.manifest;
   
   if (!androidManifest.application) {
     KlaviyoLog.log('Creating application tag in manifest');
-    androidManifest.application = [{ $: { 'android:name': '.MainApplication' } }];
+    androidManifest.application = [{ $: { 'android:name': '.MainApplication' } } as ManifestApplication];
   }
 
-  const application = androidManifest.application[0];
+  const application = androidManifest.application[0] as ManifestApplication;
   
   // Add or update the log level meta-data
   if (!application['meta-data']) {
@@ -29,8 +40,8 @@ const mutateAndroidManifest = (config: any, props: KlaviyoPluginAndroidProps) =>
   KlaviyoLog.log(`Setting Klaviyo log level to ${logLevel}`);
 
   // Remove any existing log level meta-data entries
-  application['meta-data'] = application['meta-data'].filter(
-    (item: any) => !['com.klaviyo.core.log_level', 'com.klaviyo.android.log_level'].includes(item.$['android:name'])
+  application['meta-data'] = (application['meta-data'] || []).filter(
+    (item: ManifestMetaData) => !['com.klaviyo.core.log_level', 'com.klaviyo.android.log_level'].includes(item.$['android:name'])
   );
 
   // Add the correct log level meta-data
@@ -39,7 +50,7 @@ const mutateAndroidManifest = (config: any, props: KlaviyoPluginAndroidProps) =>
       'android:name': 'com.klaviyo.core.log_level',
       'android:value': logLevel.toString()
     }
-  });
+  } as ManifestMetaData);
 
   // Add KlaviyoPushService to the manifest
   if (!application.service) {
@@ -71,9 +82,7 @@ const mutateAndroidManifest = (config: any, props: KlaviyoPluginAndroidProps) =>
 };
 
 const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
-  return withAndroidManifest(config, (config) => {
-    return mutateAndroidManifest(config, props);
-  });
+  return withAndroidManifest(config, (config) => mutateAndroidManifest(config, props));
 };
 
 const findMainActivity = async (projectRoot: string): Promise<{ path: string; isKotlin: boolean } | null> => {
@@ -138,7 +147,11 @@ const findMainActivity = async (projectRoot: string): Promise<{ path: string; is
   return null;
 };
 
-export async function modifyMainActivity(config: any, props: any, findMainActivityImpl = findMainActivity) {
+export async function modifyMainActivity(
+  config: { android?: { package?: string }, modRequest: { platformProjectRoot: string } },
+  props: KlaviyoPluginAndroidProps,
+  findMainActivityImpl = findMainActivity
+) {
   KlaviyoLog.log('Modifying MainActivity');
   KlaviyoLog.log(`OpenTracking setting: ${props.openTracking}`);
   
@@ -177,10 +190,10 @@ export async function modifyMainActivity(config: any, props: any, findMainActivi
   }
 
   // Split the content into lines for more precise manipulation
-  let lines = mainActivityContent.split('\n');
+  const lines = mainActivityContent.split('\n');
 
   // Remove Klaviyo-related imports and generated blocks
-  let newLines: string[] = [];
+  const newLines: string[] = [];
   let skipLines = false;
 
   for (let i = 0; i < lines.length; i++) {
@@ -208,14 +221,14 @@ export async function modifyMainActivity(config: any, props: any, findMainActivi
   }
 
   // Clean up multiple empty lines
-  let cleanedContent = newLines.join('\n').replace(/\n{3,}/g, '\n\n');
+  const cleanedContent = newLines.join('\n').replace(/\n{3,}/g, '\n\n');
 
   // Only add the code if openTracking is enabled
   if (props.openTracking) {
     KlaviyoLog.log('Adding push tracking code to MainActivity...');
     
     // First, remove any existing generated content
-    let contentWithoutGenerated = cleanedContent.replace(
+    const contentWithoutGenerated = cleanedContent.replace(
       /\/\/ @generated begin klaviyo-[\s\S]*?\/\/ @generated end klaviyo-/g,
       ''
     ).trim();
@@ -265,7 +278,14 @@ const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (
   ]);
 };
 
-const createColorResource = async (config: any, color: string | undefined) => {
+interface ColorResourceConfig {
+  modRequest: { platformProjectRoot: string };
+}
+
+const createColorResource = async (
+  config: ColorResourceConfig,
+  color: string | undefined
+) => {
   KlaviyoLog.log(`Creating color resource for: ${color}`);
   const colorsDir = path.join(config.modRequest.platformProjectRoot, 'app', 'src', 'main', 'res', 'values');
   if (!fs.existsSync(colorsDir)) {
@@ -273,7 +293,7 @@ const createColorResource = async (config: any, color: string | undefined) => {
   }
 
   const colorsXmlPath = path.join(colorsDir, 'colors.xml');
-  let colorsObj: any = { resources: { color: [] } };
+  let colorsObj: { resources: { color: { $: { name: string }, _: string }[] } } = { resources: { color: [] } };
 
   if (fs.existsSync(colorsXmlPath)) {
     const xml = fs.readFileSync(colorsXmlPath, 'utf-8');
@@ -283,7 +303,7 @@ const createColorResource = async (config: any, color: string | undefined) => {
 
   // Remove any existing klaviyo_notification_color
   colorsObj.resources.color = (colorsObj.resources.color || []).filter(
-    (c: any) => c.$.name !== 'klaviyo_notification_color'
+    (c) => c.$.name !== 'klaviyo_notification_color'
   );
 
   // Only add the new color if it's truthy
@@ -317,15 +337,15 @@ const withNotificationResources: ConfigPlugin<KlaviyoPluginAndroidProps> = (conf
   ]);
 };
 
-const mutateNotificationManifest = (config: any, props: KlaviyoPluginAndroidProps) => {
+const mutateNotificationManifest = (config: ExportedConfigWithProps<AndroidManifest>, props: KlaviyoPluginAndroidProps) => {
   const androidManifest = config.modResults.manifest;
   
   if (!androidManifest.application) {
     KlaviyoLog.log('No application tag found, creating one...');
-    androidManifest.application = [{ $: { 'android:name': '.MainApplication' } }];
+    androidManifest.application = [{ $: { 'android:name': '.MainApplication' } } as ManifestApplication];
   }
 
-  const application = androidManifest.application[0];
+  const application = androidManifest.application[0] as ManifestApplication;
   
   if (!application['meta-data']) {
     application['meta-data'] = [];
@@ -339,9 +359,9 @@ const mutateNotificationManifest = (config: any, props: KlaviyoPluginAndroidProp
         'android:name': 'com.klaviyo.push.default_notification_icon',
         'android:resource': '@drawable/notification_icon'
       }
-    };
-    const iconExists = application['meta-data'].some(
-      (item: any) => item.$['android:name'] === 'com.klaviyo.push.default_notification_icon'
+    } as ManifestMetaData;
+    const iconExists = (application['meta-data'] || []).some(
+      (item: ManifestMetaData) => item.$['android:name'] === 'com.klaviyo.push.default_notification_icon'
     );
     if (!iconExists) {
       application['meta-data'].push(iconMetaData);
@@ -352,8 +372,8 @@ const mutateNotificationManifest = (config: any, props: KlaviyoPluginAndroidProp
   } else {
     // Remove notification icon meta-data if it exists
     KlaviyoLog.log('Removing notification icon meta-data');
-    application['meta-data'] = application['meta-data'].filter(
-      (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_icon'
+    application['meta-data'] = (application['meta-data'] || []).filter(
+      (item: ManifestMetaData) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_icon'
     );
   }
 
@@ -365,9 +385,9 @@ const mutateNotificationManifest = (config: any, props: KlaviyoPluginAndroidProp
         'android:name': 'com.klaviyo.push.default_notification_color',
         'android:resource': '@color/klaviyo_notification_color'
       }
-    };
-    const colorExists = application['meta-data'].some(
-      (item: any) => item.$['android:name'] === 'com.klaviyo.push.default_notification_color'
+    } as ManifestMetaData;
+    const colorExists = (application['meta-data'] || []).some(
+      (item: ManifestMetaData) => item.$['android:name'] === 'com.klaviyo.push.default_notification_color'
     );
     if (!colorExists) {
       application['meta-data'].push(colorMetaData);
@@ -378,8 +398,8 @@ const mutateNotificationManifest = (config: any, props: KlaviyoPluginAndroidProp
   } else {
     // Remove notification color meta-data if it exists
     KlaviyoLog.log('Removing notification color meta-data');
-    application['meta-data'] = application['meta-data'].filter(
-      (item: any) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_color'
+    application['meta-data'] = (application['meta-data'] || []).filter(
+      (item: ManifestMetaData) => item.$['android:name'] !== 'com.klaviyo.push.default_notification_color'
     );
   }
 
@@ -387,9 +407,7 @@ const mutateNotificationManifest = (config: any, props: KlaviyoPluginAndroidProp
 };
 
 const withNotificationManifest: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
-  return withAndroidManifest(config, (config) => {
-    return mutateNotificationManifest(config, props);
-  });
+  return withAndroidManifest(config, (config) => mutateNotificationManifest(config, props));
 };
 
 const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
@@ -428,18 +446,21 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, p
           try {
             // First try to remove the file
             fs.unlinkSync(destPath);
-            
-            // Verify the file was actually removed
-            if (fs.existsSync(destPath)) {
-              // Try force removal
-              fs.rmSync(destPath, { force: true });
-            }
-          } catch (error) {
-            // Try force removal as fallback
+          } catch (unlinkError) {
+            // If unlinkSync throws, try force removal as fallback
             try {
               fs.rmSync(destPath, { force: true });
-            } catch (forceError) {
-              throw new Error(`Failed to remove notification icon: ${forceError}`);
+            } catch (rmError) {
+              throw new Error(`Failed to remove notification icon: ${rmError instanceof Error ? rmError.toString() : rmError}`);
+            }
+            return config;
+          }
+          // If file still exists after unlinkSync, try rmSync
+          if (fs.existsSync(destPath)) {
+            try {
+              fs.rmSync(destPath, { force: true });
+            } catch (rmError) {
+              throw new Error(`Failed to remove notification icon: ${rmError instanceof Error ? rmError.toString() : rmError}`);
             }
           }
         } else {
@@ -453,6 +474,13 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, p
 };
 
 const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
+  const typedConfig = config as typeof config & { modResults: KlaviyoAndroidModResults };
+  if (!typedConfig.modResults) typedConfig.modResults = {};
+  if (!typedConfig.modResults.manifest) typedConfig.modResults.manifest = {
+    application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [], service: [] }]
+  };
+  if (!typedConfig.modResults.resources) typedConfig.modResults.resources = { string: [], color: [] };
+  if (!props) props = { logLevel: 1, openTracking: true, notificationIconFilePath: undefined, notificationColor: undefined };
   KlaviyoLog.log('Starting Android plugin configuration...');
   KlaviyoLog.log('Plugin props:' + JSON.stringify(props));
 
@@ -472,15 +500,19 @@ const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, pro
  */
 export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
   return withStringsXml(config, config => {
-    let strings = config.modResults;
+    interface StringResource {
+      $: { name: string };
+      _: string;
+    }
+    const strings = config.modResults as { resources: { string: StringResource[]; color: { $: { name: string }; _: string }[] } };
 
     // Ensure resources and string array exist
-    if (!strings.resources) strings.resources = {};
+    if (!strings.resources) strings.resources = { string: [], color: [] };
     if (!Array.isArray(strings.resources.string)) strings.resources.string = [];
     const stringArray = strings.resources.string;
 
     function setStringResource(name: string, value: string) {
-      const existing = stringArray.find((item: any) => item?.$?.name === name);
+      const existing = stringArray.find((item) => item?.$?.name === name);
       if (existing) {
         existing._ = value;
       } else {

@@ -34,37 +34,41 @@ jest.mock('xml2js', () => ({
 
 // Mock @expo/config-plugins
 jest.mock('@expo/config-plugins', () => ({
-  withDangerousMod: jest.fn().mockImplementation((config, [platform, action]) => {
-    // Add a mods property with the platform mod
-    return {
-      ...config,
-      mods: {
-        ...(config.mods || {}),
-        [platform]: action,
-      },
-    };
-  }),
+  withDangerousMod: jest.fn().mockImplementation((config, [platform, action]) => ({
+    ...config,
+    mods: {
+      ...(config.mods || {}),
+      [platform]: action,
+    },
+  })),
   withAndroidManifest: jest.fn().mockImplementation((config, mod) => {
-    // Return a function that takes config and props
-    return (config: any, props: any) => {
-      // Return the config as-is for testing
-      return config;
-    };
+    return mod(config);
   }),
-  withStringsXml: jest.fn().mockImplementation((config, mod) => {
-    // Return a function that takes config and props
-    return (config: any, props: any) => {
-      // Return the config as-is for testing
-      return config;
-    };
-  }),
+  withStringsXml: jest.fn().mockImplementation((config, mod) => (config: any, props: any) => config),
   withPlugins: jest.fn().mockImplementation((config, plugins) => {
-    // Return a function that takes config and props
-    return (config: any, props: any) => {
-      // Return the config as-is for testing
-      return config;
-    };
+    let result = config;
+    for (const entry of plugins) {
+      // Each entry can be [plugin, props] or just plugin
+      if (Array.isArray(entry)) {
+        const [plugin, props] = entry;
+        result = plugin(result, props);
+      } else {
+        result = entry(result);
+      }
+    }
+    return result;
   }),
+  withInfoPlist: jest.fn().mockImplementation((config, mod) => {
+    const modifiedConfig = { ...config };
+    const result = mod(modifiedConfig);
+    return result || modifiedConfig;
+  }),
+  withEntitlementsPlist: jest.fn().mockImplementation((config, mod) => {
+    const modifiedConfig = { ...config };
+    const result = mod(modifiedConfig);
+    return result || modifiedConfig;
+  }),
+  withXcodeProject: jest.fn().mockImplementation((config, mod) => config),
 }));
 
 // Mock @expo/config-plugins/build/utils/generateCode
@@ -75,4 +79,23 @@ jest.mock('@expo/config-plugins/build/utils/generateCode', () => ({
 // Mock @expo/config-plugins/build/android/Paths
 jest.mock('@expo/config-plugins/build/android/Paths', () => ({
   getMainActivityAsync: jest.fn(),
+}));
+
+// Mock the logger to avoid console output during tests
+jest.mock('../plugin/support/logger', () => ({
+  KlaviyoLog: {
+    log: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+  },
+}));
+
+// Mock the file manager
+jest.mock('../plugin/support/fileManager', () => ({
+  FileManager: {
+    readFile: jest.fn(),
+    writeFile: jest.fn(),
+    copyFile: jest.fn(),
+    dirExists: jest.fn(),
+  },
 })); 
