@@ -12,7 +12,7 @@
       "bundleIdentifier": "com.klaviyo.expoexample",
       "infoPlist": {
         "UIBackgroundModes": [
-          "remote-notification"        
+          "remote-notification"
         ],
         "ITSAppUsesNonExemptEncryption": false
       }

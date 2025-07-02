@@ -121,9 +121,39 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
 };
 
 const NSE_TARGET_NAME = "KlaviyoNotificationServiceExtension";
-const NSE_EXT_FILES = [
-  "KlaviyoNotificationService.swift"
-];
+const NSE_SWIFT_CONTENT = `import UserNotifications
+import KlaviyoSwiftExtension
+
+class KlaviyoNotificationService: UNNotificationServiceExtension {
+    var request: UNNotificationRequest!
+    var contentHandler: ((UNNotificationContent) -> Void)?
+    var bestAttemptContent: UNMutableNotificationContent?
+
+    override func didReceive(
+        _ request: UNNotificationRequest,
+        withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
+        self.request = request
+        self.contentHandler = contentHandler
+        bestAttemptContent = (request.content.mutableCopy() as? UNMutableNotificationContent)
+
+        if let bestAttemptContent = bestAttemptContent {
+            KlaviyoExtensionSDK.handleNotificationServiceDidReceivedRequest(
+                request: self.request,
+                bestAttemptContent: bestAttemptContent,
+                contentHandler: contentHandler)
+        }
+    }
+
+    override func serviceExtensionTimeWillExpire() {
+        if let contentHandler = contentHandler,
+           let bestAttemptContent = bestAttemptContent {
+            KlaviyoExtensionSDK.handleNotificationServiceExtensionTimeWillExpireRequest(
+                request: request,
+                bestAttemptContent: bestAttemptContent,
+                contentHandler: contentHandler)
+        }
+    }
+}`;
 // Use the actual bundle identifier from config instead of build-time variable
 const getAppGroupName = (config: any) => {
   const bundleId = config.ios?.bundleIdentifier;
@@ -204,7 +234,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
 
     // create the NSE group
     const extGroup = xcodeProject.addPbxGroup(
-      NSE_EXT_FILES,
+      ["KlaviyoNotificationService.swift"],
       NSE_TARGET_NAME, 
       NSE_TARGET_NAME
     );
@@ -292,18 +322,16 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
         fs.mkdirSync(nsePath, { recursive: true });
       }
       
-      // Copy static files
-      const sourceDir = path.join(config.modRequest.projectRoot, "/node_modules/klaviyo-expo-plugin/", NSE_TARGET_NAME);
-      for (const file of NSE_EXT_FILES) {
-        try {
-          await FileManager.copyFile(
-            path.join(sourceDir, file),
-            path.join(nsePath, file)
-          );
-        } catch (error) {
-          KlaviyoLog.error(`Failed to copy ${file}: ${error}`);
-          throw error;
-        }
+      // Generate Swift file
+      try {
+        await FileManager.writeFile(
+          path.join(nsePath, "KlaviyoNotificationService.swift"),
+          NSE_SWIFT_CONTENT
+        );
+        KlaviyoLog.log('Generated KlaviyoNotificationService.swift');
+      } catch (error) {
+        KlaviyoLog.error(`Failed to generate Swift file: ${error}`);
+        throw error;
       }
 
       // Generate entitlements file dynamically
