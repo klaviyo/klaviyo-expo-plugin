@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import withKlaviyoIos from '../plugin/withKlaviyoIos';
 import { KlaviyoPluginIosProps } from '../plugin/types';
+import { createMockIosConfig, createMockIosProps } from './utils/testHelpers';
 
 // Mock the logger to avoid console output during tests
 jest.mock('../plugin/support/logger', () => ({
@@ -28,8 +29,8 @@ describe('withKlaviyoIos', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockConfig = global.testUtils.createMockIosConfig();
-    mockProps = global.testUtils.createMockIosProps();
+    mockConfig = createMockIosConfig();
+    mockProps = createMockIosProps();
   });
 
   describe('withRemoteNotificationsPermissions', () => {
@@ -41,7 +42,7 @@ describe('withKlaviyoIos', () => {
     });
 
     it('should add flags to Info.plist with badgeAutoclearing set to false', () => {
-      const propsWithBadgeClearingDisabled = global.testUtils.createMockIosProps({
+      const propsWithBadgeClearingDisabled = createMockIosProps({
         badgeAutoclearing: false,
       });
       const modifiedConfig = withKlaviyoIos(mockConfig, propsWithBadgeClearingDisabled) as any;
@@ -51,7 +52,7 @@ describe('withKlaviyoIos', () => {
     });
 
     it('should add flags to Info.plist with minimal existing content', () => {
-      const minimalConfig = global.testUtils.createMockIosConfig({
+      const minimalConfig = createMockIosConfig({
         modResults: {
           CFBundleIdentifier: 'com.test.app',
         },
@@ -64,7 +65,7 @@ describe('withKlaviyoIos', () => {
     });
 
     it('should update existing klaviyo flags if they already exist', () => {
-      const configWithExistingFlags = global.testUtils.createMockIosConfig({
+      const configWithExistingFlags = createMockIosConfig({
         modResults: {
           ...mockConfig.modResults,
           klaviyo_app_group: 'group.existing.app.shared',
@@ -78,7 +79,7 @@ describe('withKlaviyoIos', () => {
     });
 
     it('should handle config without ios bundleIdentifier', () => {
-      const configWithoutBundleId = global.testUtils.createMockIosConfig({
+      const configWithoutBundleId = createMockIosConfig({
         ios: {},
       });
       const modifiedConfig = withKlaviyoIos(configWithoutBundleId, mockProps) as any;
@@ -88,7 +89,7 @@ describe('withKlaviyoIos', () => {
     });
 
     it('should handle empty modResults', () => {
-      const configWithEmptyResults = global.testUtils.createMockIosConfig({
+      const configWithEmptyResults = createMockIosConfig({
         modResults: {},
       });
       const modifiedConfig = withKlaviyoIos(configWithEmptyResults, mockProps) as any;
@@ -100,7 +101,7 @@ describe('withKlaviyoIos', () => {
 
   describe('withKlaviyoAppGroup', () => {
     it('should add app group to entitlements when none exist', () => {
-      const configWithEntitlements = global.testUtils.createMockIosConfig({
+      const configWithEntitlements = createMockIosConfig({
         modResults: {},
       });
       const modifiedConfig = withKlaviyoIos(configWithEntitlements, mockProps);
@@ -108,7 +109,7 @@ describe('withKlaviyoIos', () => {
     });
 
     it('should add app group to existing entitlements', () => {
-      const configWithExistingEntitlements = global.testUtils.createMockIosConfig({
+      const configWithExistingEntitlements = createMockIosConfig({
         modResults: {
           'com.apple.security.application-groups': ['group.existing.app'],
         },
@@ -127,7 +128,7 @@ describe('withKlaviyoIos', () => {
     });
 
     it('should handle missing project name gracefully', () => {
-      const configWithoutProjectName = global.testUtils.createMockIosConfig({
+      const configWithoutProjectName = createMockIosConfig({
         modRequest: {
           ...mockConfig.modRequest,
           projectName: undefined,

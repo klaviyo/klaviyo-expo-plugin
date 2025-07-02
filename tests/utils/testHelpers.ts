@@ -224,4 +224,70 @@ export const testSimpleIntegration = <T>(
   expect(result).toBeDefined();
   expect(typeof result).toBe('function');
   return config;
-}; 
+};
+
+// iOS-specific mock functions
+export interface MockIosConfigOptions {
+  ios?: {
+    bundleIdentifier?: string;
+  };
+  modRequest?: {
+    projectName?: string;
+    platformProjectRoot?: string;
+    projectRoot?: string;
+  };
+  modResults?: {
+    CFBundleDisplayName?: string;
+    CFBundleIdentifier?: string;
+    CFBundleVersion?: string;
+    CFBundleShortVersionString?: string;
+    [key: string]: any;
+  };
+}
+
+export interface MockIosPropsOptions {
+  badgeAutoclearing?: boolean;
+  codeSigningStyle?: string;
+  projectVersion?: string;
+  marketingVersion?: string;
+  swiftVersion?: string;
+  devTeam?: string;
+}
+
+export const createMockIosConfig = (options: MockIosConfigOptions = {}): any => {
+  const defaultModResults = {
+    CFBundleDisplayName: 'TestApp',
+    CFBundleIdentifier: 'com.test.app',
+    CFBundleVersion: '1',
+    CFBundleShortVersionString: '1.0',
+  };
+  const hasModResults = options && typeof options === 'object' && 'modResults' in options;
+  const mergedModResults = hasModResults
+    ? { ...defaultModResults, ...options.modResults }
+    : defaultModResults;
+  return {
+    name: 'TestApp',
+    ios: {
+      bundleIdentifier: 'com.test.app',
+      ...options.ios,
+    },
+    modRequest: {
+      projectName: 'TestApp',
+      platformProjectRoot: '/test/project/ios',
+      projectRoot: '/test/project',
+      ...options.modRequest,
+    },
+    modResults: mergedModResults,
+    ...options,
+  };
+};
+
+export const createMockIosProps = (options: MockIosPropsOptions = {}): any => ({
+  badgeAutoclearing: true,
+  codeSigningStyle: 'Automatic',
+  projectVersion: '1',
+  marketingVersion: '1.0',
+  swiftVersion: '5.0',
+  devTeam: 'XXXXXXXXXX',
+  ...options,
+}); 
