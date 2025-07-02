@@ -70,3 +70,33 @@ export const mergeProps = (props: KlaviyoPluginProps): KlaviyoPluginPropsDefault
     ios: mergeIosProps(props.ios)
   };
 };
+
+// Android manifest and resources types for plugin/withKlaviyoAndroid.ts
+export interface AndroidMetaData {
+  $: { 'android:name': string; 'android:value'?: string; 'android:resource'?: string };
+}
+
+export interface AndroidService {
+  $: { 'android:name': string; 'android:exported'?: string };
+  'intent-filter'?: any[];
+}
+
+export interface AndroidApplication {
+  $: { 'android:name': string };
+  'meta-data'?: AndroidMetaData[];
+  service?: AndroidService[];
+}
+
+export interface AndroidManifest {
+  application: AndroidApplication[];
+}
+
+export interface AndroidResources {
+  string: any[];
+  color: any[];
+}
+
+export interface KlaviyoAndroidModResults {
+  manifest?: AndroidManifest;
+  resources?: AndroidResources;
+}
