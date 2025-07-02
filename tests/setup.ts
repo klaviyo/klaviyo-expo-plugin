@@ -79,4 +79,23 @@ jest.mock('@expo/config-plugins/build/utils/generateCode', () => ({
 // Mock @expo/config-plugins/build/android/Paths
 jest.mock('@expo/config-plugins/build/android/Paths', () => ({
   getMainActivityAsync: jest.fn(),
+}));
+
+// Mock the logger to avoid console output during tests
+jest.mock('../plugin/support/logger', () => ({
+  KlaviyoLog: {
+    log: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+  },
+}));
+
+// Mock the file manager
+jest.mock('../plugin/support/fileManager', () => ({
+  FileManager: {
+    readFile: jest.fn(),
+    writeFile: jest.fn(),
+    copyFile: jest.fn(),
+    dirExists: jest.fn(),
+  },
 })); 

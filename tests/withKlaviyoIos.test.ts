@@ -4,25 +4,6 @@ import withKlaviyoIos from '../plugin/withKlaviyoIos';
 import { KlaviyoPluginIosProps } from '../plugin/types';
 import { createMockIosConfig, createMockIosProps } from './utils/testHelpers';
 
-// Mock the logger to avoid console output during tests
-jest.mock('../plugin/support/logger', () => ({
-  KlaviyoLog: {
-    log: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn(),
-  },
-}));
-
-// Mock the file manager
-jest.mock('../plugin/support/fileManager', () => ({
-  FileManager: {
-    readFile: jest.fn(),
-    writeFile: jest.fn(),
-    copyFile: jest.fn(),
-    dirExists: jest.fn(),
-  },
-}));
-
 describe('withKlaviyoIos', () => {
   let mockConfig: any;
   let mockProps: KlaviyoPluginIosProps;

@@ -36,15 +36,6 @@ jest.mock('path', () => ({
   join: jest.fn((...args) => args.join('/')),
 }));
 
-// Mock the logger to avoid console output
-jest.mock('../plugin/support/logger', () => ({
-  KlaviyoLog: {
-    log: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn(),
-  },
-}));
-
 describe('withKlaviyoAndroid Internal Functions', () => {
   describe('findMainActivity', () => {
     it('should find MainActivity using Expo detection', async () => {
@@ -152,7 +143,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       });
 
       it('should handle null android package in config', () => {
-        const { result } = testPluginFunction(withMainActivityModifications, { android: null }, { openTracking: true }, 'mods.android');
+        const { result } = testPluginFunction(withMainActivityModifications, { android: null as any }, { openTracking: true }, 'mods.android');
         expect(result).toHaveProperty('mods.android');
       });
 
@@ -433,7 +424,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       const configs = [
         createMockConfig(),
         createMockConfig({ android: {} }),
-        createMockConfig({ android: { package: 'com.example.test', manifest: {} } }),
+        createMockConfig({ android: { package: 'com.example.test' } as any }),
       ];
       
       configs.forEach(config => {
@@ -1216,7 +1207,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           }
         }
       });
-      const props = createMockProps({ logLevel: null });
+      const props = createMockProps({ logLevel: null as any });
       mutateAndroidManifest(config, props);
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '1')).toBe(true);
