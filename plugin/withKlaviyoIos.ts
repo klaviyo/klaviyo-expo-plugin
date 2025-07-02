@@ -15,7 +15,6 @@ const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
     withKlaviyoPodfile,
     withKlaviyoXcodeProject,
     withKlaviyoNSE,
-    withKlaviyoAppGroup,
   ].map(plugin => [plugin, props]));
 };
 
@@ -123,11 +122,16 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
 
 const NSE_TARGET_NAME = "KlaviyoNotificationServiceExtension";
 const NSE_EXT_FILES = [
-  "KlaviyoNotificationService.swift",
-  `${NSE_TARGET_NAME}.entitlements`,
-  `${NSE_TARGET_NAME}-Info.plist`
+  "KlaviyoNotificationService.swift"
 ];
-const appGroupName = `group.$(PRODUCT_BUNDLE_IDENTIFIER).${NSE_TARGET_NAME}.shared`;
+// Use the actual bundle identifier from config instead of build-time variable
+const getAppGroupName = (config: any) => {
+  const bundleId = config.ios?.bundleIdentifier;
+  if (!bundleId) {
+    throw new Error('iOS bundle identifier is required for app group configuration');
+  }
+  return `group.${bundleId}.${NSE_TARGET_NAME}.shared`;
+};
 
 /**
  * Adds remote notifications permissions and other associated values in the plist.
@@ -140,7 +144,6 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
 
   return withInfoPlist(config, (config) => {
     const infoPlist = config.modResults;
-    infoPlist.klaviyo_app_group = appGroupName;
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
     return config;
   });
@@ -288,6 +291,8 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
       if (!FileManager.dirExists(nsePath)) {
         fs.mkdirSync(nsePath, { recursive: true });
       }
+      
+      // Copy static files
       const sourceDir = path.join(config.modRequest.projectRoot, "/node_modules/klaviyo-expo-plugin/", NSE_TARGET_NAME);
       for (const file of NSE_EXT_FILES) {
         try {
@@ -301,23 +306,79 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
         }
       }
 
+      // Generate entitlements file dynamically
+      const appGroupName = getAppGroupName(config);
+      const entitlementsContent = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>${appGroupName}</string>
+    </array>
+</dict>
+</plist>`;
+
+      try {
+        await FileManager.writeFile(
+          path.join(nsePath, `${NSE_TARGET_NAME}.entitlements`),
+          entitlementsContent
+        );
+        KlaviyoLog.log(`Generated entitlements file with app group: ${appGroupName}`);
+      } catch (error) {
+        KlaviyoLog.error(`Failed to generate entitlements file: ${error}`);
+        throw error;
+      }
+
+      // Generate Info.plist file dynamically
+      const bundleId = config.ios?.bundleIdentifier;
+      const nseBundleId = `${bundleId}.${NSE_TARGET_NAME}`;
+      const infoPlistContent = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionPointIdentifier</key>
+        <string>com.apple.usernotifications.service</string>
+        <key>NSExtensionPrincipalClass</key>
+        <string>$(PRODUCT_MODULE_NAME).KlaviyoNotificationService</string>
+    </dict>
+    <key>klaviyo_app_group</key>
+    <string>${appGroupName}</string>
+    <key>CFBundleIdentifier</key>
+    <string>${nseBundleId}</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>XPC!</string>
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>1.0</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+</dict>
+</plist>`;
+
+      try {
+        await FileManager.writeFile(
+          path.join(nsePath, `${NSE_TARGET_NAME}-Info.plist`),
+          infoPlistContent
+        );
+        KlaviyoLog.log(`Generated Info.plist file with bundle ID: ${nseBundleId}`);
+      } catch (error) {
+        KlaviyoLog.error(`Failed to generate Info.plist file: ${error}`);
+        throw error;
+      }
+
       return config;
     },
   ]);
 };
 
-/**
- * Adds the app group to target entitlements.
- */
-const withKlaviyoAppGroup: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
-  return withEntitlementsPlist(config, (config) => {
-    const appGroupsKey = 'com.apple.security.application-groups';
-      const existingAppGroups = config.modResults[appGroupsKey];
-      if (Array.isArray(existingAppGroups) && !existingAppGroups.includes(appGroupName)) {
-        config.modResults[appGroupsKey] = existingAppGroups.concat([appGroupName]);
-      } else {
-        config.modResults[appGroupsKey] = [appGroupName];
-      }
-    return config;
-  });
-};
+

@@ -11,7 +11,11 @@
     "ios": {
       "bundleIdentifier": "com.klaviyo.expoexample",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification",
+          "remote-notification"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -49,7 +53,7 @@
             "projectVersion": "1",
             "marketingVersion": "1.0",
             "swiftVersion": "5.0",
-            "devTeam": "XXXXXXXXXX"
+            "devTeam": "G3793W2RJ2"
           }
         }
       ]
@@ -59,6 +63,13 @@
     },
     "assetBundlePatterns": [
       "**/*"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1c04d6a2-82fa-477d-8ade-a79321cbd0b1"
+      }
+    },
+    "owner": "dan-klaviyo"
   }
 }
