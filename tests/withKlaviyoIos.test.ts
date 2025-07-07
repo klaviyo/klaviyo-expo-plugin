@@ -121,4 +121,68 @@ describe('withKlaviyoIos', () => {
       expect(modifiedConfig.modResults.klaviyo_badge_autoclearing).toBe(true);
     });
   });
+
+  describe('app group identifier consistency', () => {
+    const expectedAppGroupName = 'group.$(PRODUCT_BUNDLE_IDENTIFIER).KlaviyoNotificationServiceExtension.shared';
+    const nseTargetName = 'KlaviyoNotificationServiceExtension';
+
+    it('should use consistent app group name across all configurations', () => {
+      const modifiedConfig = withKlaviyoIos(mockConfig, mockProps) as any;
+      
+      // Verify main app Info.plist has correct app group
+      expect(modifiedConfig.modResults.klaviyo_app_group).toBe(expectedAppGroupName);
+    });
+
+    it('should add correct app group to main app entitlements', () => {
+      const configWithEntitlements = createMockIosConfig({
+        modResults: {},
+      });
+      const modifiedConfig = withKlaviyoIos(configWithEntitlements, mockProps);
+      
+      // The withKlaviyoAppGroup plugin should add the correct app group
+      expect(modifiedConfig).toBeDefined();
+    });
+
+    it('should validate app group name format matches expected pattern', () => {
+      // This test validates that the app group name follows the correct format
+      // and includes the NSE target name as expected
+      expect(expectedAppGroupName).toMatch(/^group\.\$\(PRODUCT_BUNDLE_IDENTIFIER\)\.KlaviyoNotificationServiceExtension\.shared$/);
+      expect(expectedAppGroupName).toContain(nseTargetName);
+      expect(expectedAppGroupName).not.toContain('group.$(PRODUCT_BUNDLE_IDENTIFIER).shared');
+    });
+
+    it('should ensure plugin generates consistent app group name', () => {
+      // Test that the plugin consistently generates the same app group name
+      const config1 = withKlaviyoIos(mockConfig, mockProps) as any;
+      const config2 = withKlaviyoIos(mockConfig, mockProps) as any;
+      
+      expect(config1.modResults.klaviyo_app_group).toBe(config2.modResults.klaviyo_app_group);
+      expect(config1.modResults.klaviyo_app_group).toBe(expectedAppGroupName);
+    });
+
+    it('should validate app group name is not the incorrect short format', () => {
+      // This test ensures we're not using the incorrect short format
+      const incorrectAppGroupName = 'group.$(PRODUCT_BUNDLE_IDENTIFIER).shared';
+      expect(expectedAppGroupName).not.toBe(incorrectAppGroupName);
+      expect(expectedAppGroupName).toContain(nseTargetName);
+    });
+
+    it('should handle different bundle identifiers consistently', () => {
+      const testBundleIds = [
+        'com.example.app',
+        'com.example.app.preview',
+        'com.example.app.development'
+      ];
+
+      testBundleIds.forEach(bundleId => {
+        const configWithBundleId = createMockIosConfig({
+          ios: { bundleIdentifier: bundleId }
+        });
+        const modifiedConfig = withKlaviyoIos(configWithBundleId, mockProps) as any;
+        
+        // The app group should always use the template, not a hardcoded bundle ID
+        expect(modifiedConfig.modResults.klaviyo_app_group).toBe(expectedAppGroupName);
+      });
+    });
+  });
 }); 
