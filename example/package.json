@@ -20,7 +20,7 @@
     "expo-router": "~5.0.6",
     "expo-status-bar": "~2.2.3",
     "expo-task-manager": "^13.1.5",
-    "klaviyo-expo-plugin": "github:klaviyo/klaviyo-expo-plugin#55560af6c807ce56f3ead333299fd8b2bc7bb80b",
+    "klaviyo-expo-plugin": "github:klaviyo/klaviyo-expo-plugin#89d7fbb14fd526047207d93b881b69a0e40384e5",
     "klaviyo-react-native-sdk": "^2.0.0",
     "react": "19.0.0",
     "react-native": "0.79.2",
