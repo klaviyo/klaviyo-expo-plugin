@@ -127,7 +127,6 @@ const NSE_EXT_FILES = [
   `${NSE_TARGET_NAME}.entitlements`,
   `${NSE_TARGET_NAME}-Info.plist`
 ];
-const appGroupName = `group.$(PRODUCT_BUNDLE_IDENTIFIER).${NSE_TARGET_NAME}.shared`;
 
 /**
  * Adds remote notifications permissions and other associated values in the plist.
@@ -140,7 +139,12 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
 
   return withInfoPlist(config, (config) => {
     const infoPlist = config.modResults;
-    infoPlist.klaviyo_app_group = appGroupName;
+    const bundleIdentifier = config.ios?.bundleIdentifier;
+    if (!bundleIdentifier) {
+      throw new Error('iOS bundle identifier is required but not found in app configuration');
+    }
+    const actualAppGroupName = `group.${bundleIdentifier}.${NSE_TARGET_NAME}.shared`;
+    infoPlist.klaviyo_app_group = actualAppGroupName;
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
     return config;
   });
@@ -255,6 +259,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
     for (const key in configurations) {
       if (typeof configurations[key].buildSettings !== "undefined") {
         const buildSettingsObj = configurations[key].buildSettings;
+<<<<<<< HEAD
         buildSettingsObj.CODE_SIGN_STYLE = props.codeSigningStyle;
         buildSettingsObj.CURRENT_PROJECT_VERSION = props.projectVersion;
         buildSettingsObj.MARKETING_VERSION = props.marketingVersion;
@@ -267,6 +272,20 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
         
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
           buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
+=======
+        
+        // Only apply NSE-specific settings to NSE target configurations
+        if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
+          buildSettingsObj.CODE_SIGN_STYLE = props.codeSigningStyle;
+          buildSettingsObj.CURRENT_PROJECT_VERSION = props.projectVersion;
+          buildSettingsObj.MARKETING_VERSION = props.marketingVersion;
+          buildSettingsObj.SWIFT_VERSION = props.swiftVersion;
+          buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
+          
+          if (props.devTeam != undefined) {
+            buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
+          }
+>>>>>>> f1aeca5 (removing product_bundle_identifier logic from plist and removing unused code)
         }
       }
     }
