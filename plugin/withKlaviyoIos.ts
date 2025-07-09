@@ -332,12 +332,17 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
 const withKlaviyoAppGroup: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withEntitlementsPlist(config, (config) => {
     const appGroupsKey = 'com.apple.security.application-groups';
-      const existingAppGroups = config.modResults[appGroupsKey];
-      if (Array.isArray(existingAppGroups) && !existingAppGroups.includes(appGroupName)) {
-        config.modResults[appGroupsKey] = existingAppGroups.concat([appGroupName]);
-      } else {
-        config.modResults[appGroupsKey] = [appGroupName];
-      }
+    const bundleIdentifier = config.ios?.bundleIdentifier;
+    if (!bundleIdentifier) {
+      throw new Error('iOS bundle identifier is required but not found in app configuration');
+    }
+    const actualAppGroupName = `group.${bundleIdentifier}.${NSE_TARGET_NAME}.shared`;
+    const existingAppGroups = config.modResults[appGroupsKey];
+    if (Array.isArray(existingAppGroups) && !existingAppGroups.includes(actualAppGroupName)) {
+      config.modResults[appGroupsKey] = existingAppGroups.concat([actualAppGroupName]);
+    } else {
+      config.modResults[appGroupsKey] = [actualAppGroupName];
+    }
     return config;
   });
 };
