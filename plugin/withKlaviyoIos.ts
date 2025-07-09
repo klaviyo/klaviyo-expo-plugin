@@ -259,7 +259,10 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
     for (const key in configurations) {
       if (typeof configurations[key].buildSettings !== "undefined") {
         const buildSettingsObj = configurations[key].buildSettings;
-        
+        // Set DEVELOPMENT_TEAM for all targets if devTeam is provided
+        if (props.devTeam != undefined) {
+          buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
+        }
         // Only apply NSE-specific settings to NSE target configurations
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
           buildSettingsObj.CODE_SIGN_STYLE = props.codeSigningStyle;
@@ -267,10 +270,6 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
           buildSettingsObj.MARKETING_VERSION = props.marketingVersion;
           buildSettingsObj.SWIFT_VERSION = props.swiftVersion;
           buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
-          
-          if (props.devTeam != undefined) {
-            buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
-          }
         }
       }
     }
