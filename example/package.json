@@ -10,7 +10,8 @@
     "test": "jest --watchAll",
     "reset-all": "cd .. && rm -rf node_modules package-lock.json && npm install && cd example && rm -rf node_modules package-lock.json && npm install",
     "clean-android": "cd .. && npm run build && cd example && rm -rf android && EXPO_DEBUG=true npx expo prebuild --clean --platform android && npx expo run:android",
-    "clean-ios": "cd .. && npm run build && cd example && rm -rf ios && EXPO_DEBUG=true npx expo prebuild --clean --platform ios && npx expo run:ios"
+    "clean-ios": "cd .. && npm run build && cd example && rm -rf ios && EXPO_DEBUG=true npx expo prebuild --clean --platform ios && npx expo run:ios",
+    "eas-ios-local": "rm -rf ios && npx expo prebuild --platform ios --clean && eas build --platform ios --local"
   },
   "dependencies": {
     "@babel/runtime": "^7.24.0",
@@ -20,7 +21,7 @@
     "expo-router": "~5.0.6",
     "expo-status-bar": "~2.2.3",
     "expo-task-manager": "^13.1.5",
-    "klaviyo-expo-plugin": "github:klaviyo/klaviyo-expo-plugin#f1aeca53445b9cd9cc8e336d33aba1b35e9a2c04",
+    "klaviyo-expo-plugin": "github:klaviyo/klaviyo-expo-plugin#1b91197668495aeea89dc6bba322b03dfcc72803",
     "klaviyo-react-native-sdk": "^2.0.0",
     "react": "19.0.0",
     "react-native": "0.79.2",
