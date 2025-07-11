@@ -262,43 +262,40 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
     
     // Extract signing settings from the main target
     const configurations = xcodeProject.pbxXCBuildConfigurationSection();
-    let codeSignStyle, codeSignIdentity, otherCodeSigningFlags, developmentTeam, provisioningProfile;
-
+    let developmentTeam;
+    let codeSignIdentity;
+    let otherCodeSigningFlags;
+    let provisioningProfile;
     // Find the main app target's build settings
     for (const key in configurations) {
       const buildSettings = configurations[key].buildSettings;
       if (buildSettings && buildSettings.PRODUCT_NAME === `"${projectName}"`) {
-        codeSignStyle = buildSettings.CODE_SIGN_STYLE;
+        developmentTeam = buildSettings.DEVELOPMENT_TEAM;
         codeSignIdentity = buildSettings.CODE_SIGN_IDENTITY;
         otherCodeSigningFlags = buildSettings.OTHER_CODE_SIGN_FLAGS;
-        developmentTeam = buildSettings.DEVELOPMENT_TEAM;
         provisioningProfile = buildSettings.PROVISIONING_PROFILE_SPECIFIER;
-        KlaviyoLog.log(`Extracted signing settings from main target: team=${developmentTeam}, style=${codeSignStyle}`);
+        KlaviyoLog.log(`Extracted signing settings from main target: team=${developmentTeam}`);
         break;
       }
     }
 
-    // Apply settings to all configurations
     for (const key in configurations) {
       if (typeof configurations[key].buildSettings !== "undefined") {
         const buildSettingsObj = configurations[key].buildSettings;
-        
-        // Set DEVELOPMENT_TEAM for all targets if devTeam is provided (for local builds)
+
+        buildSettingsObj.CODE_SIGN_STYLE = "Automatic"; 
+
         if (props.devTeam != undefined) {
           buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
         }
-        
-        // Only apply NSE-specific settings to NSE target configurations
+
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
           buildSettingsObj.CURRENT_PROJECT_VERSION = props.projectVersion;
           buildSettingsObj.MARKETING_VERSION = props.marketingVersion;
           buildSettingsObj.SWIFT_VERSION = props.swiftVersion;
           buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
-          
+
           // Copy signing settings from main target to NSE target
-          if (codeSignStyle) {
-            buildSettingsObj.CODE_SIGN_STYLE = codeSignStyle;
-          }
           if (codeSignIdentity) {
             buildSettingsObj.CODE_SIGN_IDENTITY = codeSignIdentity;
           }
@@ -311,8 +308,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
           if (provisioningProfile) {
             buildSettingsObj.PROVISIONING_PROFILE_SPECIFIER = provisioningProfile;
           }
-          
-          KlaviyoLog.log(`Applied signing settings to NSE target: team=${developmentTeam}, style=${codeSignStyle}, profile=${provisioningProfile}`);
+          KlaviyoLog.log(`Applied signing settings to NSE target: team=${developmentTeam}, profile=${provisioningProfile}`);
         }
       }
     }
