@@ -139,7 +139,11 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
 
   return withInfoPlist(config, (config) => {
     const infoPlist = config.modResults;
-    const actualAppGroupName = `group.$(PRODUCT_BUNDLE_IDENTIFIER).${NSE_TARGET_NAME}.shared`;
+    const bundleIdentifier = config.ios?.bundleIdentifier;
+    if (!bundleIdentifier) {
+      throw new Error('iOS bundle identifier is required but not found in app configuration');
+    }
+    const actualAppGroupName = `group.${bundleIdentifier}.${NSE_TARGET_NAME}.shared`;
     infoPlist.klaviyo_app_group = actualAppGroupName;
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
     return config;
@@ -382,7 +386,11 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
 const withKlaviyoAppGroup: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withEntitlementsPlist(config, (config) => {
     const appGroupsKey = 'com.apple.security.application-groups';
-    const actualAppGroupName = `group.$(PRODUCT_BUNDLE_IDENTIFIER).${NSE_TARGET_NAME}.shared`;
+    const bundleIdentifier = config.ios?.bundleIdentifier;
+    if (!bundleIdentifier) {
+      throw new Error('iOS bundle identifier is required but not found in app configuration');
+    }
+    const actualAppGroupName = `group.${bundleIdentifier}.${NSE_TARGET_NAME}.shared`;
     const existingAppGroups = config.modResults[appGroupsKey];
     if (Array.isArray(existingAppGroups) && !existingAppGroups.includes(actualAppGroupName)) {
       config.modResults[appGroupsKey] = existingAppGroups.concat([actualAppGroupName]);
