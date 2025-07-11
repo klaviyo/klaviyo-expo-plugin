@@ -139,11 +139,7 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
 
   return withInfoPlist(config, (config) => {
     const infoPlist = config.modResults;
-    const bundleIdentifier = config.ios?.bundleIdentifier;
-    if (!bundleIdentifier) {
-      throw new Error('iOS bundle identifier is required but not found in app configuration');
-    }
-    const actualAppGroupName = `group.${bundleIdentifier}.${NSE_TARGET_NAME}.shared`;
+    const actualAppGroupName = `group.$(PRODUCT_BUNDLE_IDENTIFIER).${NSE_TARGET_NAME}.shared`;
     infoPlist.klaviyo_app_group = actualAppGroupName;
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
     return config;
@@ -198,6 +194,11 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
 const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withXcodeProject(config, async (config) => {
     const xcodeProject = config.modResults;
+    const projectName = config.modRequest.projectName || config.name;
+    if (!projectName) {
+      throw new Error('Could not determine project name for iOS build');
+    }
+
     if (!!xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
       KlaviyoLog.log(`⚠️ ${NSE_TARGET_NAME} already exists in project. Skipping...`);
       return config;
@@ -255,28 +256,69 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
       nseTarget.uuid
     );
     
+    // Extract signing settings from the main target
     const configurations = xcodeProject.pbxXCBuildConfigurationSection();
+    let codeSignStyle, codeSignIdentity, otherCodeSigningFlags, developmentTeam, provisioningProfile;
+
+    // Find the main app target's build settings
+    for (const key in configurations) {
+      const buildSettings = configurations[key].buildSettings;
+      if (buildSettings && buildSettings.PRODUCT_NAME === `"${projectName}"`) {
+        codeSignStyle = buildSettings.CODE_SIGN_STYLE;
+        codeSignIdentity = buildSettings.CODE_SIGN_IDENTITY;
+        otherCodeSigningFlags = buildSettings.OTHER_CODE_SIGN_FLAGS;
+        developmentTeam = buildSettings.DEVELOPMENT_TEAM;
+        provisioningProfile = buildSettings.PROVISIONING_PROFILE_SPECIFIER;
+        KlaviyoLog.log(`Extracted signing settings from main target: team=${developmentTeam}, style=${codeSignStyle}`);
+        break;
+      }
+    }
+
+    // Apply settings to all configurations
     for (const key in configurations) {
       if (typeof configurations[key].buildSettings !== "undefined") {
         const buildSettingsObj = configurations[key].buildSettings;
-        // Set DEVELOPMENT_TEAM for all targets if devTeam is provided
+        
+        // Set DEVELOPMENT_TEAM for all targets if devTeam is provided (for local builds)
         if (props.devTeam != undefined) {
           buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
         }
+        
         // Only apply NSE-specific settings to NSE target configurations
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
-          buildSettingsObj.CODE_SIGN_STYLE = props.codeSigningStyle;
           buildSettingsObj.CURRENT_PROJECT_VERSION = props.projectVersion;
           buildSettingsObj.MARKETING_VERSION = props.marketingVersion;
           buildSettingsObj.SWIFT_VERSION = props.swiftVersion;
           buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
+          
+          // Copy signing settings from main target to NSE target
+          if (codeSignStyle) {
+            buildSettingsObj.CODE_SIGN_STYLE = codeSignStyle;
+          }
+          if (codeSignIdentity) {
+            buildSettingsObj.CODE_SIGN_IDENTITY = codeSignIdentity;
+          }
+          if (otherCodeSigningFlags) {
+            buildSettingsObj.OTHER_CODE_SIGN_FLAGS = otherCodeSigningFlags;
+          }
+          if (developmentTeam) {
+            buildSettingsObj.DEVELOPMENT_TEAM = developmentTeam;
+          }
+          if (provisioningProfile) {
+            buildSettingsObj.PROVISIONING_PROFILE_SPECIFIER = provisioningProfile;
+          }
+          
+          KlaviyoLog.log(`Applied signing settings to NSE target: team=${developmentTeam}, style=${codeSignStyle}, profile=${provisioningProfile}`);
         }
       }
     }
     
-    // Add development team to the NSE target specifically
-    if (props.devTeam != undefined) {
-      xcodeProject.addTargetAttribute("DevelopmentTeam", props.devTeam, nseTarget);
+    // Set target attributes for development team
+    const finalDevelopmentTeam = developmentTeam || props.devTeam;
+    if (finalDevelopmentTeam) {
+      xcodeProject.addTargetAttribute("DevelopmentTeam", finalDevelopmentTeam, nseTarget);
+      xcodeProject.addTargetAttribute("DevelopmentTeam", finalDevelopmentTeam);
+      KlaviyoLog.log(`Set DevelopmentTeam attribute to ${finalDevelopmentTeam} for both targets`);
     }
 
     return config;
@@ -340,11 +382,7 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
 const withKlaviyoAppGroup: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withEntitlementsPlist(config, (config) => {
     const appGroupsKey = 'com.apple.security.application-groups';
-    const bundleIdentifier = config.ios?.bundleIdentifier;
-    if (!bundleIdentifier) {
-      throw new Error('iOS bundle identifier is required but not found in app configuration');
-    }
-    const actualAppGroupName = `group.${bundleIdentifier}.${NSE_TARGET_NAME}.shared`;
+    const actualAppGroupName = `group.$(PRODUCT_BUNDLE_IDENTIFIER).${NSE_TARGET_NAME}.shared`;
     const existingAppGroups = config.modResults[appGroupsKey];
     if (Array.isArray(existingAppGroups) && !existingAppGroups.includes(actualAppGroupName)) {
       config.modResults[appGroupsKey] = existingAppGroups.concat([actualAppGroupName]);
