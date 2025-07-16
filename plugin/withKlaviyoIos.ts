@@ -153,7 +153,7 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
 /**
  * Adds necessary Klaviyo pods to the Podfile setup.
  */
-const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
+const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withDangerousMod(config, [
     'ios',
     async config => {
@@ -179,10 +179,50 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
     pod 'KlaviyoSwiftExtension'
   end
   `;
+        
+        let updatedPodfile = podfile;
+        
+        // Add the Klaviyo target if it doesn't exist
         if (!podfile.includes("pod 'KlaviyoSwiftExtension'")) {
-          const updatedPodfile = `${podfile}\n${podInsertion}`;
-          await FileManager.writeFile(`${iosRoot}/Podfile`, updatedPodfile);
+          updatedPodfile = `${podfile}\n${podInsertion}`;
         }
+        
+        // Add development team configuration to post_install block
+        const developmentTeamConfig = `
+    installer.generated_projects.each do |project|
+      project.targets.each do |target|
+        target.build_configurations.each do |config|
+          config.build_settings["DEVELOPMENT_TEAM"] = "${props.devTeam}"
+        end
+      end
+    end`;
+        
+        // Check if post_install block exists
+        if (updatedPodfile.includes('post_install do |installer|')) {
+          // Find the post_install block and insert the development team config
+          const postInstallRegex = /(post_install do \|installer\|[\s\S]*?)(end)/;
+          const match = updatedPodfile.match(postInstallRegex);
+          
+          if (match) {
+            const beforeEnd = match[1];
+            const afterEnd = match[2];
+            updatedPodfile = updatedPodfile.replace(
+              postInstallRegex,
+              `${beforeEnd}${developmentTeamConfig}\n  ${afterEnd}`
+            );
+          }
+        } else {
+          // If no post_install block exists, create one
+          const postInstallBlock = `
+post_install do |installer|
+${developmentTeamConfig}
+end`;
+          updatedPodfile = `${updatedPodfile}\n${postInstallBlock}`;
+        }
+        
+        await FileManager.writeFile(`${iosRoot}/Podfile`, updatedPodfile);
+        KlaviyoLog.log('Updated Podfile with Klaviyo configuration and development team settings');
+        
       } catch (err) {
         KlaviyoLog.log('Could not write Klaviyo changes to Podfile: ' + err);
       }
@@ -285,9 +325,9 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
 
         buildSettingsObj.CODE_SIGN_STYLE = "Automatic"; 
 
-        // if (props.devTeam != undefined) {
-        //   buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
-        // }
+        if (props.devTeam != undefined) {
+          buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
+        }
 
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
           buildSettingsObj.CURRENT_PROJECT_VERSION = props.projectVersion;
@@ -302,9 +342,9 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
           if (otherCodeSigningFlags) {
             buildSettingsObj.OTHER_CODE_SIGN_FLAGS = otherCodeSigningFlags;
           }
-          // if (developmentTeam) {
-          //   buildSettingsObj.DEVELOPMENT_TEAM = developmentTeam;
-          // }
+          if (developmentTeam) {
+            buildSettingsObj.DEVELOPMENT_TEAM = developmentTeam;
+          }
           if (provisioningProfile) {
             buildSettingsObj.PROVISIONING_PROFILE_SPECIFIER = provisioningProfile;
           }
@@ -315,11 +355,11 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
     
     // Set target attributes for development team
     const finalDevelopmentTeam = developmentTeam || props.devTeam;
-    // if (finalDevelopmentTeam) {
-    //   xcodeProject.addTargetAttribute("DevelopmentTeam", finalDevelopmentTeam, nseTarget);
-    //   xcodeProject.addTargetAttribute("DevelopmentTeam", finalDevelopmentTeam);
-    //   KlaviyoLog.log(`Set DevelopmentTeam attribute to ${finalDevelopmentTeam} for both targets`);
-    // }
+    if (finalDevelopmentTeam) {
+      xcodeProject.addTargetAttribute("DevelopmentTeam", finalDevelopmentTeam, nseTarget);
+      xcodeProject.addTargetAttribute("DevelopmentTeam", finalDevelopmentTeam);
+      KlaviyoLog.log(`Set DevelopmentTeam attribute to ${finalDevelopmentTeam} for both targets`);
+    }
 
     return config;
   });
