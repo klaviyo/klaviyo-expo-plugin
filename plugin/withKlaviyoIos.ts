@@ -285,9 +285,9 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
 
         buildSettingsObj.CODE_SIGN_STYLE = "Automatic"; 
 
-        if (props.devTeam != undefined) {
-          buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
-        }
+        // if (props.devTeam != undefined) {
+        //   buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
+        // }
 
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
           buildSettingsObj.CURRENT_PROJECT_VERSION = props.projectVersion;
@@ -302,9 +302,9 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
           if (otherCodeSigningFlags) {
             buildSettingsObj.OTHER_CODE_SIGN_FLAGS = otherCodeSigningFlags;
           }
-          if (developmentTeam) {
-            buildSettingsObj.DEVELOPMENT_TEAM = developmentTeam;
-          }
+          // if (developmentTeam) {
+          //   buildSettingsObj.DEVELOPMENT_TEAM = developmentTeam;
+          // }
           if (provisioningProfile) {
             buildSettingsObj.PROVISIONING_PROFILE_SPECIFIER = provisioningProfile;
           }
@@ -315,11 +315,11 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
     
     // Set target attributes for development team
     const finalDevelopmentTeam = developmentTeam || props.devTeam;
-    if (finalDevelopmentTeam) {
-      xcodeProject.addTargetAttribute("DevelopmentTeam", finalDevelopmentTeam, nseTarget);
-      xcodeProject.addTargetAttribute("DevelopmentTeam", finalDevelopmentTeam);
-      KlaviyoLog.log(`Set DevelopmentTeam attribute to ${finalDevelopmentTeam} for both targets`);
-    }
+    // if (finalDevelopmentTeam) {
+    //   xcodeProject.addTargetAttribute("DevelopmentTeam", finalDevelopmentTeam, nseTarget);
+    //   xcodeProject.addTargetAttribute("DevelopmentTeam", finalDevelopmentTeam);
+    //   KlaviyoLog.log(`Set DevelopmentTeam attribute to ${finalDevelopmentTeam} for both targets`);
+    // }
 
     return config;
   });
