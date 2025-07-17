@@ -1,6 +1,6 @@
 {
   "name": "klaviyo-expo-plugin",
-  "version": "0.1.0",
+  "version": "0.1.0-rc.1",
   "main": "dist/plugin/withKlaviyo.js",
   "types": "dist/plugin/withKlaviyo.d.ts",
   "scripts": {
@@ -26,7 +26,7 @@
     "@expo/config-plugins": "^9.0.15",
     "@types/glob": "^8.1.0",
     "@types/jest": "^29.5.0",
-    "@types/node": "^20.19.8",
+    "@types/node": "^20.0.0",
     "@types/xml2js": "^0.4.14",
     "jest": "^29.5.0",
     "tmp": "^0.2.3",
@@ -39,7 +39,6 @@
   },
   "dependencies": {
     "expo": "*",
-    "expo-dev-client": "~5.2.4",
     "react": "19.0.0",
     "react-native": "0.79.2"
   }
