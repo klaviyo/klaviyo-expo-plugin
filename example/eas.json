@@ -6,25 +6,12 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "ios": {
-        "credentialsSource": "remote",
-        "autoIncrement": false
-      }
+      "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
-      "ios": {
-        "credentialsSource": "remote",
-        "autoIncrement": false
-      }
+      "distribution": "internal"
     },
-    "production": {
-      "autoIncrement": true,
-      "ios": {
-        "credentialsSource": "remote"
-      }
-    }
+    "production": {}
   },
   "submit": {
     "production": {}

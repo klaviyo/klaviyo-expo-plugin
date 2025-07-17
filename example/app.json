@@ -2,7 +2,7 @@
   "expo": {
     "name": "klaviyo plugin example",
     "slug": "klaviyo-plugin-example",
-    "version": "0.1.0-rc.1",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "expoexample",
@@ -10,6 +10,10 @@
     "newArchEnabled": false,
     "ios": {
       "bundleIdentifier": "com.klaviyo.expoexample",
+      "appleTeamId": "G3793W2RJ2",
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.klaviyo.expoexample.KlaviyoNotificationServiceExtension.shared"]
+      },
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
@@ -52,13 +56,24 @@
             "projectVersion": "1",
             "marketingVersion": "1.0",
             "swiftVersion": "5.0",
-            "devTeam": "XXXXXXXXXX"
+            "devTeam": "G3793W2RJ2"
           }
         }
       ]
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "appExtensions": {
+        "ios": {
+          "targets": [
+            {
+              "name": "KlaviyoNotificationServiceExtension",
+              "bundleIdentifier": "com.klaviyo.expoexample.KlaviyoNotificationServiceExtension",
+              "type": "notification-service"
+            }
+          ]
+        }
+      }
     },
     "assetBundlePatterns": [
       "**/*"
@@ -66,9 +81,24 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "1c04d6a2-82fa-477d-8ade-a79321cbd0b1"
+        "projectId": "1c04d6a2-82fa-477d-8ade-a79321cbd0b1",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "KlaviyoNotificationServiceExtension",
+                  "bundleIdentifier": "com.klaviyo.expoexample.KlaviyoNotificationServiceExtension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": ["group.com.klaviyo.expoexample.KlaviyoNotificationServiceExtension.shared"]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     },
-    "owner": "dan-klaviyo"
+    "owner": "klaviyo"
   }
 }

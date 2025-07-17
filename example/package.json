@@ -1,9 +1,9 @@
 {
   "name": "example",
   "main": "expo-router/entry",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0",
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
@@ -21,10 +21,10 @@
     "expo-router": "~5.0.6",
     "expo-status-bar": "~2.2.3",
     "expo-task-manager": "^13.1.5",
-    "klaviyo-expo-plugin": "github:klaviyo/klaviyo-expo-plugin#1b91197668495aeea89dc6bba322b03dfcc72803",
+    "klaviyo-expo-plugin": "github:klaviyo/klaviyo-expo-plugin#e998732284b5f76cef8a6f391d03ff616469b57f",
     "klaviyo-react-native-sdk": "^2.0.0",
     "react": "19.0.0",
-    "react-native": "0.79.2",
+    "react-native": "0.79.5",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.10.0"
   },
