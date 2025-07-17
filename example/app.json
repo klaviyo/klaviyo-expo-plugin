@@ -10,7 +10,6 @@
     "newArchEnabled": false,
     "ios": {
       "bundleIdentifier": "com.klaviyo.expoexample",
-      "appleTeamId": "G3793W2RJ2",
       "entitlements": {
         "com.apple.security.application-groups": ["group.com.klaviyo.expoexample.KlaviyoNotificationServiceExtension.shared"]
       },
@@ -62,18 +61,6 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true,
-      "appExtensions": {
-        "ios": {
-          "targets": [
-            {
-              "name": "KlaviyoNotificationServiceExtension",
-              "bundleIdentifier": "com.klaviyo.expoexample.KlaviyoNotificationServiceExtension",
-              "type": "notification-service"
-            }
-          ]
-        }
-      }
     },
     "assetBundlePatterns": [
       "**/*"
