@@ -10,9 +10,6 @@
     "newArchEnabled": false,
     "ios": {
       "bundleIdentifier": "com.klaviyo.expoexample",
-      "entitlements": {
-        "com.apple.security.application-groups": ["group.com.klaviyo.expoexample.KlaviyoNotificationServiceExtension.shared"]
-      },
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
