@@ -4,7 +4,7 @@
 <dict>
     <key>com.apple.security.application-groups</key>
     <array>
-        <string>group.$(PRODUCT_BUNDLE_IDENTIFIER).shared</string>
+        <string>group.{{BUNDLE_IDENTIFIER}}.KlaviyoNotificationServiceExtension.shared</string>
     </array>
 </dict>
 </plist> 
