@@ -47,6 +47,8 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 - Minimum Deployment Target `13.0+`
 - Apple Push Notification Service (APNs) set up
 
+> **⚠️ Important Note for Federated Apple Developer Accounts:** If you're using a federated Apple Developer account, you'll need to provide an ASC API token with Admin access. While Expo supports federated accounts through ASC API tokens, the EAS CLI cannot directly log into federated accounts for credential management. See [Expo's documentation on federated accounts](https://docs.expo.dev/app-signing/apple-developer-program-roles-and-permissions/#federated-apple-developer-accounts) for more details.
+
 ## Installation
 
 1. Install the plugin in your Expo project. You need both `klaviyo-react-native-sdk` and `klaviyo-expo-plugin` for full functionality:
