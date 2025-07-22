@@ -295,6 +295,26 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
             path.join(sourceDir, file),
             path.join(nsePath, file)
           );
+          
+          // If this is the entitlements file, replace the bundle identifier placeholder
+          if (file === `${NSE_TARGET_NAME}.entitlements`) {
+            const bundleIdentifier = config.ios?.bundleIdentifier;
+            if (!bundleIdentifier) {
+              throw new Error('iOS bundle identifier is required but not found in app configuration');
+            }
+            
+            const entitlementsPath = path.join(nsePath, file);
+            let entitlementsContent = await FileManager.readFile(entitlementsPath);
+            
+            // Replace the placeholder with the actual bundle identifier
+            entitlementsContent = entitlementsContent.replace(
+              /{{BUNDLE_IDENTIFIER}}/g,
+              bundleIdentifier
+            );
+            
+            await FileManager.writeFile(entitlementsPath, entitlementsContent);
+            KlaviyoLog.log(`Updated entitlements file with bundle identifier: ${bundleIdentifier}`);
+          }
         } catch (error) {
           KlaviyoLog.error(`Failed to copy ${file}: ${error}`);
           throw error;
