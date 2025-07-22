@@ -59,6 +59,28 @@
     },
     "assetBundlePatterns": [
       "**/*"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1c04d6a2-82fa-477d-8ade-a79321cbd0b1",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "KlaviyoNotificationServiceExtension",
+                  "bundleIdentifier": "com.klaviyo.expoexample.KlaviyoNotificationServiceExtension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": ["group.com.klaviyo.expoexample.KlaviyoNotificationServiceExtension.shared"]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "owner": "klaviyo"
   }
 }
