@@ -63,7 +63,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "1c04d6a2-82fa-477d-8ade-a79321cbd0b1",
+        "projectId": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
         "build": {
           "experimental": {
             "ios": {
