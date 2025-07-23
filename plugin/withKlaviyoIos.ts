@@ -32,8 +32,9 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
       throw new Error('Could not determine project name for iOS build');
     }
 
-    // Get the plugin's root directory, accounting for the dist folder
-    const pluginRoot = path.resolve(__dirname, '../..');
+    // Get the plugin's root directory using require.resolve to handle monorepo hoisting
+    const pkgJsonPath = require.resolve('klaviyo-expo-plugin/package.json');
+    const pluginRoot = path.dirname(pkgJsonPath);
     const srcPlistPath = path.join(pluginRoot, 'ios', 'klaviyo-plugin-configuration.plist');
     const destPlistPath = path.join(
       config.modRequest.platformProjectRoot,
@@ -297,7 +298,10 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
       if (!FileManager.dirExists(nsePath)) {
         fs.mkdirSync(nsePath, { recursive: true });
       }
-      const sourceDir = path.join(config.modRequest.projectRoot, "/node_modules/klaviyo-expo-plugin/", NSE_TARGET_NAME);
+      // Get the plugin's root directory using require.resolve to handle monorepo hoisting
+      const pkgJsonPath = require.resolve('klaviyo-expo-plugin/package.json');
+      const pluginRoot = path.dirname(pkgJsonPath);
+      const sourceDir = path.join(pluginRoot, NSE_TARGET_NAME);
       for (const file of NSE_EXT_FILES) {
         try {
           await FileManager.copyFile(
