@@ -1,6 +1,6 @@
 {
   "name": "klaviyo-expo-plugin",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0",
   "main": "dist/plugin/withKlaviyo.js",
   "types": "dist/plugin/withKlaviyo.d.ts",
   "scripts": {
