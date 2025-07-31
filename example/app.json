@@ -2,7 +2,7 @@
   "expo": {
     "name": "klaviyo plugin example",
     "slug": "klaviyo-plugin-example",
-    "version": "0.1.0-rc.1",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "expoexample",
