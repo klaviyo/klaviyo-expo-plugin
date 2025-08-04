@@ -160,6 +160,15 @@ Common issues and solutions:
    - Verify FCM/APNs setup
    - Check notification permissions
    - Ensure proper configuration in app.json
+      - You may need to add the `aps-environment` to your `ios.entitlements` in your app config if it is not there already
+        ```
+        ios: {
+          entitlements: {
+          'aps-environment': 'development', // or 'production'
+          // ... other entitlements
+          }
+        }
+        ```
 
 2. **Deep Links Not Working**
    - Verify URL scheme configuration
@@ -170,6 +179,10 @@ Common issues and solutions:
    - Clean and rebuild the project
    - Verify Expo SDK version compatibility
    - Check native dependencies
+  
+4. **EAS Errors**
+   - (iOS) Check your Identifiers in the Apple Developer Console and ensure the main app target has Push Notifications and App Group capabilities checked, and your Notification Service Extension target has App Groups capability checked
+   - (iOS) Ensure the correct provisioning profile is being recognized by EAS, and declare the Notification Service Extension in the `extra.eas.build.experimental.ios.appExtensions` of your app config as mentioned [here](https://docs.expo.dev/build-reference/app-extensions/#managed-projects-experimental-support)
 
 ## License
 
