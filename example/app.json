@@ -9,6 +9,9 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
+      "entitlements": {
+        "aps-environment": "development"
+      },
       "bundleIdentifier": "com.klaviyo.expoexample",
       "infoPlist": {
         "UIBackgroundModes": ["remote-notification"]
