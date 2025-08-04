@@ -80,17 +80,6 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
         'PBXResourcesBuildPhase'
       );
 
-      if (!buildPhase) {
-        // Create the build phase if it doesn't exist
-        buildPhase = xcodeProject.addBuildPhase(
-          [],
-          'PBXResourcesBuildPhase',
-          'Copy Bundle Resources',
-          target.uuid
-        );
-        KlaviyoLog.log('Created Copy Bundle Resources build phase');
-      }
-
       if (buildPhase) {
         // Add the file as a resource
         xcodeProject.addResourceFile(destPlistPath, { target: target.uuid });
