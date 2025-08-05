@@ -10,7 +10,6 @@ export interface KlaviyoPluginIosBaseProps  {
   codeSigningStyle: string;
   projectVersion: string;
   marketingVersion: string;
-  swiftVersion: string;
   devTeam?: string;
 }
 
@@ -31,7 +30,6 @@ export interface KlaviyoPluginIosProps extends KlaviyoPluginIosBaseProps {
   codeSigningStyle: string;
   projectVersion: string;
   marketingVersion: string;
-  swiftVersion: string;
   devTeam: string | undefined;
 }
 
@@ -52,7 +50,6 @@ const IOS_DEFAULTS: KlaviyoPluginIosProps = {
   codeSigningStyle: "Automatic",
   projectVersion: "1",
   marketingVersion: "1.0",
-  swiftVersion: "5.0",
   devTeam: undefined
 };
 
