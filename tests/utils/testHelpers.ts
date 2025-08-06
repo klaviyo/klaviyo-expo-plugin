@@ -250,7 +250,6 @@ export interface MockIosPropsOptions {
   codeSigningStyle?: string;
   projectVersion?: string;
   marketingVersion?: string;
-  swiftVersion?: string;
   devTeam?: string;
 }
 
@@ -287,7 +286,6 @@ export const createMockIosProps = (options: MockIosPropsOptions = {}): any => ({
   codeSigningStyle: 'Automatic',
   projectVersion: '1',
   marketingVersion: '1.0',
-  swiftVersion: '5.0',
   devTeam: 'XXXXXXXXXX',
   ...options,
 }); 

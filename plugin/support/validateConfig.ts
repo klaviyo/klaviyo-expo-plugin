@@ -73,16 +73,6 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
     throw new KlaviyoConfigError('iOS marketingVersion must be in format "X.Y" or "X.Y.Z"');
   }
 
-  // Validate swiftVersion
-  if (config.swiftVersion) {
-    const allowedSwiftVersions = ['4.0', '4.2', '5.0', '6.0'];
-    if (!allowedSwiftVersions.includes(String(config.swiftVersion))) {
-      throw new KlaviyoConfigError(
-        `iOS swiftVersion must be one of: ${allowedSwiftVersions.join(', ')}`
-      );
-    }
-  }
-
   // Validate devTeam
   if (config.devTeam !== undefined) {
     if (typeof config.devTeam !== 'string' || !/^[A-Z0-9]{10}$/.test(config.devTeam)) {
