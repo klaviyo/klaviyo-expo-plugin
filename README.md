@@ -179,8 +179,9 @@ Common issues and solutions:
    - Check native dependencies
   
 4. **EAS Errors**
-   - (iOS) Check your Identifiers in the Apple Developer Console and ensure the main app target has Push Notifications and App Group capabilities checked, and your Notification Service Extension target has App Groups capability checked
-   - (iOS) Ensure the correct provisioning profile is being recognized by EAS, and declare the Notification Service Extension in the `extra.eas.build.experimental.ios.appExtensions` of your app config as mentioned [here](https://docs.expo.dev/build-reference/app-extensions/#managed-projects-experimental-support)
+   - (iOS) Check your Identifiers in the Apple Developer Console and ensure the main app target has Push Notifications and App Group capabilities checked, and your Notification Service Extension target has App Groups capability checked. Check that both App Group capabilities have the app group name with the appended `.KlaviyoNotificationServiceExtension.shared` suffix
+   - (iOS) You should have two different provisioning profiles generated for this project. One for the main target, one for the Notification Service Extension.
+   - (iOS) Ensure the correct provisioning profiles are being recognized by EAS, and declare the Notification Service Extension in the `extra.eas.build.experimental.ios.appExtensions` of your app config as mentioned [here](https://docs.expo.dev/build-reference/app-extensions/#managed-projects-experimental-support)
 
 ## License
 
