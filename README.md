@@ -1,7 +1,4 @@
 # klaviyo-expo-plugin
-
-### 🚧 Project Status: Release Candidate 🚧
-
 ## Contents
 
 - [klaviyo-expo-plugin](#klaviyo-expo-plugin)
