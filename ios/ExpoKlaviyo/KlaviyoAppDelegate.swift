@@ -10,14 +10,12 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
     private var originalDelegate: UNUserNotificationCenterDelegate?
     
     public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-        
         // Store the original delegate (for expo-notifications)
         let center = UNUserNotificationCenter.current()
         originalDelegate = center.delegate
         
         // Set self for Klaviyo SDK to intercept notifications
         center.delegate = self
-        
         return true
     }
     
