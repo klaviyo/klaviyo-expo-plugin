@@ -1,10 +1,6 @@
 import ExpoModulesCore
 import KlaviyoSwift
 
-#if canImport(EXNotifications)
-import EXNotifications
-#endif
-
 public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotificationCenterDelegate {
     
     private var originalDelegate: UNUserNotificationCenterDelegate?
