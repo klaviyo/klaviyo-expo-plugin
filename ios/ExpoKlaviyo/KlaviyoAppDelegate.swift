@@ -9,7 +9,7 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
         // Store the original delegate in order to call expo-notifications handlers
         let center = UNUserNotificationCenter.current()
         originalDelegate = center.delegate
-        // Allow Klaviyo intercept notifications
+        // Allow Klaviyo to intercept notifications
         center.delegate = self
         return true
     }
