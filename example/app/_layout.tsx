@@ -5,6 +5,7 @@ import * as TaskManager from 'expo-task-manager';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
+import { Klaviyo } from 'klaviyo-react-native-sdk';
 
 const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
 
@@ -90,6 +91,43 @@ const handleDeeplink = (notification: Notifications.Notification | Notifications
 };
 
 export default function AppLayout() {
+
+  useEffect(() => {
+    const handleUrl = (url: string) => {
+      console.log('[Klaviyo] DEBUG - Received URL:', JSON.stringify(url));
+      console.log('[Klaviyo] DEBUG - URL type:', typeof url);
+      console.log('[Klaviyo] DEBUG - URL length:', url?.length);
+
+      // Check if this is a Klaviyo universal tracking link
+      if (Klaviyo.handleUniversalTrackingLink(url)) {
+        // Klaviyo SDK is handling the tracking link
+        // It will redirect to the destination URL which will be handled in a subsequent call
+        console.log('Klaviyo tracking link processed:', url);
+        return;
+      }
+
+      // Handle other deep links in your app (both custom schemes and universal links)
+      // This will be called after Klaviyo redirects from the tracking link
+      console.log('Navigating to destination:', url);
+      // Add your navigation logic here
+    };
+
+    // Handle the initial URL if the app was opened with a link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleUrl(url);
+      }
+    });
+
+    // Listen for deep link events while the app is running
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleUrl(url);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
   
   useEffect(() => {
     // Register the background task

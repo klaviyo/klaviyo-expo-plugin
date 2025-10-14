@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
-      "bundleIdentifier": "com.klaviyo.expoexample",
+      "bundleIdentifier": "com.klaviyo.rntest",
+      "associatedDomains": ["applinks:trk.send.evancmasseau.com"],
       "infoPlist": {
         "UIBackgroundModes": ["remote-notification"]
       }
@@ -19,7 +20,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.klaviyo.expoexample",
+      "package": "com.klaviyo.rntest",
       "jsEngine": "hermes",
       "useNextNotificationsApi": true,
       "googleServicesFile": "./google-services.json",
@@ -48,7 +49,7 @@
             "codeSigningStyle": "Automatic",
             "projectVersion": "1",
             "marketingVersion": "1.0",
-            "devTeam": "XXXXXXXXXX"
+            "devTeam": "G3793W2RJ2"
           }
         }
       ]
@@ -69,9 +70,9 @@
               "appExtensions": [
                 {
                   "targetName": "KlaviyoNotificationServiceExtension",
-                  "bundleIdentifier": "com.klaviyo.expoexample.KlaviyoNotificationServiceExtension",
+                  "bundleIdentifier": "com.klaviyo.rntest.KlaviyoNotificationServiceExtension",
                   "entitlements": {
-                    "com.apple.security.application-groups": ["group.com.klaviyo.expoexample.KlaviyoNotificationServiceExtension.shared"]
+                    "com.apple.security.application-groups": ["group.com.klaviyo.rntest.KlaviyoNotificationServiceExtension.shared"]
                   }
                 }
               ]

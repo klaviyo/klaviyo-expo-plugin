@@ -149,11 +149,11 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
     async config => {
       const iosRoot = path.join(config.modRequest.projectRoot, "ios");
       try {
-        const podfile = await FileManager.readFile(`${iosRoot}/Podfile`);
+        let podfile = await FileManager.readFile(`${iosRoot}/Podfile`);
         // Check for both standard and linkage-specific use_frameworks!
         const usesFrameworks = podfile.includes('use_frameworks!');
         const usesFrameworksWithLinkage = podfile.includes('use_frameworks! :linkage');
-        
+
         // Extract the linkage type if it exists
         let linkageType = '';
         if (usesFrameworksWithLinkage) {
@@ -162,21 +162,40 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
             linkageType = linkageMatch[1];
           }
         }
-        
+
+        // Add Klaviyo SDK pod overrides at the target level
+        const klaviyoCommit = 'b9fe0a8b7bb9737548ec9e6b95359a364024b5da';
+        const klaviyoPodOverrides = `
+  # Override Klaviyo Swift SDK with specific commit
+  pod 'KlaviyoCore', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '${klaviyoCommit}'
+  pod 'KlaviyoSwift', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '${klaviyoCommit}'
+  pod 'KlaviyoForms', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '${klaviyoCommit}'
+  pod 'KlaviyoSwiftExtension', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '${klaviyoCommit}'
+`;
+
+        // Insert Klaviyo pod overrides after use_expo_modules!
+        if (!podfile.includes('pod \'KlaviyoCore\'')) {
+          podfile = podfile.replace(
+            /use_expo_modules!\s*\n/,
+            `use_expo_modules!\n${klaviyoPodOverrides}\n`
+          );
+        }
+
         const podInsertion = `
   target 'KlaviyoNotificationServiceExtension' do
     ${usesFrameworks ? `use_frameworks!${linkageType ? ` :linkage => ${linkageType}` : ''}` : ''}
-    pod 'KlaviyoSwiftExtension'
+    pod 'KlaviyoSwiftExtension', :git => 'https://github.com/klaviyo/klaviyo-swift-sdk.git', :commit => '${klaviyoCommit}'
   end
   `;
-        if (!podfile.includes("pod 'KlaviyoSwiftExtension'")) {
-          const updatedPodfile = `${podfile}\n${podInsertion}`;
-          await FileManager.writeFile(`${iosRoot}/Podfile`, updatedPodfile);
+        if (!podfile.includes("target 'KlaviyoNotificationServiceExtension'")) {
+          podfile = `${podfile}\n${podInsertion}`;
         }
+
+        await FileManager.writeFile(`${iosRoot}/Podfile`, podfile);
       } catch (err) {
         KlaviyoLog.log('Could not write Klaviyo changes to Podfile: ' + err);
       }
-      
+
       return config;
     },
   ]);
