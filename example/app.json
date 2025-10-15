@@ -20,13 +20,27 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.klaviyo.rntest",
+      "package": "com.klaviyorntestapp",
       "jsEngine": "hermes",
       "useNextNotificationsApi": true,
       "googleServicesFile": "./google-services.json",
       "notification": {
         "defaultChannelId": "default"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "trk.send.evancmasseau.com",
+              "pathPrefix": "/u"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
