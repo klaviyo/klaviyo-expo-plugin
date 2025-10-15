@@ -11,6 +11,10 @@
   - [Configuration](#configuration)
     - [Plugin props](#plugin-props)
     - [Required config values](#required-config-values)
+  - [Universal Links](#universal-links)
+    - [iOS Setup](#ios-setup)
+    - [Android Setup](#android-setup)
+    - [React Native Code](#react-native-code)
   - [Example app](#example-app)
   - [Troubleshooting](#troubleshooting)
   - [License](#license)
@@ -27,6 +31,7 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 - Key:value pair data reading
 - Notification service extension setup (iOS)
 - Icon / color notification configuration (Android)
+- Universal links / App links support
 
 ## Requirements
 
@@ -135,6 +140,130 @@ In your configuration file, set the following:
 
 These values are used in various native configuration files and must be properly set for the plugin to work correctly.
 
+## Universal Links
+
+Universal Links (iOS) and App Links (Android) allow you to navigate to a particular page within your app when users tap on links from outside your app, such as from emails, websites, or push notifications. Klaviyo uses universal links for click tracking in email campaigns, allowing you to track user engagement while seamlessly directing them to your app.
+
+The Klaviyo SDK provides the `handleUniversalTrackingLink()` method to automatically handle click tracking for Klaviyo universal links and redirect users to the intended destination within your app.
+
+### iOS Setup
+
+To enable universal links on iOS, you need to configure Associated Domains in your app configuration:
+
+1. Add the `associatedDomains` array to your `ios` configuration in `app.json`:
+
+```json
+{
+  "expo": {
+    "ios": {
+      "bundleIdentifier": "com.yourcompany.yourapp",
+      "associatedDomains": [
+        "applinks:trk.your-domain.com"
+      ]
+    }
+  }
+}
+```
+
+2. Verify domain ownership by hosting an `apple-app-site-association` file on your domain. This file must be accessible at `https://trk.your-domain.com/.well-known/apple-app-site-association` or `https://trk.your-domain.com/apple-app-site-association`.
+
+For more details on setting up Associated Domains, see [Apple's documentation](https://developer.apple.com/documentation/xcode/supporting-associated-domains).
+
+### Android Setup
+
+To enable App Links on Android, you need to configure intent filters in your app configuration:
+
+1. Add intent filters to your `android` configuration in `app.json`:
+
+```json
+{
+  "expo": {
+    "android": {
+      "package": "com.yourcompany.yourapp",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "trk.your-domain.com",
+              "pathPrefix": "/u"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    }
+  }
+}
+```
+
+2. Verify domain ownership by hosting a Digital Asset Links JSON file on your domain. This file must be accessible at `https://trk.your-domain.com/.well-known/assetlinks.json`.
+
+For more details on setting up Android App Links, see [Android's documentation](https://developer.android.com/training/app-links).
+
+### React Native Code
+
+In your React Native code, use Expo's `expo-linking` library to handle both universal links and custom deep links:
+
+```typescript
+import { useEffect } from 'react';
+import * as Linking from 'expo-linking';
+import { Klaviyo } from 'klaviyo-react-native-sdk';
+
+export default function App() {
+  useEffect(() => {
+    const handleUrl = (url: string) => {
+      // Check if this is a Klaviyo universal tracking link
+      if (Klaviyo.handleUniversalTrackingLink(url)) {
+        // Klaviyo SDK is handling the tracking link
+        // It will track the click and redirect to the destination URL
+        console.log('Klaviyo tracking link processed:', url);
+        return;
+      }
+
+      // Handle other deep links in your app (both custom schemes and universal links)
+      // This will be called after Klaviyo redirects from the tracking link to your destination
+      console.log('Navigating to destination:', url);
+      // Add your navigation logic here (e.g., using React Navigation)
+    };
+
+    // Handle the initial URL if the app was opened with a link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleUrl(url);
+      }
+    });
+
+    // Listen for deep link events while the app is running
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleUrl(url);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  // Rest of your app code
+  return (
+    // Your app components
+  );
+}
+```
+
+**How it works:**
+
+1. When a user taps a Klaviyo tracking link (format: `https://trk.your-domain.com/u/...`), your app opens
+2. The `handleUrl` function receives the URL
+3. `Klaviyo.handleUniversalTrackingLink()` checks if it's a Klaviyo tracking link:
+   - If **true**: The SDK tracks the click event and resolves the tracking link to its destination URL, which triggers another call to `handleUrl` with the destination
+   - If **false**: The URL is not a Klaviyo tracking link, so you should handle it as a regular deep link
+4. Your app navigates to the appropriate screen based on the destination URL
+
+For more information on deep linking with Expo, see [Expo's Linking documentation](https://docs.expo.dev/guides/linking/).
+
 ## Example app
 
 We created an example app to show how to use this plugin in coordination with the `klaviyo-react-native-sdk`. Set this up and run based on whichever platform you'd like to test on:
@@ -165,10 +294,22 @@ Common issues and solutions:
         }
         ```
 
-2. **Deep Links Not Working**
-   - Verify URL scheme configuration
-   - Check intent filters (Android)
-   - Verify associated domains (iOS)
+2. **Deep Links / Universal Links Not Working**
+   - **Custom URL schemes**: Verify URL scheme configuration in your app.json
+   - **Universal Links (iOS)**:
+     - Verify `associatedDomains` is configured correctly in your app.json
+     - Ensure your `apple-app-site-association` file is properly hosted and accessible
+     - Test the domain verification using Apple's [app-site-association verification tool](https://search.developer.apple.com/appsearch-validation-tool/)
+     - Make sure your domain supports HTTPS
+   - **App Links (Android)**:
+     - Check intent filters are configured with `autoVerify: true` in your app.json
+     - Ensure your `assetlinks.json` file is properly hosted at `https://your-domain.com/.well-known/assetlinks.json`
+     - Test the domain verification using the command: `adb shell pm get-app-links your.package.name`
+     - Verify the domain supports HTTPS
+   - **Testing Universal Links**:
+     - Universal links will NOT work when tapped from within the same app or in simulator under certain conditions
+     - Test by sending yourself an email with the link or using the Notes app
+     - On Android, use `adb shell am start -a android.intent.action.VIEW -d "https://your-tracking-link"` to test
 
 3. **Build Errors**
    - Clean and rebuild the project
