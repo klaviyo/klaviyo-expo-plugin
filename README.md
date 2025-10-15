@@ -146,6 +146,11 @@ Universal Links (iOS) and App Links (Android) allow you to navigate to a particu
 
 The Klaviyo SDK provides the `handleUniversalTrackingLink()` method to automatically handle click tracking for Klaviyo universal links and redirect users to the intended destination within your app.
 
+> **⚠️ Important:** Universal link tracking requires `klaviyo-react-native-sdk` version **2.1.0 or higher**. Make sure you have the correct version installed:
+> ```bash
+> npm install klaviyo-react-native-sdk@^2.1.0
+> ```
+
 ### iOS Setup
 
 To enable universal links on iOS, you need to configure Associated Domains in your app configuration:
