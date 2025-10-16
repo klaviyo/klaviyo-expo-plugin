@@ -6,8 +6,6 @@ import { getMainActivityAsync } from '@expo/config-plugins/build/android/Paths';
 import * as glob from 'glob';
 import {
   KlaviyoPluginAndroidProps,
-  AndroidMetaData,
-  AndroidService,
   KlaviyoAndroidModResults
 } from './types';
 import * as xml2js from 'xml2js';
@@ -57,8 +55,13 @@ const mutateAndroidManifest = (config: ExportedConfigWithProps<AndroidManifest>,
     application.service = [];
   }
 
+  interface ManifestService {
+    $: Record<string, string>;
+    'intent-filter'?: unknown[];
+  }
+
   const pushServiceIndex = application.service.findIndex(
-    (item: any) => item.$['android:name'] === 'com.klaviyo.pushFcm.KlaviyoPushService'
+    (item: ManifestService) => item.$['android:name'] === 'com.klaviyo.pushFcm.KlaviyoPushService'
   );
 
   if (pushServiceIndex === -1) {
@@ -252,15 +255,58 @@ export async function modifyMainActivity(
       newSrc: isKotlin ?
         `\n    override fun onNewIntent(intent: Intent) {\n        super.onNewIntent(intent)\n\n        // Tracks when a system tray notification is opened\n        Klaviyo.handlePush(intent)\n    }` :
         `\n    @Override\n    public void onNewIntent(Intent intent) {\n        super.onNewIntent(intent);\n\n        // Tracks when a system tray notification is opened\n        Klaviyo.handlePush(intent);\n    }`,
-      anchor: isKotlin ? 
+      anchor: isKotlin ?
         /^class MainActivity : ReactActivity\(\) \{$/m :
         /^(?:public\s+)?class\s+MainActivity\s+(?:extends|:)\s+ReactActivity\s*(?:\(\))?\s*\{/m,
       offset: 1,
       comment: '//',
     });
 
+    // Check if onCreate already exists
+    const hasOnCreate = isKotlin ?
+      /override fun onCreate\(/m.test(methodContents.contents) :
+      /@Override[\s\S]*?protected void onCreate\(/m.test(methodContents.contents);
+
+    let finalContents = methodContents.contents;
+
+    if (hasOnCreate) {
+      // If onCreate exists, inject the onNewIntent call after super.onCreate
+      KlaviyoLog.log('Found existing onCreate, injecting onNewIntent call...');
+      const onCreateInjection = isKotlin ?
+        'super.onCreate(null)\n        // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate\n        onNewIntent(intent)\n        // @generated end klaviyo-onCreate' :
+        'super.onCreate(savedInstanceState);\n        // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate\n        onNewIntent(getIntent());\n        // @generated end klaviyo-onCreate';
+
+      const onCreateReplacement = isKotlin ?
+        /super\.onCreate\(null\)/m :
+        /super\.onCreate\(savedInstanceState\);/m;
+
+      // Remove any existing onCreate injection first
+      finalContents = finalContents.replace(
+        /\/\/ @generated begin klaviyo-onCreate[\s\S]*?\/\/ @generated end klaviyo-onCreate\n?\s*/g,
+        ''
+      );
+
+      finalContents = finalContents.replace(onCreateReplacement, onCreateInjection);
+    } else {
+      // If onCreate doesn't exist, add it after onNewIntent
+      KlaviyoLog.log('No onCreate found, adding new onCreate method...');
+      const onCreateContents = mergeContents({
+        tag: 'klaviyo-onCreate',
+        src: methodContents.contents,
+        newSrc: isKotlin ?
+          `\n    override fun onCreate(savedInstanceState: android.os.Bundle?) {\n        super.onCreate(savedInstanceState)\n\n        // Tracks when a system tray notification is opened while app is killed\n        onNewIntent(intent)\n    }` :
+          `\n    @Override\n    protected void onCreate(android.os.Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n\n        // Tracks when a system tray notification is opened while app is killed\n        onNewIntent(getIntent());\n    }`,
+        anchor: isKotlin ?
+          /override fun onNewIntent\(intent: Intent\) \{[\s\S]*?\n {4}\}/m :
+          /@Override\s+public void onNewIntent\(Intent intent\) \{[\s\S]*?\n {4}\}/m,
+        offset: 1,
+        comment: '//',
+      });
+      finalContents = onCreateContents.contents;
+    }
+
     // Write the modified content back to the file
-    fs.writeFileSync(mainActivityPath, methodContents.contents);
+    fs.writeFileSync(mainActivityPath, finalContents);
   } else {
     KlaviyoLog.log('Removing push tracking code from MainActivity...');
     // Write the cleaned content back
@@ -446,7 +492,7 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, p
           try {
             // First try to remove the file
             fs.unlinkSync(destPath);
-          } catch (unlinkError) {
+          } catch {
             // If unlinkSync throws, try force removal as fallback
             try {
               fs.rmSync(destPath, { force: true });
