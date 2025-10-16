@@ -148,7 +148,7 @@ In addition, this plugin adds a `KlaviyoNotificationServiceExtension` target to 
   }
 ]
 ```
-to the `extra.eas.build.experimental.ios` body of your app config where {YOUR_BUNDLE_ID} is your own app's bundle id. (See [our example](https://github.com/klaviyo/klaviyo-expo-plugin/blob/d00e12aca1b4c077a9803f4d0c62d2b2e174ce79/example/app.json#L62-L82) app config.)
+to the `extra.eas.build.experimental.ios` body of your app config where `{YOUR_BUNDLE_ID}` is your own app's bundle id. (See [our example](https://github.com/klaviyo/klaviyo-expo-plugin/blob/d00e12aca1b4c077a9803f4d0c62d2b2e174ce79/example/app.json#L62-L82) app config.)
 
 
 ## Example app
