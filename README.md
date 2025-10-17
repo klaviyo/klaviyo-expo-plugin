@@ -135,6 +135,22 @@ In your configuration file, set the following:
 
 These values are used in various native configuration files and must be properly set for the plugin to work correctly.
 
+In addition, this plugin adds a `KlaviyoNotificationServiceExtension` target to support Notification Service Extension capabilities on iOS and utilizes [app groups](https://developer.apple.com/documentation/Xcode/configuring-app-groups) to sync and share data across the Klaviyo SDK modules. To support this added target and app group in your Expo configuration file, add:
+
+```
+"appExtensions": [
+  {
+    "targetName": "KlaviyoNotificationServiceExtension",
+    "bundleIdentifier": "{YOUR_BUNDLE_ID}.KlaviyoNotificationServiceExtension",
+    "entitlements": {
+      "com.apple.security.application-groups": ["group.{YOUR_BUNDLE_ID}.KlaviyoNotificationServiceExtension.shared"]
+    }
+  }
+]
+```
+to the `extra.eas.build.experimental.ios` body of your app config where `{YOUR_BUNDLE_ID}` is your own app's bundle id. (See [our example](https://github.com/klaviyo/klaviyo-expo-plugin/blob/d00e12aca1b4c077a9803f4d0c62d2b2e174ce79/example/app.json#L62-L82) app config.)
+
+
 ## Example app
 
 We created an example app to show how to use this plugin in coordination with the `klaviyo-react-native-sdk`. Set this up and run based on whichever platform you'd like to test on:
