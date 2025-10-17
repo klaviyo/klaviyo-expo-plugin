@@ -849,7 +849,7 @@ public class MainActivity extends ReactActivity {
         // Check that onCreate was added
         expect(writtenContent).toContain('protected void onCreate');
         expect(writtenContent).toContain('super.onCreate(savedInstanceState);');
-        expect(writtenContent).toContain('onNewIntent(getIntent());');
+        expect(writtenContent).toContain('Klaviyo.handlePush(getIntent());');
         expect(writtenContent).toContain('// Tracks when a system tray notification is opened while app is killed');
       });
 
@@ -879,16 +879,16 @@ public class MainActivity extends ReactActivity {
         expect(fs.writeFileSync).toHaveBeenCalled();
         const writtenContent = fs.writeFileSync.mock.calls[0][1];
 
-        // Check that onNewIntent was injected after super.onCreate
+        // Check that Klaviyo.handlePush was injected after super.onCreate
         expect(writtenContent).toContain('super.onCreate(savedInstanceState);');
-        expect(writtenContent).toContain('onNewIntent(getIntent());');
+        expect(writtenContent).toContain('Klaviyo.handlePush(getIntent());');
         expect(writtenContent).toContain('// @generated begin klaviyo-onCreate');
         expect(writtenContent).toContain('// @generated end klaviyo-onCreate');
 
-        // Verify order: super.onCreate should come before onNewIntent
+        // Verify order: super.onCreate should come before Klaviyo.handlePush
         const superIndex = writtenContent.indexOf('super.onCreate(savedInstanceState);');
-        const onNewIntentIndex = writtenContent.indexOf('onNewIntent(getIntent());');
-        expect(superIndex).toBeLessThan(onNewIntentIndex);
+        const handlePushIndex = writtenContent.indexOf('Klaviyo.handlePush(getIntent());');
+        expect(superIndex).toBeLessThan(handlePushIndex);
       });
 
       it('adds onNewIntent method in Java MainActivity', async () => {
@@ -968,7 +968,7 @@ class MainActivity : ReactActivity() {
         // Check that onCreate was added
         expect(writtenContent).toContain('override fun onCreate');
         expect(writtenContent).toContain('super.onCreate(savedInstanceState)');
-        expect(writtenContent).toContain('onNewIntent(intent)');
+        expect(writtenContent).toContain('Klaviyo.handlePush(intent)');
         expect(writtenContent).toContain('// Tracks when a system tray notification is opened while app is killed');
       });
 
@@ -1012,7 +1012,7 @@ class MainActivity : ReactActivity() {
           writtenContent.indexOf('// @generated begin klaviyo-onCreate'),
           writtenContent.indexOf('// @generated end klaviyo-onCreate')
         );
-        expect(onCreateBlock).toContain('onNewIntent(intent)');
+        expect(onCreateBlock).toContain('Klaviyo.handlePush(intent)');
       });
 
       it('adds onNewIntent method in Kotlin MainActivity', async () => {
@@ -1090,7 +1090,7 @@ public class MainActivity extends ReactActivity {
   protected void onCreate(android.os.Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate
-    onNewIntent(getIntent());
+    Klaviyo.handlePush(getIntent());
     // @generated end klaviyo-onCreate
   }
 }`;
@@ -1108,7 +1108,6 @@ public class MainActivity extends ReactActivity {
         expect(writtenContent).not.toContain('import android.content.Intent');
         expect(writtenContent).not.toContain('import com.klaviyo.analytics.Klaviyo');
         expect(writtenContent).not.toContain('Klaviyo.handlePush');
-        expect(writtenContent).not.toContain('onNewIntent(getIntent());');
         expect(writtenContent).not.toContain('// @generated begin klaviyo-');
       });
     });
@@ -1141,8 +1140,8 @@ public class MainActivity extends ReactActivity {
         const secondRunContent = fs.writeFileSync.mock.calls[0][1];
 
         // Count occurrences of the injection
-        const onNewIntentMatches = (secondRunContent.match(/onNewIntent\(getIntent\(\)\);/g) || []).length;
-        expect(onNewIntentMatches).toBe(1); // Should only appear once
+        const handlePushMatches = (secondRunContent.match(/Klaviyo\.handlePush\(getIntent\(\)\);/g) || []).length;
+        expect(handlePushMatches).toBe(1); // Should only appear once
       });
     });
   });

@@ -270,11 +270,11 @@ export async function modifyMainActivity(
     let finalContents = methodContents.contents;
 
     if (hasOnCreate) {
-      // If onCreate exists, inject the onNewIntent call after super.onCreate
-      KlaviyoLog.log('Found existing onCreate, injecting onNewIntent call...');
+      // If onCreate exists, inject the Klaviyo.handlePush call after super.onCreate
+      KlaviyoLog.log('Found existing onCreate, injecting Klaviyo.handlePush call...');
       const onCreateInjection = isKotlin ?
-        'super.onCreate(null)\n        // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate\n        onNewIntent(intent)\n        // @generated end klaviyo-onCreate' :
-        'super.onCreate(savedInstanceState);\n        // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate\n        onNewIntent(getIntent());\n        // @generated end klaviyo-onCreate';
+        'super.onCreate(null)\n        // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate\n        Klaviyo.handlePush(intent)\n        // @generated end klaviyo-onCreate' :
+        'super.onCreate(savedInstanceState);\n        // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate\n        Klaviyo.handlePush(getIntent());\n        // @generated end klaviyo-onCreate';
 
       const onCreateReplacement = isKotlin ?
         /super\.onCreate\(null\)/m :
@@ -294,8 +294,8 @@ export async function modifyMainActivity(
         tag: 'klaviyo-onCreate',
         src: methodContents.contents,
         newSrc: isKotlin ?
-          `\n    override fun onCreate(savedInstanceState: android.os.Bundle?) {\n        super.onCreate(savedInstanceState)\n\n        // Tracks when a system tray notification is opened while app is killed\n        onNewIntent(intent)\n    }` :
-          `\n    @Override\n    protected void onCreate(android.os.Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n\n        // Tracks when a system tray notification is opened while app is killed\n        onNewIntent(getIntent());\n    }`,
+          `\n    override fun onCreate(savedInstanceState: android.os.Bundle?) {\n        super.onCreate(savedInstanceState)\n\n        // Tracks when a system tray notification is opened while app is killed\n        Klaviyo.handlePush(intent)\n    }` :
+          `\n    @Override\n    protected void onCreate(android.os.Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n\n        // Tracks when a system tray notification is opened while app is killed\n        Klaviyo.handlePush(getIntent());\n    }`,
         anchor: isKotlin ?
           /override fun onNewIntent\(intent: Intent\) \{[\s\S]*?\n {4}\}/m :
           /@Override\s+public void onNewIntent\(Intent intent\) \{[\s\S]*?\n {4}\}/m,
