@@ -1,9 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Klaviyo } from 'klaviyo-react-native-sdk';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProfileScreen() {
   const [apiKey, setApiKey] = useState('');
+
+  // Load stored API key and refresh profile from Klaviyo on mount
+  useEffect(() => {
+    const loadStoredApiKey = async () => {
+      try {
+        const storedApiKey = await AsyncStorage.getItem('klaviyoApiKey');
+        if (storedApiKey) {
+          setApiKey(storedApiKey);
+        }
+      } catch (error) {
+        console.error('Error loading stored API key:', error);
+      }
+    };
+
+    const refreshProfile = () => {
+      // Wait a bit for Klaviyo to finish initializing
+      setTimeout(() => {
+        Klaviyo.getEmail((email: string) => {
+          if (email) {
+            setProfile(prev => ({ ...prev, email }));
+          }
+        });
+        Klaviyo.getPhoneNumber((phoneNumber: string) => {
+          if (phoneNumber) {
+            setProfile(prev => ({ ...prev, phoneNumber }));
+          }
+        });
+        Klaviyo.getExternalId((externalId: string) => {
+          if (externalId) {
+            setProfile(prev => ({ ...prev, externalId }));
+          }
+        });
+      }, 500);
+    };
+
+    loadStoredApiKey();
+    // Refresh profile from Klaviyo's stored state after initialization
+    refreshProfile();
+  }, []);
   const [profile, setProfile] = useState({
     email: '',
     firstName: '',
@@ -12,12 +52,24 @@ export default function ProfileScreen() {
     externalId: ''
   });
 
-  const handleInitialize = () => {
+  const handleInitialize = async () => {
     if (apiKey.length !== 6) {
       Alert.alert('Invalid API Key', 'Please enter a 6-character API key');
       return;
     }
-    Klaviyo.initialize(apiKey);
+
+    try {
+      // Save API key to AsyncStorage
+      await AsyncStorage.setItem('klaviyoApiKey', apiKey);
+      console.log('Saved API key to storage:', apiKey);
+
+      // Initialize Klaviyo
+      Klaviyo.initialize(apiKey);
+      Alert.alert('Success', 'Klaviyo initialized successfully');
+    } catch (error) {
+      console.error('Error saving API key:', error);
+      Alert.alert('Error', 'Failed to save API key');
+    }
   };
 
   const handleTrackEvent = () => {

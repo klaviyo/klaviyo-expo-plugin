@@ -5,6 +5,8 @@ import * as TaskManager from 'expo-task-manager';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Klaviyo } from 'klaviyo-react-native-sdk';
 
 const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
 
@@ -90,8 +92,23 @@ const handleDeeplink = (notification: Notifications.Notification | Notifications
 };
 
 export default function AppLayout() {
-  
+
   useEffect(() => {
+    // Initialize Klaviyo from stored API key
+    const initializeKlaviyo = async () => {
+      try {
+        const storedApiKey = await AsyncStorage.getItem('klaviyoApiKey');
+        if (storedApiKey && storedApiKey.length === 6) {
+          console.log('Initializing Klaviyo with stored API key:', storedApiKey);
+          Klaviyo.initialize(storedApiKey);
+        }
+      } catch (error) {
+        console.error('Error initializing Klaviyo from storage:', error);
+      }
+    };
+
+    initializeKlaviyo();
+
     // Register the background task
     Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
 

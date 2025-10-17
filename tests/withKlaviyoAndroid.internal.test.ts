@@ -462,7 +462,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       let mockProps: any;
 
       beforeEach(() => {
-        jest.resetAllMocks();
+        jest.clearAllMocks();
         mockWithStringsXml = require('@expo/config-plugins').withStringsXml;
         mockConfig = createMockConfig();
         mockProps = createMockProps();
@@ -779,7 +779,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     const baseProps = createMockProps({ openTracking: true });
 
     beforeEach(() => {
-      jest.resetAllMocks();
+      jest.clearAllMocks();
       fs.existsSync.mockReturnValue(true);
       fs.readFileSync.mockReturnValue(`package com.example.test;\npublic class MainActivity extends ReactActivity {}`);
     });
@@ -811,6 +811,338 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/path/MainActivity.java', isKotlin: false });
       fs.readFileSync.mockReturnValue(`package com.example.test;\n// no class here`);
       await expect(modifyMainActivity(baseConfig, baseProps, mockFindMainActivity)).rejects.toThrow('Could not find MainActivity class declaration');
+    });
+  });
+
+  describe('onCreate tracking functionality', () => {
+    const fs = require('fs');
+    const baseConfig = createMockConfig();
+    const baseProps = createMockProps({ openTracking: true });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      fs.existsSync.mockReturnValue(true);
+      fs.writeFileSync.mockClear();
+    });
+
+    describe('Java MainActivity', () => {
+      it('adds onCreate when it does not exist in Java MainActivity', async () => {
+        const javaMainActivity = `package com.example.test;
+
+import com.facebook.react.ReactActivity;
+
+public class MainActivity extends ReactActivity {
+  @Override
+  protected String getMainComponentName() {
+    return "main";
+  }
+}`;
+
+        const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/MainActivity.java', isKotlin: false });
+        fs.readFileSync.mockReturnValue(javaMainActivity);
+
+        await modifyMainActivity(baseConfig, baseProps, mockFindMainActivity);
+
+        expect(fs.writeFileSync).toHaveBeenCalled();
+        const writtenContent = fs.writeFileSync.mock.calls[0][1];
+
+        // Check that onCreate was added
+        expect(writtenContent).toContain('protected void onCreate');
+        expect(writtenContent).toContain('super.onCreate(savedInstanceState);');
+        expect(writtenContent).toContain('Klaviyo.handlePush(getIntent());');
+        expect(writtenContent).toContain('// Tracks when a system tray notification is opened while app is killed');
+      });
+
+      it('injects into existing onCreate in Java MainActivity', async () => {
+        const javaMainActivityWithOnCreate = `package com.example.test;
+
+import com.facebook.react.ReactActivity;
+
+public class MainActivity extends ReactActivity {
+  @Override
+  protected void onCreate(android.os.Bundle savedInstanceState) {
+    setTheme(R.style.AppTheme);
+    super.onCreate(savedInstanceState);
+  }
+
+  @Override
+  protected String getMainComponentName() {
+    return "main";
+  }
+}`;
+
+        const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/MainActivity.java', isKotlin: false });
+        fs.readFileSync.mockReturnValue(javaMainActivityWithOnCreate);
+
+        await modifyMainActivity(baseConfig, baseProps, mockFindMainActivity);
+
+        expect(fs.writeFileSync).toHaveBeenCalled();
+        const writtenContent = fs.writeFileSync.mock.calls[0][1];
+
+        // Check that Klaviyo.handlePush was injected after super.onCreate
+        expect(writtenContent).toContain('super.onCreate(savedInstanceState);');
+        expect(writtenContent).toContain('Klaviyo.handlePush(getIntent());');
+        expect(writtenContent).toContain('// @generated begin klaviyo-onCreate');
+        expect(writtenContent).toContain('// @generated end klaviyo-onCreate');
+
+        // Verify order: super.onCreate should come before Klaviyo.handlePush
+        const superIndex = writtenContent.indexOf('super.onCreate(savedInstanceState);');
+        const handlePushIndex = writtenContent.indexOf('Klaviyo.handlePush(getIntent());');
+        expect(superIndex).toBeLessThan(handlePushIndex);
+      });
+
+      it('adds onNewIntent method in Java MainActivity', async () => {
+        const javaMainActivity = `package com.example.test;
+
+import com.facebook.react.ReactActivity;
+
+public class MainActivity extends ReactActivity {
+  @Override
+  protected String getMainComponentName() {
+    return "main";
+  }
+}`;
+
+        const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/MainActivity.java', isKotlin: false });
+        fs.readFileSync.mockReturnValue(javaMainActivity);
+
+        await modifyMainActivity(baseConfig, baseProps, mockFindMainActivity);
+
+        expect(fs.writeFileSync).toHaveBeenCalled();
+        const writtenContent = fs.writeFileSync.mock.calls[0][1];
+
+        // Check that onNewIntent was added
+        expect(writtenContent).toContain('@Override');
+        expect(writtenContent).toContain('public void onNewIntent(Intent intent)');
+        expect(writtenContent).toContain('super.onNewIntent(intent);');
+        expect(writtenContent).toContain('Klaviyo.handlePush(intent);');
+        expect(writtenContent).toContain('// Tracks when a system tray notification is opened');
+      });
+
+      it('adds required imports in Java MainActivity', async () => {
+        const javaMainActivity = `package com.example.test;
+
+import com.facebook.react.ReactActivity;
+
+public class MainActivity extends ReactActivity {
+  @Override
+  protected String getMainComponentName() {
+    return "main";
+  }
+}`;
+
+        const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/MainActivity.java', isKotlin: false });
+        fs.readFileSync.mockReturnValue(javaMainActivity);
+
+        await modifyMainActivity(baseConfig, baseProps, mockFindMainActivity);
+
+        expect(fs.writeFileSync).toHaveBeenCalled();
+        const writtenContent = fs.writeFileSync.mock.calls[0][1];
+
+        // Check that imports were added
+        expect(writtenContent).toContain('import android.content.Intent;');
+        expect(writtenContent).toContain('import com.klaviyo.analytics.Klaviyo;');
+      });
+    });
+
+    describe('Kotlin MainActivity', () => {
+      it('adds onCreate when it does not exist in Kotlin MainActivity', async () => {
+        const kotlinMainActivity = `package com.example.test
+
+import com.facebook.react.ReactActivity
+
+class MainActivity : ReactActivity() {
+    override fun getMainComponentName(): String {
+        return "main"
+    }
+}`;
+
+        const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/MainActivity.kt', isKotlin: true });
+        fs.readFileSync.mockReturnValue(kotlinMainActivity);
+
+        await modifyMainActivity(baseConfig, baseProps, mockFindMainActivity);
+
+        expect(fs.writeFileSync).toHaveBeenCalled();
+        const writtenContent = fs.writeFileSync.mock.calls[0][1];
+
+        // Check that onCreate was added
+        expect(writtenContent).toContain('override fun onCreate');
+        expect(writtenContent).toContain('super.onCreate(savedInstanceState)');
+        expect(writtenContent).toContain('Klaviyo.handlePush(intent)');
+        expect(writtenContent).toContain('// Tracks when a system tray notification is opened while app is killed');
+      });
+
+      it('injects into existing onCreate in Kotlin MainActivity', async () => {
+        const kotlinMainActivityWithOnCreate = `package com.example.test
+
+import com.facebook.react.ReactActivity
+import android.os.Bundle
+
+class MainActivity : ReactActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(R.style.AppTheme);
+        super.onCreate(savedInstanceState)
+    }
+
+    override fun getMainComponentName(): String {
+        return "main"
+    }
+}`;
+
+        const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/MainActivity.kt', isKotlin: true });
+        fs.readFileSync.mockReturnValue(kotlinMainActivityWithOnCreate);
+
+        await modifyMainActivity(baseConfig, baseProps, mockFindMainActivity);
+
+        expect(fs.writeFileSync).toHaveBeenCalled();
+        const writtenContent = fs.writeFileSync.mock.calls[0][1];
+
+        // Check that Klaviyo.handlePush was injected after super.onCreate
+        expect(writtenContent).toContain('super.onCreate(savedInstanceState)');
+        expect(writtenContent).toContain('// @generated begin klaviyo-onCreate');
+        expect(writtenContent).toContain('// @generated end klaviyo-onCreate');
+
+        // Verify order: super.onCreate should come before the onCreate injection block
+        const superIndex = writtenContent.indexOf('super.onCreate(savedInstanceState)');
+        const onCreateBlockIndex = writtenContent.indexOf('// @generated begin klaviyo-onCreate');
+        expect(superIndex).toBeLessThan(onCreateBlockIndex);
+
+        // Verify the injected call is in the onCreate block (not just in onNewIntent method signature)
+        const onCreateBlock = writtenContent.substring(
+          writtenContent.indexOf('// @generated begin klaviyo-onCreate'),
+          writtenContent.indexOf('// @generated end klaviyo-onCreate')
+        );
+        expect(onCreateBlock).toContain('Klaviyo.handlePush(intent)');
+      });
+
+      it('adds onNewIntent method in Kotlin MainActivity', async () => {
+        const kotlinMainActivity = `package com.example.test
+
+import com.facebook.react.ReactActivity
+
+class MainActivity : ReactActivity() {
+    override fun getMainComponentName(): String {
+        return "main"
+    }
+}`;
+
+        const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/MainActivity.kt', isKotlin: true });
+        fs.readFileSync.mockReturnValue(kotlinMainActivity);
+
+        await modifyMainActivity(baseConfig, baseProps, mockFindMainActivity);
+
+        expect(fs.writeFileSync).toHaveBeenCalled();
+        const writtenContent = fs.writeFileSync.mock.calls[0][1];
+
+        // Check that onNewIntent was added
+        expect(writtenContent).toContain('override fun onNewIntent(intent: Intent)');
+        expect(writtenContent).toContain('super.onNewIntent(intent)');
+        expect(writtenContent).toContain('Klaviyo.handlePush(intent)');
+        expect(writtenContent).toContain('// Tracks when a system tray notification is opened');
+      });
+
+      it('adds required imports in Kotlin MainActivity', async () => {
+        const kotlinMainActivity = `package com.example.test
+
+import com.facebook.react.ReactActivity
+
+class MainActivity : ReactActivity() {
+    override fun getMainComponentName(): String {
+        return "main"
+    }
+}`;
+
+        const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/MainActivity.kt', isKotlin: true });
+        fs.readFileSync.mockReturnValue(kotlinMainActivity);
+
+        await modifyMainActivity(baseConfig, baseProps, mockFindMainActivity);
+
+        expect(fs.writeFileSync).toHaveBeenCalled();
+        const writtenContent = fs.writeFileSync.mock.calls[0][1];
+
+        // Check that imports were added (Kotlin doesn't use semicolons)
+        expect(writtenContent).toContain('import android.content.Intent');
+        expect(writtenContent).toContain('import com.klaviyo.analytics.Klaviyo');
+      });
+    });
+
+    describe('openTracking disabled', () => {
+      it('removes onCreate injection when openTracking is disabled', async () => {
+        const javaMainActivityWithTracking = `package com.example.test;
+
+import android.content.Intent;
+import com.klaviyo.analytics.Klaviyo;
+import com.facebook.react.ReactActivity;
+
+public class MainActivity extends ReactActivity {
+  // @generated begin klaviyo-imports - expo prebuild (DO NOT MODIFY) sync-hash
+  // @generated end klaviyo-imports
+
+  // @generated begin klaviyo-onNewIntent - expo prebuild (DO NOT MODIFY) sync-hash
+  @Override
+  public void onNewIntent(Intent intent) {
+    super.onNewIntent(intent);
+    Klaviyo.handlePush(intent);
+  }
+  // @generated end klaviyo-onNewIntent
+
+  @Override
+  protected void onCreate(android.os.Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate
+    Klaviyo.handlePush(getIntent());
+    // @generated end klaviyo-onCreate
+  }
+}`;
+
+        const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/MainActivity.java', isKotlin: false });
+        fs.readFileSync.mockReturnValue(javaMainActivityWithTracking);
+
+        const disabledProps = createMockProps({ openTracking: false });
+        await modifyMainActivity(baseConfig, disabledProps, mockFindMainActivity);
+
+        expect(fs.writeFileSync).toHaveBeenCalled();
+        const writtenContent = fs.writeFileSync.mock.calls[0][1];
+
+        // Check that Klaviyo code was removed
+        expect(writtenContent).not.toContain('import android.content.Intent');
+        expect(writtenContent).not.toContain('import com.klaviyo.analytics.Klaviyo');
+        expect(writtenContent).not.toContain('Klaviyo.handlePush');
+        expect(writtenContent).not.toContain('// @generated begin klaviyo-');
+      });
+    });
+
+    describe('idempotency', () => {
+      it('does not duplicate onCreate injection on multiple runs', async () => {
+        const javaMainActivityWithOnCreate = `package com.example.test;
+
+import com.facebook.react.ReactActivity;
+
+public class MainActivity extends ReactActivity {
+  @Override
+  protected void onCreate(android.os.Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+  }
+}`;
+
+        const mockFindMainActivity = jest.fn().mockResolvedValue({ path: '/test/MainActivity.java', isKotlin: false });
+        fs.readFileSync.mockReturnValue(javaMainActivityWithOnCreate);
+
+        // Run twice
+        await modifyMainActivity(baseConfig, baseProps, mockFindMainActivity);
+        const firstRunContent = fs.writeFileSync.mock.calls[0][1];
+
+        // Simulate reading the modified content
+        fs.readFileSync.mockReturnValue(firstRunContent);
+        fs.writeFileSync.mockClear();
+
+        await modifyMainActivity(baseConfig, baseProps, mockFindMainActivity);
+        const secondRunContent = fs.writeFileSync.mock.calls[0][1];
+
+        // Count occurrences of the injection
+        const handlePushMatches = (secondRunContent.match(/Klaviyo\.handlePush\(getIntent\(\)\);/g) || []).length;
+        expect(handlePushMatches).toBe(1); // Should only appear once
+      });
     });
   });
 
