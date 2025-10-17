@@ -73,7 +73,37 @@ jest.mock('@expo/config-plugins', () => ({
 
 // Mock @expo/config-plugins/build/utils/generateCode
 jest.mock('@expo/config-plugins/build/utils/generateCode', () => ({
-  mergeContents: jest.fn(),
+  mergeContents: jest.fn().mockImplementation((options) => {
+    // Simple mock implementation that adds newSrc to src
+    const { src, newSrc, anchor, offset, tag, comment } = options;
+
+    // Check if the content already has this tag
+    const tagRegex = new RegExp(`${comment}\\s*@generated begin ${tag}[\\s\\S]*?${comment}\\s*@generated end ${tag}`, 'g');
+    if (tagRegex.test(src)) {
+      // Content already exists, return as-is
+      return { contents: src };
+    }
+
+    // Find the anchor in the source
+    const lines = src.split('\n');
+    const anchorIndex = lines.findIndex(line => anchor.test(line));
+
+    if (anchorIndex === -1) {
+      // If anchor not found, just append at the end
+      const beforeTag = comment ? `${comment} @generated begin ${tag} - expo prebuild (DO NOT MODIFY) sync-${tag}` : '';
+      const afterTag = comment ? `${comment} @generated end ${tag}` : '';
+      return { contents: src + '\n' + beforeTag + '\n' + newSrc + '\n' + afterTag };
+    }
+
+    // Insert newSrc after the anchor line + offset
+    const insertIndex = anchorIndex + (offset || 0);
+    const beforeTag = comment ? `${comment} @generated begin ${tag} - expo prebuild (DO NOT MODIFY) sync-${tag}` : '';
+    const afterTag = comment ? `${comment} @generated end ${tag}` : '';
+
+    lines.splice(insertIndex + 1, 0, beforeTag, newSrc, afterTag);
+
+    return { contents: lines.join('\n') };
+  }),
 }));
 
 // Mock @expo/config-plugins/build/android/Paths
