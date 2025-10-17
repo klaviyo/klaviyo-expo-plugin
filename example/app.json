@@ -38,7 +38,7 @@
         "klaviyo-expo-plugin",
         {
           "android": {
-            "logLevel": 6,
+            "logLevel": 1,
             "openTracking": true,
             "notificationIconFilePath": "./assets/images/ic_notification.png",
             "notificationColor": "#FF0000"
