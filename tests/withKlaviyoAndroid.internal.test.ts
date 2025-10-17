@@ -981,7 +981,7 @@ import android.os.Bundle
 class MainActivity : ReactActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.AppTheme);
-        super.onCreate(null)
+        super.onCreate(savedInstanceState)
     }
 
     override fun getMainComponentName(): String {
@@ -997,13 +997,13 @@ class MainActivity : ReactActivity() {
         expect(fs.writeFileSync).toHaveBeenCalled();
         const writtenContent = fs.writeFileSync.mock.calls[0][1];
 
-        // Check that onNewIntent was injected after super.onCreate
-        expect(writtenContent).toContain('super.onCreate(null)');
+        // Check that Klaviyo.handlePush was injected after super.onCreate
+        expect(writtenContent).toContain('super.onCreate(savedInstanceState)');
         expect(writtenContent).toContain('// @generated begin klaviyo-onCreate');
         expect(writtenContent).toContain('// @generated end klaviyo-onCreate');
 
         // Verify order: super.onCreate should come before the onCreate injection block
-        const superIndex = writtenContent.indexOf('super.onCreate(null)');
+        const superIndex = writtenContent.indexOf('super.onCreate(savedInstanceState)');
         const onCreateBlockIndex = writtenContent.indexOf('// @generated begin klaviyo-onCreate');
         expect(superIndex).toBeLessThan(onCreateBlockIndex);
 

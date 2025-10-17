@@ -273,12 +273,12 @@ export async function modifyMainActivity(
       // If onCreate exists, inject the Klaviyo.handlePush call after super.onCreate
       KlaviyoLog.log('Found existing onCreate, injecting Klaviyo.handlePush call...');
       const onCreateInjection = isKotlin ?
-        'super.onCreate(null)\n        // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate\n        Klaviyo.handlePush(intent)\n        // @generated end klaviyo-onCreate' :
-        'super.onCreate(savedInstanceState);\n        // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate\n        Klaviyo.handlePush(getIntent());\n        // @generated end klaviyo-onCreate';
+        'super.onCreate($1)\n        // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate\n        Klaviyo.handlePush(intent)\n        // @generated end klaviyo-onCreate' :
+        'super.onCreate($1);$2\n        // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate\n        Klaviyo.handlePush(getIntent());\n        // @generated end klaviyo-onCreate';
 
       const onCreateReplacement = isKotlin ?
-        /super\.onCreate\(null\)/m :
-        /super\.onCreate\(savedInstanceState\);/m;
+        /super\.onCreate\(([^)]*)\)/m :
+        /super\.onCreate\(([^)]*)\)(;?)/m;
 
       // Remove any existing onCreate injection first
       finalContents = finalContents.replace(
