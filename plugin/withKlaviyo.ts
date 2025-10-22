@@ -6,7 +6,7 @@ import { validateAndroidConfig, validateIosConfig } from './support/validateConf
 import * as path from 'path';
 import { KlaviyoLog } from './support/logger';
 
-const withKlaviyo: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
+const withKlaviyo: ConfigPlugin<KlaviyoPluginProps | undefined> = (config, props) => {
   KlaviyoLog.log('Running prebuild configuration');
 
   const mergedProps = mergeProps(props);

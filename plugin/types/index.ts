@@ -61,10 +61,10 @@ export const mergeIosProps = (props?: KlaviyoPluginIosBaseProps): KlaviyoPluginI
   return { ...IOS_DEFAULTS, ...(props ?? {}) };
 };
 
-export const mergeProps = (props: KlaviyoPluginProps): KlaviyoPluginPropsDefaultValues => {
+export const mergeProps = (props?: KlaviyoPluginProps): KlaviyoPluginPropsDefaultValues => {
   return {
-    android: mergeAndroidProps(props.android),
-    ios: mergeIosProps(props.ios)
+    android: mergeAndroidProps(props?.android),
+    ios: mergeIosProps(props?.ios)
   };
 };
 
