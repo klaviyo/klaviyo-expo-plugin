@@ -88,7 +88,7 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> 
   return withAndroidManifest(config, (config) => mutateAndroidManifest(config, props));
 };
 
-export async function modifyMainActivity(
+export function modifyMainActivity(
   language: 'kt' | 'java',
   props: KlaviyoPluginAndroidProps,
   mainActivityContents: string
@@ -238,7 +238,7 @@ export async function modifyMainActivity(
 const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withMainActivity(config, async (conf) => {
     const language = conf.modResults.language;
-    conf.modResults.contents = await modifyMainActivity(language, props, conf.modResults.contents);
+    conf.modResults.contents = modifyMainActivity(language, props, conf.modResults.contents);
     return conf;
   });
 };
