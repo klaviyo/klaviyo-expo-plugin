@@ -1,4 +1,4 @@
-import { ConfigPlugin, withDangerousMod, withAndroidManifest, withStringsXml, withPlugins } from '@expo/config-plugins';
+import { ConfigPlugin, withDangerousMod, withAndroidManifest, withStringsXml, withPlugins, withMainActivity } from '@expo/config-plugins';
 import * as fs from 'fs';
 import * as path from 'path';
 import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
@@ -88,97 +88,18 @@ const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> 
   return withAndroidManifest(config, (config) => mutateAndroidManifest(config, props));
 };
 
-const findMainActivity = async (projectRoot: string): Promise<{ path: string; isKotlin: boolean } | null> => {
-  KlaviyoLog.log(`Searching for MainActivity in: ${projectRoot}`);
-  
-  // First try Expo's built-in detection
-  try {
-    const expoMainActivity = await getMainActivityAsync(projectRoot);
-    const mainActivityPath = expoMainActivity?.toString();
-    if (mainActivityPath && fs.existsSync(mainActivityPath)) {
-      KlaviyoLog.log(`Found MainActivity using Expo detection: ${mainActivityPath}`);
-      return {
-        path: mainActivityPath,
-        isKotlin: mainActivityPath.endsWith('.kt')
-      };
-    }
-  } catch (e: unknown) {
-    KlaviyoLog.error('Could not find main activity using Expo detection: ' + (e instanceof Error ? e.message : String(e)));
-  }
-
-  // Fall back to searching for ReactActivity
-  const possibleJavaDirs = [
-    path.join(projectRoot, 'app', 'src', 'main', 'java'),
-    path.join(projectRoot, 'src', 'main', 'java'),
-    path.join(projectRoot, 'java')
-  ];
-
-  for (const javaDir of possibleJavaDirs) {
-    KlaviyoLog.log(`Checking directory: ${javaDir}`);
-    if (!fs.existsSync(javaDir)) {
-      KlaviyoLog.log(`Directory does not exist: ${javaDir}`);
-      continue;
-    }
-
-    // Search for both .kt and .java files
-    const kotlinFiles = glob.sync('**/*.kt', { cwd: javaDir });
-    const javaFiles = glob.sync('**/*.java', { cwd: javaDir });
-    KlaviyoLog.log(`Found ${kotlinFiles.length} Kotlin files and ${javaFiles.length} Java files in ${javaDir}`);
-    
-    // Check Kotlin files first
-    for (const file of kotlinFiles) {
-      const filePath = path.join(javaDir, file);
-      const content = fs.readFileSync(filePath, 'utf-8');
-      if (content.includes('class') && (content.includes(': ReactActivity') || content.includes('extends ReactActivity'))) {
-        KlaviyoLog.log(`Found ReactActivity in Kotlin file: ${filePath}`);
-        return { path: filePath, isKotlin: true };
-      }
-    }
-
-    // Then check Java files
-    for (const file of javaFiles) {
-      const filePath = path.join(javaDir, file);
-      const content = fs.readFileSync(filePath, 'utf-8');
-      if (content.includes('class') && content.includes('extends ReactActivity')) {
-        KlaviyoLog.log(`Found ReactActivity in Java file: ${filePath}`);
-        return { path: filePath, isKotlin: false };
-      }
-    }
-  }
-
-  KlaviyoLog.error('Could not find MainActivity in any of the expected locations');
-  return null;
-};
-
 export async function modifyMainActivity(
-  config: { android?: { package?: string }, modRequest: { platformProjectRoot: string } },
+  language: 'kt' | 'java',
   props: KlaviyoPluginAndroidProps,
-  findMainActivityImpl = findMainActivity
+  mainActivityContents: string
 ) {
   KlaviyoLog.log('Modifying MainActivity');
   KlaviyoLog.log(`OpenTracking setting: ${props.openTracking}`);
   
-  if (!config.android?.package) {
-    throw new Error('Android package not found in app config');
-  }
-
-  const mainActivityInfo = await findMainActivityImpl(config.modRequest.platformProjectRoot);
-
-  if (!mainActivityInfo) {
-    throw new Error('Could not find main activity file. Please ensure your app has a valid ReactActivity.');
-  }
-
-  const { path: mainActivityPath, isKotlin } = mainActivityInfo;
-  KlaviyoLog.log(`MainActivity path: ${mainActivityPath}`);
-  KlaviyoLog.log(`MainActivity language: ${isKotlin ? 'Kotlin' : 'Java'}`);
-
-  if (!fs.existsSync(mainActivityPath)) {
-    throw new Error(`MainActivity not found at path: ${mainActivityPath}`);
-  }
+  const isKotlin = language === 'kt';
 
   // Read the current content
-  const mainActivityContent = fs.readFileSync(mainActivityPath, 'utf-8');
-  KlaviyoLog.log(`Found MainActivity, current size: ${mainActivityContent.length} bytes`);
+  const mainActivityContent = mainActivityContents;
 
   // Find the package declaration line to use as our anchor
   const packageMatch = mainActivityContent.match(/^package .+$/m);
@@ -306,22 +227,20 @@ export async function modifyMainActivity(
     }
 
     // Write the modified content back to the file
-    fs.writeFileSync(mainActivityPath, finalContents);
+    return finalContents;
   } else {
     KlaviyoLog.log('Removing push tracking code from MainActivity...');
     // Write the cleaned content back
-    fs.writeFileSync(mainActivityPath, cleanedContent);
+    return cleanedContent;
   }
 }
 
 const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
-  return withDangerousMod(config, [
-    'android',
-    async (config) => {
-      await modifyMainActivity(config, props);
-      return config;
-    },
-  ]);
+  return withMainActivity(config, async (conf) => {
+    const language = conf.modResults.language;
+    conf.modResults.contents = await modifyMainActivity(language, props, conf.modResults.contents);
+    return conf;
+  });
 };
 
 interface ColorResourceConfig {
@@ -574,6 +493,6 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
 };
 
 // TEST ONLY exports
-export { findMainActivity, withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest, createColorResource, mutateAndroidManifest };
+export { withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest, createColorResource, mutateAndroidManifest };
 
 export default withKlaviyoAndroid; 
