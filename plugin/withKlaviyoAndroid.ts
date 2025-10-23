@@ -2,8 +2,6 @@ import { ConfigPlugin, withDangerousMod, withAndroidManifest, withStringsXml, wi
 import * as fs from 'fs';
 import * as path from 'path';
 import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
-import { getMainActivityAsync } from '@expo/config-plugins/build/android/Paths';
-import * as glob from 'glob';
 import {
   KlaviyoPluginAndroidProps,
   KlaviyoAndroidModResults
