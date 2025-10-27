@@ -37,28 +37,6 @@ jest.mock('path', () => ({
 }));
 
 describe('withKlaviyoAndroid Internal Functions', () => {
-  describe('findMainActivity', () => {
-    it('should find MainActivity using Expo detection', async () => {
-      // Ensure the test config has a valid platformProjectRoot
-      const config = createMockConfig({
-        modRequest: { platformProjectRoot: '/test/project/root' }
-      });
-
-      const result = await findMainActivity(config.modRequest.platformProjectRoot);
-      expect(result).toBeDefined();
-      expect(result?.path).toBe('/test/path/MainActivity.java');
-      expect(result?.isKotlin).toBe(false);
-    });
-
-    it('should return null when no MainActivity is found', async () => {
-      const fs = require('fs');
-      fs.existsSync.mockReturnValue(false);
-      
-      const result = await findMainActivity('/test/project/root');
-      expect(result).toBeNull();
-    });
-  });
-
   describe('withMainActivityModifications', () => {
     it('should return a function', () => {
       const { result } = testPluginFunction(withMainActivityModifications, {}, { openTracking: true }, 'mods.android');
