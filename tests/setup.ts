@@ -69,6 +69,26 @@ jest.mock('@expo/config-plugins', () => ({
     return result || modifiedConfig;
   }),
   withXcodeProject: jest.fn().mockImplementation((config, mod) => config),
+  withMainActivity: jest.fn().mockImplementation((config, action) => {
+    const modifiedConfig = {
+      ...config,
+      modResults: {
+        language: 'java',
+        contents: `package com.example.test;
+
+import com.facebook.react.ReactActivity;
+
+public class MainActivity extends ReactActivity {
+  @Override
+  protected String getMainComponentName() {
+    return "main";
+  }
+}`
+      }
+    };
+    const result = action(modifiedConfig);
+    return result || modifiedConfig;
+  }),
 }));
 
 // Mock @expo/config-plugins/build/utils/generateCode
