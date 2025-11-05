@@ -136,6 +136,8 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
     const actualAppGroupName = `group.${bundleIdentifier}.${NSE_TARGET_NAME}.shared`;
     infoPlist.klaviyo_app_group = actualAppGroupName;
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
+    infoPlist.CFBundleShortVersionString = props.marketingVersion || "1.0";
+    infoPlist.CFBundleVersion = props.projectVersion || "1";
     return config;
   });
 };
@@ -269,7 +271,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
 /**
  * Adds the Klaviyo files to the NotificationServiceExtension target.
  */
-const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
+const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withDangerousMod(config, [
     'ios',
     async config => {
@@ -307,6 +309,24 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
             
             await FileManager.writeFile(entitlementsPath, entitlementsContent);
             KlaviyoLog.log(`Updated entitlements file with bundle identifier: ${bundleIdentifier}`);
+          }
+          
+          if (file === `${NSE_TARGET_NAME}-Info.plist`) {
+            const marketingVersion = props.marketingVersion || "1.0";
+            const buildNumber = props.projectVersion || "1";
+            const infoPlistPath = path.join(nsePath, file);
+            let infoPlistContent = await FileManager.readFile(infoPlistPath);
+            infoPlistContent = infoPlistContent.replace(
+              /(<key>CFBundleShortVersionString<\/key>\s*<string>)[^<]*(<\/string>)/,
+              `$1${marketingVersion}$2`
+            );
+            infoPlistContent = infoPlistContent.replace(
+              /(<key>CFBundleVersion<\/key>\s*<string>)[^<]*(<\/string>)/,
+              `$1${buildNumber}$2`
+            );
+            
+            await FileManager.writeFile(infoPlistPath, infoPlistContent);
+            KlaviyoLog.log(`Updated Info.plist with version ${marketingVersion} (build ${buildNumber})`);
           }
         } catch (error) {
           KlaviyoLog.error(`Failed to copy ${file}: ${error}`);
