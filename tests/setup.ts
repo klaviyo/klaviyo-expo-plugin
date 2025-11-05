@@ -15,8 +15,8 @@ jest.mock('fs', () => ({
 // Mock path module
 jest.mock('path', () => ({
   ...jest.requireActual('path'),
-  join: jest.fn(),
-  resolve: jest.fn(),
+  join: jest.fn((...args) => args.join('/')),
+  resolve: jest.fn((...args) => args.join('/')),
 }));
 
 // Mock glob module
@@ -148,4 +148,9 @@ jest.mock('../plugin/support/fileManager', () => ({
     copyFile: jest.fn(),
     dirExists: jest.fn(),
   },
+}));
+
+// Mock the plugin resolver
+jest.mock('../plugin/support/pluginResolver', () => ({
+  getPluginRoot: jest.fn().mockReturnValue('/mock/plugin/root'),
 })); 
