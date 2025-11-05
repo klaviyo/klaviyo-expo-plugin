@@ -21,11 +21,7 @@
       },
       "package": "com.klaviyo.expoexample",
       "jsEngine": "hermes",
-      "useNextNotificationsApi": true,
-      "googleServicesFile": "./google-services.json",
-      "notification": {
-        "defaultChannelId": "default"
-      }
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",

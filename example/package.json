@@ -17,27 +17,30 @@
   "dependencies": {
     "@babel/runtime": "^7.24.0",
     "@expo/vector-icons": "^15.0.2",
-    "@react-native-async-storage/async-storage": "^1.23.1",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "54.0.22",
     "expo-asset": "^12.0.8",
+    "expo-constants": "~18.0.10",
     "expo-font": "^14.0.7",
-    "expo-linking": "~7.1.5",
-    "expo-notifications": "~0.29.14",
-    "expo-router": "~5.0.6",
-    "expo-status-bar": "~2.2.3",
-    "expo-task-manager": "^13.1.5",
-    "klaviyo-expo-plugin": "file:../",
+    "expo-linking": "~8.0.8",
+    "expo-notifications": "~0.32.12",
+    "expo-router": "~6.0.14",
+    "expo-status-bar": "~3.0.8",
+    "expo-task-manager": "~14.0.8",
+    "klaviyo-expo-plugin": "github:klaviyo/klaviyo-expo-plugin#bl/0.1.2",
     "klaviyo-react-native-sdk": "^2.1.0",
-    "react": "19.1.1",
-    "react-native": "0.82.1",
+    "memoize-one": "^6.0.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
     "react-native-safe-area-context": "^5.6.2",
-    "react-native-screens": "^4.18.0"
+    "react-native-screens": "~4.16.0",
+    "whatwg-url-without-unicode": "^8.0.0-3"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@react-native/metro-config": "^0.79.2",
-    "@types/react": "^19.1.1",
-    "typescript": "~5.8.3"
+    "@types/react": "~19.1.10",
+    "typescript": "~5.9.2"
   },
   "private": true
 }
