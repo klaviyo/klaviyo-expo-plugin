@@ -27,7 +27,7 @@
     "expo-router": "~6.0.14",
     "expo-status-bar": "~3.0.8",
     "expo-task-manager": "~14.0.8",
-    "klaviyo-expo-plugin": "github:klaviyo/klaviyo-expo-plugin#bl/0.1.2",
+    "klaviyo-expo-plugin": "file:../",
     "klaviyo-react-native-sdk": "^2.1.0",
     "memoize-one": "^6.0.0",
     "react": "19.1.0",
