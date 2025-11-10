@@ -24,6 +24,9 @@ build/
 .DS_Store
 *.pem
 
+# AI agent local configuration files
+.claude/
+
 # Testing
 coverage/
 .nyc_output/

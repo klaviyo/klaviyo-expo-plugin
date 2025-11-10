@@ -1,0 +1,12 @@
+# Cursor AI Configuration
+# This file configures Cursor's AI assistant for this repository
+
+# Primary guidance document
+Please read and follow the guidelines in AGENTS.md
+
+# Additional Cursor-specific guidance
+- When generating code, always check AGENTS.md for repo-specific patterns
+- Follow Expo plugin best practices outlined in AGENTS.md
+- Respect the TypeScript and testing conventions described in AGENTS.md
+- Verify plugin modifications work on both iOS and Android before committing
+- Test with the example app to ensure plugin behavior is correct
