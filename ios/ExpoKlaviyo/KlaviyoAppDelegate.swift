@@ -1,5 +1,6 @@
 import ExpoModulesCore
 import KlaviyoSwift
+import KlaviyoLocation
 
 public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotificationCenterDelegate {
     
@@ -11,6 +12,7 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
         originalDelegate = center.delegate
         // Allow Klaviyo to intercept notifications
         center.delegate = self
+        KlaviyoSDK().monitorGeofencesFromBackground()
         return true
     }
     
