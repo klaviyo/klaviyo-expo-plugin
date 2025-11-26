@@ -13,6 +13,7 @@ const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withPlugins(config, [
     withKlaviyoPluginConfigurationPlist,
     withRemoteNotificationsPermissions,
+    withGeofencingConfig,
     withKlaviyoPodfile,
     withKlaviyoXcodeProject,
     withKlaviyoNSE,
@@ -138,6 +139,67 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
     infoPlist.CFBundleShortVersionString = props.marketingVersion || "1.0";
     infoPlist.CFBundleVersion = props.projectVersion || "1";
+    return config;
+  });
+};
+
+/**
+ * Adds geofencing configuration including location permissions and UIBackgroundModes.
+ */
+const withGeofencingConfig: ConfigPlugin<KlaviyoPluginIosProps> = (
+  config,
+  props
+) => {
+  KlaviyoLog.log('Checking geofencing configuration...');
+  KlaviyoLog.log('Geofencing props: ' + JSON.stringify(props.geofencing));
+  
+  if (!props.geofencing?.enabled) {
+    KlaviyoLog.log('Geofencing is not enabled, skipping geofencing configuration...');
+    return config;
+  }
+
+  const geofencing = props.geofencing;
+  KlaviyoLog.log('Setting up geofencing configuration...');
+
+  return withInfoPlist(config, (config) => {
+    const infoPlist = config.modResults;
+
+    // Add location permission keys
+    if (geofencing.locationAlwaysAndWhenInUseUsageDescription) {
+      infoPlist.NSLocationAlwaysAndWhenInUseUsageDescription = 
+        geofencing.locationAlwaysAndWhenInUseUsageDescription;
+      KlaviyoLog.log('Added NSLocationAlwaysAndWhenInUseUsageDescription to Info.plist');
+    }
+
+    if (geofencing.locationAlwaysUsageDescription) {
+      infoPlist.NSLocationAlwaysUsageDescription = 
+        geofencing.locationAlwaysUsageDescription;
+      KlaviyoLog.log('Added NSLocationAlwaysUsageDescription to Info.plist');
+    }
+
+    // Add UIBackgroundModes (location and fetch)
+    // Check both modResults and config.ios.infoPlist for existing modes
+    const existingFromModResults = infoPlist.UIBackgroundModes || [];
+    const existingFromConfig = config.ios?.infoPlist?.UIBackgroundModes || [];
+    const existingBackgroundModes = Array.isArray(existingFromModResults) 
+      ? existingFromModResults 
+      : Array.isArray(existingFromConfig) 
+        ? existingFromConfig 
+        : [];
+    
+    const backgroundModesToAdd = ['location', 'fetch'];
+    const updatedBackgroundModes = [...existingBackgroundModes];
+
+    backgroundModesToAdd.forEach(mode => {
+      if (!updatedBackgroundModes.includes(mode)) {
+        updatedBackgroundModes.push(mode);
+        KlaviyoLog.log(`Added ${mode} to UIBackgroundModes`);
+      }
+    });
+
+    infoPlist.UIBackgroundModes = updatedBackgroundModes;
+    KlaviyoLog.log(`Final UIBackgroundModes: ${JSON.stringify(updatedBackgroundModes)}`);
+
     return config;
   });
 };

@@ -46,6 +46,11 @@ module.exports = () => {
             projectVersion: '3',
             marketingVersion: '0.1.2',
             devTeam: 'XXXXXXXXXX',
+            geofencing: {
+              enabled: true,
+              locationAlwaysAndWhenInUseUsageDescription: "We need your location to send you relevant notifications",
+              locationAlwaysUsageDescription: "We need your location to send you relevant notifications"
+            }
           },
         },
       ],

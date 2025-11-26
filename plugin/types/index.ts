@@ -11,6 +11,11 @@ export interface KlaviyoPluginIosBaseProps  {
   projectVersion: string;
   marketingVersion: string;
   devTeam?: string;
+  geofencing?: {
+    enabled: boolean;
+    locationAlwaysAndWhenInUseUsageDescription?: string;
+    locationAlwaysUsageDescription?: string;
+  };
 }
 
 export interface KlaviyoPluginProps {
@@ -31,6 +36,11 @@ export interface KlaviyoPluginIosProps extends KlaviyoPluginIosBaseProps {
   projectVersion: string;
   marketingVersion: string;
   devTeam: string | undefined;
+  geofencing?: {
+    enabled: boolean;
+    locationAlwaysAndWhenInUseUsageDescription?: string;
+    locationAlwaysUsageDescription?: string;
+  };
 }
 
 export interface KlaviyoPluginPropsDefaultValues extends KlaviyoPluginProps {
