@@ -13,6 +13,8 @@ const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withPlugins(config, [
     withKlaviyoPluginConfigurationPlist,
     withRemoteNotificationsPermissions,
+    withGeofencingConfig,
+    withGeofencingPodspec,
     withKlaviyoPodfile,
     withKlaviyoXcodeProject,
     withKlaviyoNSE,
@@ -143,6 +145,136 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
 };
 
 /**
+ * Logs geofencing configuration status.
+ * Location permission strings are handled by expo-location, not this plugin.
+ */
+const withGeofencingConfig: ConfigPlugin<KlaviyoPluginIosProps> = (
+  config,
+  props
+) => {
+  KlaviyoLog.log('Checking geofencing configuration...');
+  KlaviyoLog.log('Geofencing props: ' + JSON.stringify(props.geofencing));
+  
+  if (!props.geofencing?.enabled) {
+    KlaviyoLog.log('Geofencing is not enabled, skipping geofencing configuration...');
+  } else {
+    KlaviyoLog.log('Geofencing is enabled. Location permissions should be configured via expo-location.');
+  }
+
+  return config;
+};
+
+/**
+ * Injects KlaviyoLocation dependency into the podspec and adds location background mode if geofencing is enabled.
+ */
+const withGeofencingPodspec: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
+  const geofencingEnabled = props.geofencing?.enabled ?? false;
+  
+  // Handle podspec and Swift file modifications
+  config = withDangerousMod(config, [
+    'ios',
+    async config => {
+      const pluginRoot = getPluginRoot();
+      const podspecPath = path.join(pluginRoot, 'ios', 'ExpoKlaviyo.podspec');
+      const swiftPath = path.join(pluginRoot, 'ios', 'ExpoKlaviyo', 'KlaviyoAppDelegate.swift');
+      
+      if (geofencingEnabled) {
+        // Inject KlaviyoLocation dependency into podspec
+        try {
+          let podspecContent = await FileManager.readFile(podspecPath);
+          podspecContent = podspecContent.replace(
+            "# KLAVIYO_LOCATION_DEPENDENCY",
+            "s.dependency 'KlaviyoLocation' # KLAVIYO_LOCATION_DEPENDENCY"
+          );
+          await FileManager.writeFile(podspecPath, podspecContent);
+          KlaviyoLog.log('Injected KlaviyoLocation dependency into podspec');
+        } catch (err) {
+          KlaviyoLog.log('Could not configure podspec for geofencing: ' + err);
+        }
+        
+        // Inject import and registerGeofencing into KlaviyoAppDelegate.swift
+        try {
+          let swiftContent = await FileManager.readFile(swiftPath);
+          swiftContent = swiftContent.replace(
+            "// KLAVIYO_GEOFENCING_IMPORT",
+            "import KlaviyoLocation // KLAVIYO_GEOFENCING_IMPORT"
+          );
+          swiftContent = swiftContent.replace(
+            "// KLAVIYO_GEOFENCING_REGISTER",
+            "KlaviyoSDK().registerGeofencing() // KLAVIYO_GEOFENCING_REGISTER"
+          );
+          await FileManager.writeFile(swiftPath, swiftContent);
+          KlaviyoLog.log('Injected KlaviyoLocation import and registerGeofencing() into KlaviyoAppDelegate.swift');
+        } catch (err) {
+          KlaviyoLog.log('Could not configure KlaviyoAppDelegate for geofencing: ' + err);
+        }
+      } else {
+        // Remove geofencing code but keep placeholders
+        try {
+          let podspecContent = await FileManager.readFile(podspecPath);
+          podspecContent = podspecContent.replace(
+            /s\.dependency 'KlaviyoLocation' # KLAVIYO_LOCATION_DEPENDENCY/g,
+            "# KLAVIYO_LOCATION_DEPENDENCY"
+          );
+          await FileManager.writeFile(podspecPath, podspecContent);
+          KlaviyoLog.log('Removed KlaviyoLocation dependency from podspec');
+        } catch (err) {
+          KlaviyoLog.log('Could not remove podspec geofencing config: ' + err);
+        }
+        
+        try {
+          let swiftContent = await FileManager.readFile(swiftPath);
+          swiftContent = swiftContent.replace(
+            /import KlaviyoLocation \/\/ KLAVIYO_GEOFENCING_IMPORT/g,
+            "// KLAVIYO_GEOFENCING_IMPORT"
+          );
+          swiftContent = swiftContent.replace(
+            /KlaviyoSDK\(\)\.registerGeofencing\(\) \/\/ KLAVIYO_GEOFENCING_REGISTER/g,
+            "// KLAVIYO_GEOFENCING_REGISTER"
+          );
+          await FileManager.writeFile(swiftPath, swiftContent);
+          KlaviyoLog.log('Removed KlaviyoLocation import and registerGeofencing() from KlaviyoAppDelegate.swift');
+        } catch (err) {
+          KlaviyoLog.log('Could not remove KlaviyoAppDelegate geofencing config: ' + err);
+        }
+      }
+      
+      return config;
+    },
+  ]);
+
+  if (!geofencingEnabled) {
+    KlaviyoLog.log('Geofencing not enabled, skipping background mode configuration');
+    return config;
+  }
+
+  // Add location to UIBackgroundModes via Info.plist
+  return withInfoPlist(config, (config) => {
+    const infoPlist = config.modResults;
+    
+    const existingFromModResults = infoPlist.UIBackgroundModes || [];
+    const existingFromConfig = config.ios?.infoPlist?.UIBackgroundModes || [];
+    const existingBackgroundModes = Array.isArray(existingFromModResults) 
+      ? existingFromModResults 
+      : Array.isArray(existingFromConfig) 
+        ? existingFromConfig 
+        : [];
+    
+    const updatedBackgroundModes = [...existingBackgroundModes];
+    
+    if (!updatedBackgroundModes.includes('location')) {
+      updatedBackgroundModes.push('location');
+      KlaviyoLog.log('Added location to UIBackgroundModes');
+    }
+    
+    infoPlist.UIBackgroundModes = updatedBackgroundModes;
+    KlaviyoLog.log(`Final UIBackgroundModes: ${JSON.stringify(updatedBackgroundModes)}`);
+    
+    return config;
+  });
+};
+
+/**
  * Adds necessary Klaviyo pods to the Podfile setup.
  */
 const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
@@ -150,6 +282,7 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
     'ios',
     async config => {
       const iosRoot = path.join(config.modRequest.projectRoot, "ios");
+      
       try {
         const podfile = await FileManager.readFile(`${iosRoot}/Podfile`);
         // Check for both standard and linkage-specific use_frameworks!

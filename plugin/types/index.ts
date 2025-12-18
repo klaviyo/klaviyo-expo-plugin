@@ -11,6 +11,9 @@ export interface KlaviyoPluginIosBaseProps  {
   projectVersion: string;
   marketingVersion: string;
   devTeam?: string;
+  geofencing?: {
+    enabled?: boolean;
+  };
 }
 
 export interface KlaviyoPluginProps {
@@ -31,6 +34,9 @@ export interface KlaviyoPluginIosProps extends KlaviyoPluginIosBaseProps {
   projectVersion: string;
   marketingVersion: string;
   devTeam: string | undefined;
+  geofencing?: {
+    enabled?: boolean;
+  };
 }
 
 export interface KlaviyoPluginPropsDefaultValues extends KlaviyoPluginProps {

@@ -15,6 +15,9 @@
     - [iOS Setup](#ios-setup)
     - [Android Setup](#android-setup)
     - [React Native Code](#react-native-code)
+  - [Geofencing](#geofencing)
+    - [Configuration](#geofencing-configuration)
+    - [Requesting Permissions](#requesting-permissions)
   - [Example app](#example-app)
   - [Troubleshooting](#troubleshooting)
   - [License](#license)
@@ -113,6 +116,7 @@ npx expo prebuild
 |`ios.projectVersion`| string | optional | The internal build number for version. Default: `"1"`|
 |`ios.marketingVersion`| string | optional| The app version displayed in the App Store. Must be of the format "X.X" or "X.X.X". Default: `"1.0"`|
 |`ios.devTeam`| string | optional| The 10-digit alphanumeric Apple Development Team ID associated with the necessary signing capabilites, provisioning profile, etc. Format: "XXXXXXXXXX" Default: `undefined`|
+|`ios.geofencing`| object | optional | Configuration object for enabling geofencing/location tracking support. See [Geofencing](#geofencing) below. Default: `undefined` (geofencing disabled)|
 
 Note: If you do not need to specify any of these for your project, it will use the defaults defined here. If you do not specify any of these props, you can add the plugin without additional arguments:
 ```
@@ -295,6 +299,72 @@ export default function App() {
 4. Your app navigates to the appropriate screen based on the destination URL
 
 For more information on deep linking with Expo, see [Expo's Linking documentation](https://docs.expo.dev/guides/linking/).
+
+## Geofencing
+
+Geofencing enables location-based marketing by allowing Klaviyo to trigger events when users enter or exit specific geographic regions.
+
+### Configuration
+
+To enable geofencing support, add the `geofencing` configuration to your iOS plugin props:
+
+```json
+{
+  "expo": {
+    "plugins": [
+      [
+        "klaviyo-expo-plugin",
+        {
+          "ios": {
+            "geofencing": {
+              "enabled": true
+            }
+          }
+        }
+      ]
+    ]
+  }
+}
+```
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `enabled` | boolean | optional | Enables geofencing support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. Default: `false` |
+
+When geofencing is enabled, the plugin will:
+- Add the `KlaviyoLocation` pod dependency to the project
+- Import `KlaviyoLocation` and call `KlaviyoSDK().registerGeofencing()` in the app delegate
+- Add `location` to `UIBackgroundModes` in Info.plist
+
+### Requesting Permissions
+
+Users must grant location permissions at runtime. We recommend using `expo-location` (see docs [here](https://docs.expo.dev/versions/latest/sdk/location/)) to request permissions:
+
+```typescript
+import * as Location from 'expo-location';
+
+async function requestLocationPermissions() {
+  // First request foreground permission
+  const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
+  
+  if (foregroundStatus !== 'granted') {
+    console.log('Foreground location permission denied');
+    return;
+  }
+
+  // Then request background permission for geofencing
+  const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+  
+  if (backgroundStatus !== 'granted') {
+    console.log('Background location permission denied');
+    return;
+  }
+
+  console.log('Location permissions granted for geofencing');
+}
+```
+
+See the example app for a complete implementation.
 
 ## Example app
 
