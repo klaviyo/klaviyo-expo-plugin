@@ -79,4 +79,17 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
       throw new KlaviyoConfigError('iOS devTeam must be a 10-digit alphanumeric string');
     }
   }
+
+  // Validate geofencing
+  if (config.geofencing !== undefined) {
+    if (typeof config.geofencing !== 'object' || config.geofencing === null) {
+      throw new KlaviyoConfigError('iOS geofencing must be an object');
+    }
+
+    // Validate enabled (optional, defaults to false)
+    if (config.geofencing.enabled !== undefined && typeof config.geofencing.enabled !== 'boolean') {
+      throw new KlaviyoConfigError('iOS geofencing.enabled must be a boolean');
+    }
+
+  }
 };

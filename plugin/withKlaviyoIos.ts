@@ -145,10 +145,8 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
 };
 
 /**
- * Adds geofencing configuration including location permissions and UIBackgroundModes.
- */
-/**
- * Adds geofencing location permission strings to Info.plist.
+ * Logs geofencing configuration status.
+ * Location permission strings are handled by expo-location, not this plugin.
  */
 const withGeofencingConfig: ConfigPlugin<KlaviyoPluginIosProps> = (
   config,
@@ -159,30 +157,11 @@ const withGeofencingConfig: ConfigPlugin<KlaviyoPluginIosProps> = (
   
   if (!props.geofencing?.enabled) {
     KlaviyoLog.log('Geofencing is not enabled, skipping geofencing configuration...');
-    return config;
+  } else {
+    KlaviyoLog.log('Geofencing is enabled. Location permissions should be configured via expo-location.');
   }
 
-  const geofencing = props.geofencing;
-  KlaviyoLog.log('Setting up geofencing configuration...');
-
-  return withInfoPlist(config, (config) => {
-    const infoPlist = config.modResults;
-
-    // Add location permission keys
-    if (geofencing.locationAlwaysAndWhenInUseUsageDescription) {
-      infoPlist.NSLocationAlwaysAndWhenInUseUsageDescription = 
-        geofencing.locationAlwaysAndWhenInUseUsageDescription;
-      KlaviyoLog.log('Added NSLocationAlwaysAndWhenInUseUsageDescription to Info.plist');
-    }
-
-    if (geofencing.locationAlwaysUsageDescription) {
-      infoPlist.NSLocationAlwaysUsageDescription = 
-        geofencing.locationAlwaysUsageDescription;
-      KlaviyoLog.log('Added NSLocationAlwaysUsageDescription to Info.plist');
-    }
-
-    return config;
-  });
+  return config;
 };
 
 /**

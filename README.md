@@ -317,9 +317,7 @@ To enable geofencing support, add the `geofencing` configuration to your iOS plu
         {
           "ios": {
             "geofencing": {
-              "enabled": true,
-              "locationAlwaysAndWhenInUseUsageDescription": "We use your location to send you relevant offers and updates based on places you visit.",
-              "locationAlwaysUsageDescription": "We use your location in the background to send you relevant offers based on places you visit."
+              "enabled": true
             }
           }
         }
@@ -331,15 +329,14 @@ To enable geofencing support, add the `geofencing` configuration to your iOS plu
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `enabled` | boolean | required | Enables geofencing support. When `true`, adds `KlaviyoLocation` pod dependency, injects `import KlaviyoLocation` and `registerGeofencing()` into the app delegate, and adds `location` to `UIBackgroundModes`. Default: `false` |
-| `locationAlwaysAndWhenInUseUsageDescription` | string | optional | The message displayed when requesting "Always and When In Use" location permission. Added to `NSLocationAlwaysAndWhenInUseUsageDescription` in Info.plist. |
-| `locationAlwaysUsageDescription` | string | optional | The message displayed when requesting "Always" location permission. Added to `NSLocationAlwaysUsageDescription` in Info.plist. |
+| `enabled` | boolean | optional | Enables geofencing support. When `true`, adds `KlaviyoLocation` pod dependency, injects `import KlaviyoLocation` and `registerGeofencing()` into the app delegate, and adds `location` to `UIBackgroundModes`. Default: `false` |
 
 When geofencing is enabled, the plugin will:
 - Add the `KlaviyoLocation` pod dependency to the project
 - Import `KlaviyoLocation` and call `KlaviyoSDK().registerGeofencing()` in the app delegate
 - Add `location` to `UIBackgroundModes` in Info.plist
-- Add the location permission strings to Info.plist (if provided)
+
+> **Note:** Location permission strings (e.g., `NSLocationAlwaysAndWhenInUseUsageDescription`) are automatically handled by `expo-location` when installed. You do not need to configure them in this plugin.
 
 ### Requesting Permissions
 
