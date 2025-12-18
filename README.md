@@ -329,18 +329,16 @@ To enable geofencing support, add the `geofencing` configuration to your iOS plu
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `enabled` | boolean | optional | Enables geofencing support. When `true`, adds `KlaviyoLocation` pod dependency, injects `import KlaviyoLocation` and `registerGeofencing()` into the app delegate, and adds `location` to `UIBackgroundModes`. Default: `false` |
+| `enabled` | boolean | optional | Enables geofencing support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. Default: `false` |
 
 When geofencing is enabled, the plugin will:
 - Add the `KlaviyoLocation` pod dependency to the project
 - Import `KlaviyoLocation` and call `KlaviyoSDK().registerGeofencing()` in the app delegate
 - Add `location` to `UIBackgroundModes` in Info.plist
 
-> **Note:** Location permission strings (e.g., `NSLocationAlwaysAndWhenInUseUsageDescription`) are automatically handled by `expo-location` when installed. You do not need to configure them in this plugin.
-
 ### Requesting Permissions
 
-Users must grant location permissions at runtime. We recommend using `expo-location` to request permissions:
+Users must grant location permissions at runtime. We recommend using `expo-location` (see docs [here](https://docs.expo.dev/versions/latest/sdk/location/)) to request permissions:
 
 ```typescript
 import * as Location from 'expo-location';
