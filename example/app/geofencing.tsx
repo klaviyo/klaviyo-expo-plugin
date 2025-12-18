@@ -17,6 +17,7 @@ export default function GeofencingScreen() {
 
   useEffect(() => {
     checkLocationPermission();
+    fetchCurrentGeofences();
   }, []);
 
   const checkLocationPermission = async () => {
@@ -182,48 +183,44 @@ export default function GeofencingScreen() {
           </>
         )}
 
-        {geofencingEnabled && (
-          <>
-            <View style={styles.statusContainer}>
-              <Text style={styles.statusText}>✓ Geofencing is active</Text>
-              <Text style={styles.statusSubtext}>
-                The app will now track geofence events based on your location.
-              </Text>
-            </View>
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>✓ Geofencing is active</Text>
+          <Text style={styles.statusSubtext}>
+            The app will now track geofence events based on your location.
+          </Text>
+        </View>
 
-            <TouchableOpacity
-              style={[styles.button, styles.fullWidthButton, styles.buttonSecondary]}
-              onPress={fetchCurrentGeofences}
-            >
-              <Text style={styles.buttonText}>Refresh Geofences</Text>
-            </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.fullWidthButton, styles.buttonSecondary]}
+          onPress={fetchCurrentGeofences}
+        >
+          <Text style={styles.buttonText}>Refresh Geofences</Text>
+        </TouchableOpacity>
 
-            <View style={styles.geofenceListContainer}>
-              <Text style={styles.geofenceListTitle}>
-                Current Geofences ({currentGeofences.length})
-              </Text>
-              {currentGeofences.length === 0 ? (
-                <Text style={styles.noGeofencesText}>
-                  No geofences configured. Geofences are fetched from your Klaviyo account.
+        <View style={styles.geofenceListContainer}>
+          <Text style={styles.geofenceListTitle}>
+            Current Geofences ({currentGeofences.length})
+          </Text>
+          {currentGeofences.length === 0 ? (
+            <Text style={styles.noGeofencesText}>
+              No geofences configured. Geofences are fetched from your Klaviyo account.
+            </Text>
+          ) : (
+            currentGeofences.map((geofence, index) => (
+              <View key={index} style={styles.geofenceItem}>
+                <Text style={styles.geofenceId}>
+                  {geofence.identifier}
                 </Text>
-              ) : (
-                currentGeofences.map((geofence, index) => (
-                  <View key={index} style={styles.geofenceItem}>
-                    <Text style={styles.geofenceId}>
-                      {geofence.identifier}
-                    </Text>
-                    <Text style={styles.geofenceCoords}>
-                      Lat: {geofence.latitude.toFixed(6)}, Lon: {geofence.longitude.toFixed(6)}
-                    </Text>
-                    <Text style={styles.geofenceRadius}>
-                      Radius: {geofence.radius}m
-                    </Text>
-                  </View>
-                ))
-              )}
-            </View>
-          </>
-        )}
+                <Text style={styles.geofenceCoords}>
+                  Lat: {geofence.latitude.toFixed(6)}, Lon: {geofence.longitude.toFixed(6)}
+                </Text>
+                <Text style={styles.geofenceRadius}>
+                  Radius: {geofence.radius}m
+                </Text>
+              </View>
+            ))
+          )}
+        </View>
       </View>
     </ScrollView>
   );
