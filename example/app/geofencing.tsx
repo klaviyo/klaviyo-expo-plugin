@@ -184,9 +184,15 @@ export default function GeofencingScreen() {
         )}
 
         <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>✓ Geofencing is active</Text>
+          <Text style={styles.statusText}>
+            {geofencingEnabled ? '✓ Geofencing is active' : 'Geofencing Status'}
+          </Text>
           <Text style={styles.statusSubtext}>
-            The app will now track geofence events based on your location.
+            {geofencingEnabled
+              ? 'The app will now track geofence events based on your location.'
+              : currentGeofences.length > 0
+                ? 'Geofences are being monitored. Click "Enable Geofencing" to register if needed.'
+                : 'Click "Enable Geofencing" to start monitoring geofences.'}
           </Text>
         </View>
 
