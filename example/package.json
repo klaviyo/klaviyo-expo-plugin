@@ -29,7 +29,7 @@
     "expo-status-bar": "~3.0.8",
     "expo-task-manager": "~14.0.8",
     "klaviyo-expo-plugin": "file:../",
-    "klaviyo-react-native-sdk": "file:../../klaviyo-react-native-sdk",
+    "klaviyo-react-native-sdk": "^2.2.0-alpha.1",
     "memoize-one": "^6.0.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
