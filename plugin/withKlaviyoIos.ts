@@ -233,7 +233,6 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
     'ios',
     async config => {
       const iosRoot = path.join(config.modRequest.projectRoot, "ios");
-      
       try {
         const podfile = await FileManager.readFile(`${iosRoot}/Podfile`);
         // Check for both standard and linkage-specific use_frameworks!

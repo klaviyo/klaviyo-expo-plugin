@@ -393,4 +393,68 @@ describe('withKlaviyoIos', () => {
       });
     });
   });
+
+  describe('withGeofencingPodspec', () => {
+    describe('UIBackgroundModes configuration', () => {
+      it('should add location to UIBackgroundModes when geofencingEnabled is true', () => {
+        const propsWithGeofencing = createMockIosProps({
+          geofencingEnabled: true,
+        });
+        
+        const modifiedConfig = withKlaviyoIos(mockConfig, propsWithGeofencing) as any;
+        
+        expect(modifiedConfig.modResults).toBeDefined();
+        expect(modifiedConfig.modResults.UIBackgroundModes).toBeDefined();
+        expect(Array.isArray(modifiedConfig.modResults.UIBackgroundModes)).toBe(true);
+        expect(modifiedConfig.modResults.UIBackgroundModes).toContain('location');
+      });
+
+      it('should not add location to UIBackgroundModes when geofencingEnabled is false', () => {
+        const propsWithoutGeofencing = createMockIosProps({
+          geofencingEnabled: false,
+        });
+        
+        const modifiedConfig = withKlaviyoIos(mockConfig, propsWithoutGeofencing) as any;
+        
+        expect(modifiedConfig.modResults).toBeDefined();
+        // If UIBackgroundModes exists, it should not contain 'location'
+        if (modifiedConfig.modResults.UIBackgroundModes) {
+          expect(modifiedConfig.modResults.UIBackgroundModes).not.toContain('location');
+        }
+      });
+
+      it('should not add location to UIBackgroundModes when geofencingEnabled is undefined', () => {
+        const propsWithoutGeofencing = createMockIosProps({
+          geofencingEnabled: undefined,
+        });
+        
+        const modifiedConfig = withKlaviyoIos(mockConfig, propsWithoutGeofencing) as any;
+        
+        expect(modifiedConfig.modResults).toBeDefined();
+        // If UIBackgroundModes exists, it should not contain 'location'
+        if (modifiedConfig.modResults.UIBackgroundModes) {
+          expect(modifiedConfig.modResults.UIBackgroundModes).not.toContain('location');
+        }
+      });
+
+      it('should not duplicate location if it already exists in UIBackgroundModes', () => {
+        const configWithLocation = createMockIosConfig({
+          modResults: {
+            UIBackgroundModes: ['remote-notification', 'location'],
+          },
+        });
+        
+        const propsWithGeofencing = createMockIosProps({
+          geofencingEnabled: true,
+        });
+        
+        const modifiedConfig = withKlaviyoIos(configWithLocation, propsWithGeofencing) as any;
+        
+        const locationCount = modifiedConfig.modResults.UIBackgroundModes.filter(
+          (mode: string) => mode === 'location'
+        ).length;
+        expect(locationCount).toBe(1);
+      });
+    });
+  });
 }); 
