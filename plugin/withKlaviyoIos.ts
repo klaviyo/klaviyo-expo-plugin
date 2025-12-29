@@ -13,7 +13,6 @@ const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withPlugins(config, [
     withKlaviyoPluginConfigurationPlist,
     withRemoteNotificationsPermissions,
-    withGeofencingConfig,
     withGeofencingPodspec,
     withKlaviyoPodfile,
     withKlaviyoXcodeProject,
@@ -145,30 +144,10 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
 };
 
 /**
- * Logs geofencing configuration status.
- * Location permission strings are handled by expo-location, not this plugin.
- */
-const withGeofencingConfig: ConfigPlugin<KlaviyoPluginIosProps> = (
-  config,
-  props
-) => {
-  KlaviyoLog.log('Checking geofencing configuration...');
-  KlaviyoLog.log('Geofencing props: ' + JSON.stringify(props.geofencing));
-  
-  if (!props.geofencing?.enabled) {
-    KlaviyoLog.log('Geofencing is not enabled, skipping geofencing configuration...');
-  } else {
-    KlaviyoLog.log('Geofencing is enabled. Location permissions should be configured via expo-location.');
-  }
-
-  return config;
-};
-
-/**
  * Injects KlaviyoLocation dependency into the podspec and adds location background mode if geofencing is enabled.
  */
 const withGeofencingPodspec: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
-  const geofencingEnabled = props.geofencing?.enabled ?? false;
+  const geofencingEnabled = props.geofencingEnabled ?? false;
   
   // Handle podspec and Swift file modifications
   config = withDangerousMod(config, [
@@ -178,65 +157,37 @@ const withGeofencingPodspec: ConfigPlugin<KlaviyoPluginIosProps> = (config, prop
       const podspecPath = path.join(pluginRoot, 'ios', 'ExpoKlaviyo.podspec');
       const swiftPath = path.join(pluginRoot, 'ios', 'ExpoKlaviyo', 'KlaviyoAppDelegate.swift');
       
-      if (geofencingEnabled) {
-        // Inject KlaviyoLocation dependency into podspec
-        try {
-          let podspecContent = await FileManager.readFile(podspecPath);
-          podspecContent = podspecContent.replace(
-            "# KLAVIYO_LOCATION_DEPENDENCY",
-            "s.dependency 'KlaviyoLocation' # KLAVIYO_LOCATION_DEPENDENCY"
-          );
-          await FileManager.writeFile(podspecPath, podspecContent);
-          KlaviyoLog.log('Injected KlaviyoLocation dependency into podspec');
-        } catch (err) {
-          KlaviyoLog.log('Could not configure podspec for geofencing: ' + err);
-        }
+      try {
+        let podspecContent = await FileManager.readFile(podspecPath);
+        podspecContent = podspecContent.replace(/.*KLAVIYO_LOCATION_DEPENDENCY.*\n?/g, '');
+        podspecContent = podspecContent.replace(
+          /(s\.dependency 'KlaviyoSwift'\s*\n)/,
+          geofencingEnabled 
+            ? "$1  s.dependency 'KlaviyoLocation' # KLAVIYO_LOCATION_DEPENDENCY\n"
+            : "$1  # KLAVIYO_LOCATION_DEPENDENCY\n"
+        );
+        await FileManager.writeFile(podspecPath, podspecContent);
         
-        // Inject import and registerGeofencing into KlaviyoAppDelegate.swift
-        try {
-          let swiftContent = await FileManager.readFile(swiftPath);
-          swiftContent = swiftContent.replace(
-            "// KLAVIYO_GEOFENCING_IMPORT",
-            "import KlaviyoLocation // KLAVIYO_GEOFENCING_IMPORT"
-          );
-          swiftContent = swiftContent.replace(
-            "// KLAVIYO_GEOFENCING_REGISTER",
-            "KlaviyoSDK().registerGeofencing() // KLAVIYO_GEOFENCING_REGISTER"
-          );
-          await FileManager.writeFile(swiftPath, swiftContent);
-          KlaviyoLog.log('Injected KlaviyoLocation import and registerGeofencing() into KlaviyoAppDelegate.swift');
-        } catch (err) {
-          KlaviyoLog.log('Could not configure KlaviyoAppDelegate for geofencing: ' + err);
-        }
-      } else {
-        // Remove geofencing code but keep placeholders
-        try {
-          let podspecContent = await FileManager.readFile(podspecPath);
-          podspecContent = podspecContent.replace(
-            /s\.dependency 'KlaviyoLocation' # KLAVIYO_LOCATION_DEPENDENCY/g,
-            "# KLAVIYO_LOCATION_DEPENDENCY"
-          );
-          await FileManager.writeFile(podspecPath, podspecContent);
-          KlaviyoLog.log('Removed KlaviyoLocation dependency from podspec');
-        } catch (err) {
-          KlaviyoLog.log('Could not remove podspec geofencing config: ' + err);
-        }
+        let swiftContent = await FileManager.readFile(swiftPath);
+        swiftContent = swiftContent.replace(/.*KLAVIYO_GEOFENCING_IMPORT.*\n?/g, '');
+        swiftContent = swiftContent.replace(/.*KLAVIYO_GEOFENCING_REGISTER.*\n?/g, '');
+        swiftContent = swiftContent.replace(
+          /(import KlaviyoSwift\s*\n)/,
+          geofencingEnabled 
+            ? "$1import KlaviyoLocation // KLAVIYO_GEOFENCING_IMPORT\n"
+            : "$1// KLAVIYO_GEOFENCING_IMPORT\n"
+        );
+        swiftContent = swiftContent.replace(
+          /(center\.delegate = self\s*\n)/,
+          geofencingEnabled 
+            ? "$1        KlaviyoSDK().registerGeofencing() // KLAVIYO_GEOFENCING_REGISTER\n"
+            : "$1        // KLAVIYO_GEOFENCING_REGISTER\n"
+        );
+        await FileManager.writeFile(swiftPath, swiftContent);
         
-        try {
-          let swiftContent = await FileManager.readFile(swiftPath);
-          swiftContent = swiftContent.replace(
-            /import KlaviyoLocation \/\/ KLAVIYO_GEOFENCING_IMPORT/g,
-            "// KLAVIYO_GEOFENCING_IMPORT"
-          );
-          swiftContent = swiftContent.replace(
-            /KlaviyoSDK\(\)\.registerGeofencing\(\) \/\/ KLAVIYO_GEOFENCING_REGISTER/g,
-            "// KLAVIYO_GEOFENCING_REGISTER"
-          );
-          await FileManager.writeFile(swiftPath, swiftContent);
-          KlaviyoLog.log('Removed KlaviyoLocation import and registerGeofencing() from KlaviyoAppDelegate.swift');
-        } catch (err) {
-          KlaviyoLog.log('Could not remove KlaviyoAppDelegate geofencing config: ' + err);
-        }
+        KlaviyoLog.log(`Geofencing ${geofencingEnabled ? 'enabled' : 'disabled'}`);
+      } catch (err) {
+        KlaviyoLog.log('Could not configure geofencing: ' + err);
       }
       
       return config;
@@ -323,7 +274,7 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
 const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withXcodeProject(config, async (config) => {
     const xcodeProject = config.modResults;
-    if (!!xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
+    if (xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
       KlaviyoLog.log(`⚠️ ${NSE_TARGET_NAME} already exists in project. Skipping...`);
       return config;
     }

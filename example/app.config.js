@@ -46,9 +46,7 @@ module.exports = () => {
             projectVersion: '3',
             marketingVersion: '0.1.2',
             devTeam: 'XXXXXXXXXX',
-            geofencing: {
-              enabled: true
-            }
+            geofencingEnabled: false,
           },
         },
       ],

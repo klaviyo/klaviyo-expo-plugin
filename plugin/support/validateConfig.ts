@@ -80,16 +80,8 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
     }
   }
 
-  // Validate geofencing
-  if (config.geofencing !== undefined) {
-    if (typeof config.geofencing !== 'object' || config.geofencing === null) {
-      throw new KlaviyoConfigError('iOS geofencing must be an object');
-    }
-
-    // Validate enabled (optional, defaults to false)
-    if (config.geofencing.enabled !== undefined && typeof config.geofencing.enabled !== 'boolean') {
-      throw new KlaviyoConfigError('iOS geofencing.enabled must be a boolean');
-    }
-
+  // Validate geofencingEnabled
+  if (config.geofencingEnabled !== undefined && typeof config.geofencingEnabled !== 'boolean') {
+    throw new KlaviyoConfigError('iOS geofencingEnabled must be a boolean');
   }
 };

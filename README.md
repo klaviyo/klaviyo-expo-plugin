@@ -116,7 +116,7 @@ npx expo prebuild
 |`ios.projectVersion`| string | optional | The internal build number for version. Default: `"1"`|
 |`ios.marketingVersion`| string | optional| The app version displayed in the App Store. Must be of the format "X.X" or "X.X.X". Default: `"1.0"`|
 |`ios.devTeam`| string | optional| The 10-digit alphanumeric Apple Development Team ID associated with the necessary signing capabilites, provisioning profile, etc. Format: "XXXXXXXXXX" Default: `undefined`|
-|`ios.geofencing`| object | optional | Configuration object for enabling geofencing/location tracking support. See [Geofencing](#geofencing) below. Default: `undefined` (geofencing disabled)|
+|`ios.geofencingEnabled`| boolean | optional | Enables geofencing/location tracking support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. See [Geofencing](#geofencing) below. Default: `false` (geofencing disabled)|
 
 Note: If you do not need to specify any of these for your project, it will use the defaults defined here. If you do not specify any of these props, you can add the plugin without additional arguments:
 ```
@@ -306,7 +306,7 @@ Geofencing enables location-based marketing by allowing Klaviyo to trigger event
 
 ### Configuration
 
-To enable geofencing support, add the `geofencing` configuration to your iOS plugin props:
+To enable geofencing support, add the `geofencingEnabled` property to your iOS plugin props:
 
 ```json
 {
@@ -316,9 +316,7 @@ To enable geofencing support, add the `geofencing` configuration to your iOS plu
         "klaviyo-expo-plugin",
         {
           "ios": {
-            "geofencing": {
-              "enabled": true
-            }
+            "geofencingEnabled": true
           }
         }
       ]
@@ -329,7 +327,7 @@ To enable geofencing support, add the `geofencing` configuration to your iOS plu
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `enabled` | boolean | optional | Enables geofencing support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. Default: `false` |
+| `geofencingEnabled` | boolean | optional | Enables geofencing support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. Default: `false` |
 
 When geofencing is enabled, the plugin will:
 - Add the `KlaviyoLocation` pod dependency to the project
