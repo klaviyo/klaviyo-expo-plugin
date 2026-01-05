@@ -34,13 +34,23 @@ jest.mock('xml2js', () => ({
 
 // Mock @expo/config-plugins
 jest.mock('@expo/config-plugins', () => ({
-  withDangerousMod: jest.fn().mockImplementation((config, [platform, action]) => ({
-    ...config,
-    mods: {
-      ...(config.mods || {}),
-      [platform]: action,
-    },
-  })),
+  withDangerousMod: jest.fn().mockImplementation((config, [platform, action]) => {
+    const existingMod = config.mods?.[platform];
+    const chainedMod = existingMod
+      ? async (config: any) => {
+          const result = await existingMod(config);
+          return await action(result);
+        }
+      : action;
+    
+    return {
+      ...config,
+      mods: {
+        ...(config.mods || {}),
+        [platform]: chainedMod,
+      },
+    };
+  }),
   withAndroidManifest: jest.fn().mockImplementation((config, mod) => {
     return mod(config);
   }),
