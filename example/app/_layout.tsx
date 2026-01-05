@@ -212,6 +212,15 @@ export default function AppLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="geofencing"
+        options={{
+          title: 'Geofencing',
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+            <Ionicons name="location" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
