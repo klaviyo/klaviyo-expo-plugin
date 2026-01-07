@@ -1,7 +1,7 @@
 {
   "name": "example",
   "main": "expo-router/entry",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -29,7 +29,7 @@
     "expo-status-bar": "~3.0.8",
     "expo-task-manager": "~14.0.8",
     "klaviyo-expo-plugin": "file:../",
-    "klaviyo-react-native-sdk": "2.2.0-alpha.1",
+    "klaviyo-react-native-sdk": "2.2.0",
     "memoize-one": "^6.0.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
