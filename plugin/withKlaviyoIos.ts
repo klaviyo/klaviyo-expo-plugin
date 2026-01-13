@@ -13,6 +13,7 @@ const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withPlugins(config, [
     withKlaviyoPluginConfigurationPlist,
     withRemoteNotificationsPermissions,
+    withGeofencingPodspec,
     withKlaviyoPodfile,
     withKlaviyoXcodeProject,
     withKlaviyoNSE,
@@ -143,6 +144,88 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
 };
 
 /**
+ * Injects KlaviyoLocation dependency into the podspec and adds location background mode if geofencing is enabled.
+ */
+const withGeofencingPodspec: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
+  const geofencingEnabled = props.geofencingEnabled ?? false;
+  
+  // Handle podspec and Swift file modifications
+  config = withDangerousMod(config, [
+    'ios',
+    async config => {
+      const pluginRoot = getPluginRoot();
+      const podspecPath = path.join(pluginRoot, 'ios', 'ExpoKlaviyo.podspec');
+      const swiftPath = path.join(pluginRoot, 'ios', 'ExpoKlaviyo', 'KlaviyoAppDelegate.swift');
+      
+      try {
+        let podspecContent = await FileManager.readFile(podspecPath);
+        podspecContent = podspecContent.replace(/.*KLAVIYO_LOCATION_DEPENDENCY.*\n?/g, '');
+        podspecContent = podspecContent.replace(
+          /(s\.dependency 'KlaviyoSwift'\s*\n)/,
+          geofencingEnabled 
+            ? "$1  s.dependency 'KlaviyoLocation' # KLAVIYO_LOCATION_DEPENDENCY\n"
+            : "$1  # KLAVIYO_LOCATION_DEPENDENCY\n"
+        );
+        await FileManager.writeFile(podspecPath, podspecContent);
+        
+        let swiftContent = await FileManager.readFile(swiftPath);
+        swiftContent = swiftContent.replace(/.*KLAVIYO_GEOFENCING_IMPORT.*\n?/g, '');
+        swiftContent = swiftContent.replace(/.*KLAVIYO_GEOFENCING_REGISTER.*\n?/g, '');
+        swiftContent = swiftContent.replace(
+          /(import KlaviyoSwift\s*\n)/,
+          geofencingEnabled 
+            ? "$1import KlaviyoLocation // KLAVIYO_GEOFENCING_IMPORT\n"
+            : "$1// KLAVIYO_GEOFENCING_IMPORT\n"
+        );
+        swiftContent = swiftContent.replace(
+          /(center\.delegate = self\s*\n)/,
+          geofencingEnabled 
+            ? "$1        KlaviyoSDK().registerGeofencing() // KLAVIYO_GEOFENCING_REGISTER\n"
+            : "$1        // KLAVIYO_GEOFENCING_REGISTER\n"
+        );
+        await FileManager.writeFile(swiftPath, swiftContent);
+        
+        KlaviyoLog.log(`Geofencing ${geofencingEnabled ? 'enabled' : 'disabled'}`);
+      } catch (err) {
+        KlaviyoLog.log('Could not configure geofencing: ' + err);
+      }
+      
+      return config;
+    },
+  ]);
+
+  if (!geofencingEnabled) {
+    KlaviyoLog.log('Geofencing not enabled, skipping background mode configuration');
+    return config;
+  }
+
+  // Add location to UIBackgroundModes via Info.plist
+  return withInfoPlist(config, (config) => {
+    const infoPlist = config.modResults;
+    
+    const existingFromModResults = infoPlist.UIBackgroundModes || [];
+    const existingFromConfig = config.ios?.infoPlist?.UIBackgroundModes || [];
+    const existingBackgroundModes = Array.isArray(existingFromModResults) 
+      ? existingFromModResults 
+      : Array.isArray(existingFromConfig) 
+        ? existingFromConfig 
+        : [];
+    
+    const updatedBackgroundModes = [...existingBackgroundModes];
+    
+    if (!updatedBackgroundModes.includes('location')) {
+      updatedBackgroundModes.push('location');
+      KlaviyoLog.log('Added location to UIBackgroundModes');
+    }
+    
+    infoPlist.UIBackgroundModes = updatedBackgroundModes;
+    KlaviyoLog.log(`Final UIBackgroundModes: ${JSON.stringify(updatedBackgroundModes)}`);
+    
+    return config;
+  });
+};
+
+/**
  * Adds necessary Klaviyo pods to the Podfile setup.
  */
 const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
@@ -190,7 +273,7 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
 const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withXcodeProject(config, async (config) => {
     const xcodeProject = config.modResults;
-    if (!!xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
+    if (xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
       KlaviyoLog.log(`⚠️ ${NSE_TARGET_NAME} already exists in project. Skipping...`);
       return config;
     }

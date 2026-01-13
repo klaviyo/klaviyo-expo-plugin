@@ -1,5 +1,6 @@
 import ExpoModulesCore
 import KlaviyoSwift
+// KLAVIYO_GEOFENCING_IMPORT
 
 public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotificationCenterDelegate {
     
@@ -11,6 +12,7 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
         originalDelegate = center.delegate
         // Allow Klaviyo to intercept notifications
         center.delegate = self
+        // KLAVIYO_GEOFENCING_REGISTER
         return true
     }
     
