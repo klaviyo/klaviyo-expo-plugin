@@ -30,6 +30,8 @@ module.exports = () => {
       favicon: './assets/images/favicon.png',
     },
     plugins: [
+      '@react-native-firebase/app',
+      '@react-native-firebase/crashlytics',
       'expo-router',
       [
         'klaviyo-expo-plugin',

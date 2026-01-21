@@ -62,5 +62,6 @@ yarn-debug.*
 yarn-error.*
 
 # Klaviyo
-google-services.json 
-GoogleService-Info.plist
+# google-services.json
+# GoogleService-Info.plist
+# Note: Commented out to include demo file for Firebase Crashlytics compatibility test
