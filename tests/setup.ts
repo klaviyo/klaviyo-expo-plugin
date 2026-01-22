@@ -52,9 +52,39 @@ jest.mock('@expo/config-plugins', () => ({
     };
   }),
   withAndroidManifest: jest.fn().mockImplementation((config, mod) => {
-    return mod(config);
+    // Expo's withAndroidManifest provides modResults.manifest - simulate this behavior
+    // This modifies the config in-place and returns it, similar to real Expo behavior
+    if (!config) return config;
+    const configWithModResults = {
+      ...config,
+      modResults: {
+        ...(config.modResults || {}),
+        manifest: config.modResults?.manifest ?? {
+          application: [{
+            $: { 'android:name': '.MainApplication' },
+            'meta-data': [],
+            service: [],
+          }],
+        },
+      },
+    };
+    return mod(configWithModResults);
   }),
-  withStringsXml: jest.fn().mockImplementation((config, mod) => (config: any, props: any) => config),
+  withStringsXml: jest.fn().mockImplementation((config, mod) => {
+    // Expo's withStringsXml provides modResults with resources - simulate this behavior
+    if (!config) return config;
+    const configWithModResults = {
+      ...config,
+      modResults: {
+        ...(config.modResults || {}),
+        resources: config.modResults?.resources ?? {
+          string: [],
+          color: [],
+        },
+      },
+    };
+    return mod(configWithModResults);
+  }),
   withPlugins: jest.fn().mockImplementation((config, plugins) => {
     let result = config;
     for (const entry of plugins) {

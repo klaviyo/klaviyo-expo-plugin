@@ -147,24 +147,18 @@ export const testIntegrationPluginFunction = <T>(
         contents: manifestContents
       }
     },
-    modResults: {
-      manifest: {
-        application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [], service: [] }]
-      },
-      resources: {
-        string: [],
-        color: [],
-      },
-    },
+    // Note: modResults is NOT included here because Expo's config plugins
+    // provide modResults internally when they run their mod callbacks.
+    // The plugin should not rely on modResults being pre-initialized.
   };
-  
+
   const props = createMockProps(propsOptions);
-  
+
   const result = plugin(config, props);
-  
+
   expect(result).toBeDefined();
-  expect(typeof result).toBe('function');
-  return config;
+  // Config plugins can return either objects or functions depending on implementation
+  return result;
 };
 
 export const testSimpleIntegration = <T>(
@@ -206,24 +200,18 @@ export const testSimpleIntegration = <T>(
         `
       }
     },
-    modResults: {
-      manifest: {
-        application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [], service: [] }]
-      },
-      resources: {
-        string: [],
-        color: [],
-      },
-    },
+    // Note: modResults is NOT included here because Expo's config plugins
+    // provide modResults internally when they run their mod callbacks.
+    // The plugin should not rely on modResults being pre-initialized.
   };
-  
+
   const props = createMockProps(propsOptions);
-  
+
   const result = plugin(config, props);
-  
+
   expect(result).toBeDefined();
-  expect(typeof result).toBe('function');
-  return config;
+  // Config plugins can return either objects or functions depending on implementation
+  return result;
 };
 
 // iOS-specific mock functions

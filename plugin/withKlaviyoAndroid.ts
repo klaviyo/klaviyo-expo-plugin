@@ -3,8 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
 import {
-  KlaviyoPluginAndroidProps,
-  KlaviyoAndroidModResults
+  KlaviyoPluginAndroidProps
 } from './types';
 import * as xml2js from 'xml2js';
 import { KlaviyoLog } from './support/logger';
@@ -437,12 +436,10 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, p
 };
 
 const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
-  const typedConfig = config as typeof config & { modResults: KlaviyoAndroidModResults };
-  if (!typedConfig.modResults) typedConfig.modResults = {};
-  if (!typedConfig.modResults.manifest) typedConfig.modResults.manifest = {
-    application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [], service: [] }]
-  };
-  if (!typedConfig.modResults.resources) typedConfig.modResults.resources = { string: [], color: [] };
+  // Note: modResults should NOT be initialized here on the config object.
+  // modResults is managed internally by Expo's withAndroidManifest, withStringsXml, etc.
+  // Manually adding modResults to the config causes it to leak into the app.json schema,
+  // which triggers "expo doctor" validation errors since modResults is not a valid Expo schema property.
   if (!props) props = { logLevel: 1, openTracking: true, notificationIconFilePath: undefined, notificationColor: undefined };
   KlaviyoLog.log('Starting Android plugin configuration...');
   KlaviyoLog.log('Plugin props:' + JSON.stringify(props));
