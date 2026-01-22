@@ -8,8 +8,18 @@ export interface KlaviyoPluginAndroidBaseProps {
 export interface KlaviyoPluginIosBaseProps  {
   badgeAutoclearing: boolean;
   codeSigningStyle: string;
-  projectVersion: string;
-  marketingVersion: string;
+  /**
+   * The build number (CFBundleVersion) for the NSE target.
+   * If not provided, automatically derived from Expo config's ios.buildNumber.
+   * Falls back to "1" if neither is available.
+   */
+  projectVersion?: string;
+  /**
+   * The marketing version (CFBundleShortVersionString) for the NSE target.
+   * If not provided, automatically derived from Expo config's version field.
+   * Falls back to "1.0" if neither is available.
+   */
+  marketingVersion?: string;
   devTeam?: string;
   geofencingEnabled?: boolean;
 }
@@ -29,8 +39,8 @@ export interface KlaviyoPluginAndroidProps extends KlaviyoPluginAndroidBaseProps
 export interface KlaviyoPluginIosProps extends KlaviyoPluginIosBaseProps {
   badgeAutoclearing: boolean;
   codeSigningStyle: string;
-  projectVersion: string;
-  marketingVersion: string;
+  projectVersion?: string;
+  marketingVersion?: string;
   devTeam: string | undefined;
   geofencingEnabled?: boolean;
 }
@@ -50,8 +60,11 @@ const ANDROID_DEFAULTS: KlaviyoPluginAndroidProps = {
 const IOS_DEFAULTS: KlaviyoPluginIosProps = {
   badgeAutoclearing: true,
   codeSigningStyle: "Automatic",
-  projectVersion: "1",
-  marketingVersion: "1.0",
+  // projectVersion and marketingVersion are intentionally undefined here
+  // They will be derived from Expo config (version and ios.buildNumber) if not provided
+  // See withKlaviyoIos.ts for the fallback logic
+  projectVersion: undefined,
+  marketingVersion: undefined,
   devTeam: undefined
 };
 

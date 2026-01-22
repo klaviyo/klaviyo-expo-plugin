@@ -121,6 +121,9 @@ const NSE_EXT_FILES = [
 
 /**
  * Adds remote notifications permissions and other associated values in the plist.
+ * Note: We no longer override CFBundleShortVersionString and CFBundleVersion here
+ * as they should be inherited from the Expo config. Overriding them would cause
+ * version mismatch errors during App Store submission (ITMS-90473).
  */
 const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = (
   config,
@@ -137,8 +140,8 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
     const actualAppGroupName = `group.${bundleIdentifier}.${NSE_TARGET_NAME}.shared`;
     infoPlist.klaviyo_app_group = actualAppGroupName;
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
-    infoPlist.CFBundleShortVersionString = props.marketingVersion || "1.0";
-    infoPlist.CFBundleVersion = props.projectVersion || "1";
+    // Note: We intentionally do NOT set CFBundleShortVersionString and CFBundleVersion here
+    // The main app's version should come from the Expo config, not be overridden by the plugin
     return config;
   });
 };
@@ -330,19 +333,27 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
       nseTarget.uuid
     );
     
+    // Get the version information from the Expo config to sync with the NSE target
+    // This ensures the extension version matches the main app version
+    const appMarketingVersion = config.version || props.marketingVersion;
+    const appProjectVersion = config.ios?.buildNumber || props.projectVersion;
+
     const configurations = xcodeProject.pbxXCBuildConfigurationSection();
     for (const key in configurations) {
       if (typeof configurations[key].buildSettings !== "undefined") {
         const buildSettingsObj = configurations[key].buildSettings;
-        buildSettingsObj.CODE_SIGN_STYLE = props.codeSigningStyle;
-        buildSettingsObj.CURRENT_PROJECT_VERSION = props.projectVersion;
-        buildSettingsObj.MARKETING_VERSION = props.marketingVersion;
-        if (props.devTeam != undefined) {
-          buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
-        }
+
+        // Only apply version and code signing settings to the NSE target configurations
+        // to avoid overriding the main app's settings
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
+          buildSettingsObj.CODE_SIGN_STYLE = props.codeSigningStyle;
+          buildSettingsObj.CURRENT_PROJECT_VERSION = appProjectVersion;
+          buildSettingsObj.MARKETING_VERSION = appMarketingVersion;
           buildSettingsObj.SWIFT_VERSION = "5.0";
           buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
+          if (props.devTeam != undefined) {
+            buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
+          }
         }
       }
     }
@@ -395,8 +406,10 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
           }
           
           if (file === `${NSE_TARGET_NAME}-Info.plist`) {
-            const marketingVersion = props.marketingVersion || "1.0";
-            const buildNumber = props.projectVersion || "1";
+            // Use Expo config version as the primary source, falling back to plugin props
+            // This ensures the NSE version matches the main app version automatically
+            const marketingVersion = config.version || props.marketingVersion || "1.0";
+            const buildNumber = config.ios?.buildNumber || props.projectVersion || "1";
             const infoPlistPath = path.join(nsePath, file);
             let infoPlistContent = await FileManager.readFile(infoPlistPath);
             infoPlistContent = infoPlistContent.replace(
@@ -407,9 +420,9 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
               /(<key>CFBundleVersion<\/key>\s*<string>)[^<]*(<\/string>)/,
               `$1${buildNumber}$2`
             );
-            
+
             await FileManager.writeFile(infoPlistPath, infoPlistContent);
-            KlaviyoLog.log(`Updated Info.plist with version ${marketingVersion} (build ${buildNumber})`);
+            KlaviyoLog.log(`Updated NSE Info.plist with version ${marketingVersion} (build ${buildNumber})`);
           }
         } catch (error) {
           KlaviyoLog.error(`Failed to copy ${file}: ${error}`);

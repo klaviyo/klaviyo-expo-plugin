@@ -186,51 +186,59 @@ describe('withKlaviyoIos', () => {
 
   describe('version synchronization', () => {
     describe('main app target Info.plist', () => {
-      it('should set CFBundleShortVersionString from props.marketingVersion', () => {
+      // The plugin should NOT override the main app's version numbers
+      // This was the root cause of ITMS-90473 errors during App Store submission
+      // See: https://github.com/klaviyo/klaviyo-expo-plugin/issues/63
+
+      it('should NOT override CFBundleShortVersionString in main app Info.plist', () => {
         const propsWithVersion = createMockIosProps({
           marketingVersion: '0.11.0',
           projectVersion: '25',
         });
         const modifiedConfig = withKlaviyoIos(mockConfig, propsWithVersion) as any;
-        
+
         expect(modifiedConfig.modResults).toBeDefined();
-        expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('0.11.0');
+        // The version should remain unchanged from what was in the mock config (1.0)
+        expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('1.0');
       });
 
-      it('should set CFBundleVersion from props.projectVersion', () => {
+      it('should NOT override CFBundleVersion in main app Info.plist', () => {
         const propsWithVersion = createMockIosProps({
           marketingVersion: '0.11.0',
           projectVersion: '25',
         });
         const modifiedConfig = withKlaviyoIos(mockConfig, propsWithVersion) as any;
-        
+
         expect(modifiedConfig.modResults).toBeDefined();
-        expect(modifiedConfig.modResults.CFBundleVersion).toBe('25');
+        // The version should remain unchanged from what was in the mock config (1)
+        expect(modifiedConfig.modResults.CFBundleVersion).toBe('1');
       });
 
-      it('should default CFBundleShortVersionString to "1.0" when marketingVersion is not provided', () => {
+      it('should preserve existing CFBundleShortVersionString when plugin props are provided', () => {
         const propsWithoutVersion = createMockIosProps({
           marketingVersion: undefined,
           projectVersion: '25',
         });
         const modifiedConfig = withKlaviyoIos(mockConfig, propsWithoutVersion) as any;
-        
+
         expect(modifiedConfig.modResults).toBeDefined();
+        // The version should remain unchanged from the mock config default
         expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('1.0');
       });
 
-      it('should default CFBundleVersion to "1" when projectVersion is not provided', () => {
+      it('should preserve existing CFBundleVersion when plugin props are not provided', () => {
         const propsWithoutVersion = createMockIosProps({
           marketingVersion: '0.11.0',
           projectVersion: undefined,
         });
         const modifiedConfig = withKlaviyoIos(mockConfig, propsWithoutVersion) as any;
-        
+
         expect(modifiedConfig.modResults).toBeDefined();
+        // The version should remain unchanged from the mock config default
         expect(modifiedConfig.modResults.CFBundleVersion).toBe('1');
       });
 
-      it('should override existing CFBundleShortVersionString in Info.plist', () => {
+      it('should NOT override existing CFBundleShortVersionString in Info.plist', () => {
         const configWithExistingVersion = createMockIosConfig({
           modResults: {
             CFBundleShortVersionString: '2.0.0',
@@ -242,9 +250,10 @@ describe('withKlaviyoIos', () => {
           projectVersion: '25',
         });
         const modifiedConfig = withKlaviyoIos(configWithExistingVersion, propsWithVersion) as any;
-        
-        expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('0.11.0');
-        expect(modifiedConfig.modResults.CFBundleVersion).toBe('25');
+
+        // The version should remain unchanged - plugin should NOT override main app versions
+        expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('2.0.0');
+        expect(modifiedConfig.modResults.CFBundleVersion).toBe('100');
       });
     });
 
@@ -369,27 +378,59 @@ describe('withKlaviyoIos', () => {
         expect(writtenContent).not.toContain('<string>1</string>');
       });
 
-      it('should ensure main app and NSE extension have matching versions', async () => {
+      it('should ensure NSE extension version matches props when provided', async () => {
         const propsWithVersion = createMockIosProps({
           marketingVersion: '0.11.0',
           projectVersion: '25',
         });
-        
+
         const modifiedConfig = await runIosMod(mockConfig, propsWithVersion) as any;
-        
-        // Check main app version
-        expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('0.11.0');
-        expect(modifiedConfig.modResults.CFBundleVersion).toBe('25');
-        
-        // Check NSE extension version was written
+
+        // Main app version should NOT be changed by the plugin
+        // (it should remain at the mock config default values)
+        expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('1.0');
+        expect(modifiedConfig.modResults.CFBundleVersion).toBe('1');
+
+        // Check NSE extension version was written with the props values
         expect(FileManager.writeFile).toHaveBeenCalled();
-        const writeCall = FileManager.writeFile.mock.calls.find(call => 
+        const writeCall = FileManager.writeFile.mock.calls.find(call =>
           call && call[0] && typeof call[0] === 'string' && call[0].includes('KlaviyoNotificationServiceExtension-Info.plist')
         );
-        
+
         const writtenContent = writeCall[1];
         expect(writtenContent).toContain('<string>0.11.0</string>');
         expect(writtenContent).toContain('<string>25</string>');
+      });
+
+      it('should derive NSE version from Expo config.version when props not provided', async () => {
+        // Create a config with Expo version set
+        const configWithExpoVersion = createMockIosConfig({
+          modResults: {
+            CFBundleShortVersionString: '2.0.0',
+            CFBundleVersion: '100',
+          },
+        });
+        // Add the Expo version field
+        configWithExpoVersion.version = '2.0.0';
+        configWithExpoVersion.ios.buildNumber = '100';
+
+        const propsWithoutVersion = createMockIosProps({
+          marketingVersion: undefined,
+          projectVersion: undefined,
+        });
+
+        await runIosMod(configWithExpoVersion, propsWithoutVersion);
+
+        // Check NSE extension version was written with the Expo config values
+        expect(FileManager.writeFile).toHaveBeenCalled();
+        const writeCall = FileManager.writeFile.mock.calls.find(call =>
+          call && call[0] && typeof call[0] === 'string' && call[0].includes('KlaviyoNotificationServiceExtension-Info.plist')
+        );
+
+        const writtenContent = writeCall[1];
+        // Should use Expo config version (2.0.0) and buildNumber (100)
+        expect(writtenContent).toContain('<string>2.0.0</string>');
+        expect(writtenContent).toContain('<string>100</string>');
       });
     });
   });
