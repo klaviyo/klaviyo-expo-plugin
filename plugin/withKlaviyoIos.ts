@@ -137,8 +137,11 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
     const actualAppGroupName = `group.${bundleIdentifier}.${NSE_TARGET_NAME}.shared`;
     infoPlist.klaviyo_app_group = actualAppGroupName;
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
-    infoPlist.CFBundleShortVersionString = props.marketingVersion || "1.0";
-    infoPlist.CFBundleVersion = props.projectVersion || "1";
+    // Note: We intentionally do NOT set CFBundleShortVersionString and CFBundleVersion
+    // for the main app here. The main app's version should come from Expo's config
+    // (app.json/app.config.js), not from the Klaviyo plugin. Setting them here would
+    // override the host app's intended version settings.
+    // See: https://github.com/klaviyo/klaviyo-expo-plugin/issues/93
     return config;
   });
 };
@@ -330,17 +333,25 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
       nseTarget.uuid
     );
     
+    // Get version from Expo config as fallback for NSE extension
+    // Use explicit props values if provided, otherwise fall back to Expo config values
+    const nseMarketingVersion = props.marketingVersion || config.version || "1.0";
+    const nseProjectVersion = props.projectVersion || config.ios?.buildNumber || "1";
+
     const configurations = xcodeProject.pbxXCBuildConfigurationSection();
     for (const key in configurations) {
       if (typeof configurations[key].buildSettings !== "undefined") {
         const buildSettingsObj = configurations[key].buildSettings;
-        buildSettingsObj.CODE_SIGN_STYLE = props.codeSigningStyle;
-        buildSettingsObj.CURRENT_PROJECT_VERSION = props.projectVersion;
-        buildSettingsObj.MARKETING_VERSION = props.marketingVersion;
-        if (props.devTeam != undefined) {
-          buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
-        }
+        // Only apply version and code signing settings to the NSE target
+        // to avoid overwriting the main app's settings
+        // See: https://github.com/klaviyo/klaviyo-expo-plugin/issues/93
         if (configurations[key].buildSettings.PRODUCT_NAME == `"${NSE_TARGET_NAME}"`) {
+          buildSettingsObj.CODE_SIGN_STYLE = props.codeSigningStyle;
+          buildSettingsObj.CURRENT_PROJECT_VERSION = nseProjectVersion;
+          buildSettingsObj.MARKETING_VERSION = nseMarketingVersion;
+          if (props.devTeam != undefined) {
+            buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
+          }
           buildSettingsObj.SWIFT_VERSION = "5.0";
           buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${NSE_TARGET_NAME}/${NSE_TARGET_NAME}.entitlements`;
         }
@@ -395,8 +406,11 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
           }
           
           if (file === `${NSE_TARGET_NAME}-Info.plist`) {
-            const marketingVersion = props.marketingVersion || "1.0";
-            const buildNumber = props.projectVersion || "1";
+            // Use explicit props values if provided, otherwise fall back to Expo config values
+            // This ensures the NSE extension matches the host app's version by default
+            // See: https://github.com/klaviyo/klaviyo-expo-plugin/issues/93
+            const marketingVersion = props.marketingVersion || config.version || "1.0";
+            const buildNumber = props.projectVersion || config.ios?.buildNumber || "1";
             const infoPlistPath = path.join(nsePath, file);
             let infoPlistContent = await FileManager.readFile(infoPlistPath);
             infoPlistContent = infoPlistContent.replace(
@@ -407,7 +421,7 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
               /(<key>CFBundleVersion<\/key>\s*<string>)[^<]*(<\/string>)/,
               `$1${buildNumber}$2`
             );
-            
+
             await FileManager.writeFile(infoPlistPath, infoPlistContent);
             KlaviyoLog.log(`Updated Info.plist with version ${marketingVersion} (build ${buildNumber})`);
           }
