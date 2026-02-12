@@ -1,4 +1,4 @@
-import { ConfigPlugin, withDangerousMod, withAndroidManifest, withStringsXml, withPlugins, withMainActivity } from '@expo/config-plugins';
+import { ConfigPlugin, withDangerousMod, withAndroidManifest, withStringsXml, withPlugins, withMainActivity, withGradleProperties } from '@expo/config-plugins';
 import * as fs from 'fs';
 import * as path from 'path';
 import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
@@ -8,7 +8,7 @@ import {
 } from './types';
 import * as xml2js from 'xml2js';
 import { KlaviyoLog } from './support/logger';
-import { ExportedConfigWithProps } from '@expo/config-plugins';
+import { ExportedConfigWithProps, ConfigPlugin as ExpoConfigPlugin } from '@expo/config-plugins';
 import {
   AndroidManifest,
   ManifestApplication,
@@ -436,6 +436,38 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, p
   ]);
 };
 
+/**
+ * Configures the klaviyoIncludeLocationPermissions gradle property to control
+ * whether location permissions are included in the merged manifest.
+ * When geofencingEnabled is false, this prevents the SDK from adding
+ * ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION, and ACCESS_BACKGROUND_LOCATION
+ * permissions to the app manifest.
+ */
+const withGeofencingGradleProperties: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
+  const geofencingEnabled = props.geofencingEnabled ?? false;
+  KlaviyoLog.log(`Configuring Android geofencing: ${geofencingEnabled ? 'enabled' : 'disabled'}`);
+
+  return withGradleProperties(config, (config) => {
+    const key = 'klaviyoIncludeLocationPermissions';
+    const value = geofencingEnabled.toString();
+
+    // Remove any existing klaviyoIncludeLocationPermissions entry
+    config.modResults = config.modResults.filter(
+      (item) => !(item.type === 'property' && item.key === key)
+    );
+
+    // Add the new property
+    config.modResults.push({
+      type: 'property',
+      key,
+      value,
+    });
+
+    KlaviyoLog.log(`Set ${key}=${value} in gradle.properties`);
+    return config;
+  });
+};
+
 const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   const typedConfig = config as typeof config & { modResults: KlaviyoAndroidModResults };
   if (!typedConfig.modResults) typedConfig.modResults = {};
@@ -443,7 +475,7 @@ const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, pro
     application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [], service: [] }]
   };
   if (!typedConfig.modResults.resources) typedConfig.modResults.resources = { string: [], color: [] };
-  if (!props) props = { logLevel: 1, openTracking: true, notificationIconFilePath: undefined, notificationColor: undefined };
+  if (!props) props = { logLevel: 1, openTracking: true, notificationIconFilePath: undefined, notificationColor: undefined, geofencingEnabled: false };
   KlaviyoLog.log('Starting Android plugin configuration...');
   KlaviyoLog.log('Plugin props:' + JSON.stringify(props));
 
@@ -454,6 +486,7 @@ const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, pro
     withAndroidManifestModifications,
     withMainActivityModifications,
     withKlaviyoPluginNameVersion,
+    withGeofencingGradleProperties,
   ].map(plugin => [plugin, props]));
 };
 
@@ -491,6 +524,6 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
 };
 
 // TEST ONLY exports
-export { withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest, createColorResource, mutateAndroidManifest };
+export { withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest, createColorResource, mutateAndroidManifest, withGeofencingGradleProperties };
 
 export default withKlaviyoAndroid; 

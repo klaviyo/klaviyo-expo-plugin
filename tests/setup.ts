@@ -42,7 +42,7 @@ jest.mock('@expo/config-plugins', () => ({
           return await action(result);
         }
       : action;
-    
+
     return {
       ...config,
       mods: {
@@ -55,6 +55,15 @@ jest.mock('@expo/config-plugins', () => ({
     return mod(config);
   }),
   withStringsXml: jest.fn().mockImplementation((config, mod) => (config: any, props: any) => config),
+  withGradleProperties: jest.fn().mockImplementation((config, mod) => {
+    // Initialize modResults if not present
+    const modifiedConfig = {
+      ...config,
+      modResults: config.modResults || [],
+    };
+    const result = mod(modifiedConfig);
+    return result || modifiedConfig;
+  }),
   withPlugins: jest.fn().mockImplementation((config, plugins) => {
     let result = config;
     for (const entry of plugins) {

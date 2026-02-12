@@ -111,6 +111,7 @@ npx expo prebuild
 | `android.openTracking` | boolean | optional | Enables tracking when notifications are opened. Default: `true`. Note that this is considered to be a **dangerous** mod, as it directly modifies your MainActivity code. |
 | `android.notificationIconFilePath` | string | optional | Path to the notification icon file. Should be a white, transparent PNG. Default: none specified. Note that you should set this instead of `expo-notifications`, as they can conflict with each other. |
 | `android.notificationColor` | string | optional | Hex color for notification accent. Must be a valid hex value, e.g., `"#FF0000"` Default: `undefined` |
+| `android.geofencingEnabled` | boolean | optional | Enables geofencing/location tracking support on Android. When `false`, prevents the SDK from adding location permissions (`ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`) to the app manifest. See [Geofencing](#geofencing) below. Default: `false` (geofencing disabled) |
 | `ios.badgeAutoclearing` | boolean | optional | Enables automatic badge count clearing when app is opened. Default: `true` |
 |`ios.codeSigningStyle`| string | optional | Declares management style for Code Signing Identity, Entitlements, and Provisioning Profile handled through XCode. Must be either "Manual" or "Automatic". Default: `"Automatic"`. Note: We highly recommend using the automatic signing style. If you select manual, you may need to go into your [developer.apple.com](https://developer.apple.com/) console and import the appropriate files and enable capabilities yourself.|
 |`ios.projectVersion`| string | optional | The internal build number for version. Default: `"1"`|
@@ -306,7 +307,7 @@ Geofencing enables location-based marketing by allowing Klaviyo to trigger event
 
 ### Configuration
 
-To enable geofencing support, add the `geofencingEnabled` property to your iOS plugin props:
+To enable geofencing support, add the `geofencingEnabled` property to both your iOS and Android plugin props:
 
 ```json
 {
@@ -315,6 +316,9 @@ To enable geofencing support, add the `geofencingEnabled` property to your iOS p
       [
         "klaviyo-expo-plugin",
         {
+          "android": {
+            "geofencingEnabled": true
+          },
           "ios": {
             "geofencingEnabled": true
           }
@@ -327,12 +331,19 @@ To enable geofencing support, add the `geofencingEnabled` property to your iOS p
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `geofencingEnabled` | boolean | optional | Enables geofencing support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. Default: `false` |
+| `android.geofencingEnabled` | boolean | optional | Enables geofencing support on Android. When `false`, prevents the SDK from adding location permissions to the manifest. Default: `false` |
+| `ios.geofencingEnabled` | boolean | optional | Enables geofencing support on iOS. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. Default: `false` |
 
-When geofencing is enabled, the plugin will:
+**When geofencing is enabled on iOS, the plugin will:**
 - Add the `KlaviyoLocation` pod dependency to the project
 - Import `KlaviyoLocation` and call `KlaviyoSDK().registerGeofencing()` in the app delegate
 - Add `location` to `UIBackgroundModes` in Info.plist
+
+**When geofencing is enabled on Android, the plugin will:**
+- Set `klaviyoIncludeLocationPermissions=true` in `gradle.properties`, which allows the SDK to include location permissions (`ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`) in the merged manifest
+
+**When geofencing is disabled (default), on Android the plugin will:**
+- Set `klaviyoIncludeLocationPermissions=false` in `gradle.properties`, which prevents the SDK from adding location permissions to your app manifest. This is useful if your app doesn't use geofencing features and you want to avoid unnecessary permission requests or app store review complications
 
 ### Requesting Permissions
 

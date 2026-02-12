@@ -8,7 +8,7 @@ jest.mock('xml2js', () => ({
   }))
 }));
 
-import { withNotificationIcon, withKlaviyoPluginNameVersion, modifyMainActivity } from '../plugin/withKlaviyoAndroid';
+import { withNotificationIcon, withKlaviyoPluginNameVersion, modifyMainActivity, withGeofencingGradleProperties } from '../plugin/withKlaviyoAndroid';
 import { createMockConfig, createMockProps, testPluginFunction } from './utils/testHelpers';
 
 // Mock file system operations
@@ -1141,6 +1141,111 @@ public class MainActivity extends ReactActivity {
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '1')).toBe(true);
       expect(logger.log).toHaveBeenCalledWith('Setting Klaviyo log level to 1');
+    });
+  });
+
+  describe('withGeofencingGradleProperties', () => {
+    const logger = require('../plugin/support/logger').KlaviyoLog;
+    let mockWithGradleProperties: jest.Mock;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockWithGradleProperties = require('@expo/config-plugins').withGradleProperties;
+    });
+
+    it('should set klaviyoIncludeLocationPermissions to false when geofencingEnabled is false', () => {
+      const config = { modResults: [] as { type: string; key: string; value: string }[] };
+      const props = createMockProps({ geofencingEnabled: false });
+
+      mockWithGradleProperties.mockImplementation((cfg, modifier) => {
+        return modifier(cfg);
+      });
+
+      const result = withGeofencingGradleProperties(config as any, props);
+
+      expect(result.modResults).toContainEqual({
+        type: 'property',
+        key: 'klaviyoIncludeLocationPermissions',
+        value: 'false',
+      });
+      expect(logger.log).toHaveBeenCalledWith('Configuring Android geofencing: disabled');
+      expect(logger.log).toHaveBeenCalledWith('Set klaviyoIncludeLocationPermissions=false in gradle.properties');
+    });
+
+    it('should set klaviyoIncludeLocationPermissions to true when geofencingEnabled is true', () => {
+      const config = { modResults: [] as { type: string; key: string; value: string }[] };
+      const props = createMockProps({ geofencingEnabled: true });
+
+      mockWithGradleProperties.mockImplementation((cfg, modifier) => {
+        return modifier(cfg);
+      });
+
+      const result = withGeofencingGradleProperties(config as any, props);
+
+      expect(result.modResults).toContainEqual({
+        type: 'property',
+        key: 'klaviyoIncludeLocationPermissions',
+        value: 'true',
+      });
+      expect(logger.log).toHaveBeenCalledWith('Configuring Android geofencing: enabled');
+      expect(logger.log).toHaveBeenCalledWith('Set klaviyoIncludeLocationPermissions=true in gradle.properties');
+    });
+
+    it('should default to false when geofencingEnabled is undefined', () => {
+      const config = { modResults: [] as { type: string; key: string; value: string }[] };
+      const props = createMockProps({ geofencingEnabled: undefined });
+
+      mockWithGradleProperties.mockImplementation((cfg, modifier) => {
+        return modifier(cfg);
+      });
+
+      const result = withGeofencingGradleProperties(config as any, props);
+
+      expect(result.modResults).toContainEqual({
+        type: 'property',
+        key: 'klaviyoIncludeLocationPermissions',
+        value: 'false',
+      });
+      expect(logger.log).toHaveBeenCalledWith('Configuring Android geofencing: disabled');
+    });
+
+    it('should remove existing klaviyoIncludeLocationPermissions before adding new one', () => {
+      const config = {
+        modResults: [
+          { type: 'property', key: 'klaviyoIncludeLocationPermissions', value: 'true' },
+          { type: 'property', key: 'otherProperty', value: 'otherValue' },
+        ] as { type: string; key: string; value: string }[],
+      };
+      const props = createMockProps({ geofencingEnabled: false });
+
+      mockWithGradleProperties.mockImplementation((cfg, modifier) => {
+        return modifier(cfg);
+      });
+
+      const result = withGeofencingGradleProperties(config as any, props);
+
+      // Should only have one klaviyoIncludeLocationPermissions entry
+      const klaviyoEntries = result.modResults.filter(
+        (item: { type: string; key: string; value: string }) => item.key === 'klaviyoIncludeLocationPermissions'
+      );
+      expect(klaviyoEntries).toHaveLength(1);
+      expect(klaviyoEntries[0].value).toBe('false');
+
+      // Should preserve other properties
+      expect(result.modResults).toContainEqual({
+        type: 'property',
+        key: 'otherProperty',
+        value: 'otherValue',
+      });
+    });
+
+    it('should call withGradleProperties with the config', () => {
+      const config = { modResults: [] as { type: string; key: string; value: string }[] };
+      const props = createMockProps({ geofencingEnabled: true });
+
+      withGeofencingGradleProperties(config as any, props);
+
+      expect(mockWithGradleProperties).toHaveBeenCalledWith(config, expect.any(Function));
     });
   });
 }); 
