@@ -42,11 +42,16 @@ export const validateAndroidConfig = (config: KlaviyoPluginProps['android'], pro
     if (!projectRoot) {
       throw new KlaviyoConfigError('projectRoot is required to validate notificationIconFilePath');
     }
-    
+
     const fullPath = path.join(projectRoot, config.notificationIconFilePath);
     if (!fs.existsSync(fullPath)) {
       throw new KlaviyoConfigError(`Android notificationIconFilePath does not exist: ${config.notificationIconFilePath}`);
     }
+  }
+
+  // Validate geofencingEnabled
+  if (config.geofencingEnabled !== undefined && typeof config.geofencingEnabled !== 'boolean') {
+    throw new KlaviyoConfigError('Android geofencingEnabled must be a boolean');
   }
 };
 

@@ -8,7 +8,7 @@ import {
 } from './types';
 import * as xml2js from 'xml2js';
 import { KlaviyoLog } from './support/logger';
-import { ExportedConfigWithProps, ConfigPlugin as ExpoConfigPlugin } from '@expo/config-plugins';
+import { ExportedConfigWithProps } from '@expo/config-plugins';
 import {
   AndroidManifest,
   ManifestApplication,
