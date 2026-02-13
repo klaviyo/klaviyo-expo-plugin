@@ -63,16 +63,6 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
     throw new KlaviyoConfigError('iOS codeSigningStyle must be either "Automatic" or "Manual"');
   }
 
-  // Validate projectVersion
-  if (config.projectVersion && !/^\d+$/.test(config.projectVersion)) {
-    throw new KlaviyoConfigError('iOS projectVersion must be a string containing only digits');
-  }
-
-  // Validate marketingVersion
-  if (config.marketingVersion && !/^\d+\.\d+(\.\d+)?$/.test(config.marketingVersion)) {
-    throw new KlaviyoConfigError('iOS marketingVersion must be in format "X.Y" or "X.Y.Z"');
-  }
-
   // Validate devTeam
   if (config.devTeam !== undefined) {
     if (typeof config.devTeam !== 'string' || !/^[A-Z0-9]{10}$/.test(config.devTeam)) {
