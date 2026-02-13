@@ -24,6 +24,7 @@ export default function GeofencingScreen() {
   const [currentGeofences, setCurrentGeofences] = useState<Geofence[]>([]);
 
   useEffect(() => {
+    if (!geofencingEnabledInBuild) return;
     checkLocationPermission();
     fetchCurrentGeofences();
   }, []);
@@ -129,7 +130,7 @@ export default function GeofencingScreen() {
 
   const handleUnregisterGeofences = () => {
     try {
-      // Klaviyo.unregisterGeofencing();
+      Klaviyo.unregisterGeofencing();
       setGeofencingEnabled(false);
       setCurrentGeofences([]);
       Alert.alert('Success', 'Geofencing has been disabled');
@@ -141,10 +142,10 @@ export default function GeofencingScreen() {
 
   const fetchCurrentGeofences = () => {
     try {
-      // Klaviyo.getCurrentGeofences((result: { geofences: Geofence[] }) => {
-      //   console.log('Current geofences:', result.geofences);
-      //   setCurrentGeofences(result.geofences);
-      // });
+      Klaviyo.getCurrentGeofences((result: { geofences: Geofence[] }) => {
+        console.log('Current geofences:', result.geofences);
+        setCurrentGeofences(result.geofences);
+      });
     } catch (error) {
       console.error('Error fetching geofences:', error);
     }
