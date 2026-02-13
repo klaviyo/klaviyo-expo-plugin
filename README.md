@@ -334,17 +334,10 @@ When geofencing is enabled, the plugin will:
 - Import `KlaviyoLocation` and call `KlaviyoSDK().registerGeofencing()` in the app delegate
 - Add `location` to `UIBackgroundModes` in Info.plist
 
-### Installing expo-location
-
-`expo-location` is an optional peer dependency that is only required when using geofencing. If you enable geofencing, you must install it separately:
-
-```bash
-npx expo install expo-location
-```
 
 ### Requesting Permissions
 
-Users must grant location permissions at runtime. Use `expo-location` (see docs [here](https://docs.expo.dev/versions/latest/sdk/location/)) to request permissions:
+Users must grant location permissions at runtime. We recommend using `expo-location` (see docs [here](https://docs.expo.dev/versions/latest/sdk/location/)) to request permissions:
 
 ```typescript
 import * as Location from 'expo-location';
