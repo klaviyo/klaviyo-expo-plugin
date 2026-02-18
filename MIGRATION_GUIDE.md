@@ -29,9 +29,9 @@ plugins: [
 
 ```js
 {
-  "version": "0.3.0",
-  "ios": {
-    "buildNumber": "3",
+  version: '0.3.0',
+  ios: {
+    buildNumber: '3',
     // ...
   },
   "plugins": [
