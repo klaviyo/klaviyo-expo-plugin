@@ -2,7 +2,7 @@
 
 This guide outlines how to migrate when upgrading to newer versions of the Klaviyo Expo plugin.
 
-## Migrating to v0.2.1
+## Migrating to v0.3.0
 
 ### Version and build number (iOS)
 
@@ -17,7 +17,7 @@ plugins: [
     {
       ios: {
         projectVersion: '3',
-        marketingVersion: '0.2.0',
+        marketingVersion: '0.3.0',
         // ...
       },
     },
@@ -29,7 +29,7 @@ plugins: [
 
 ```js
 {
-  "version": "0.2.1",
+  "version": "0.3.0",
   "ios": {
     "buildNumber": "3",
     // ...
