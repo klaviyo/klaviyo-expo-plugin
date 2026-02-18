@@ -53,6 +53,14 @@ export const validateAndroidConfig = (config: KlaviyoPluginProps['android'], pro
 export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
   if (!config) return;
 
+  // Warn if deprecated version props are used (duplicated in 0.3.0; use Expo-level build numbers instead)
+  const configWithExtras = config as unknown as Record<string, unknown>;
+  if (configWithExtras.projectVersion != null || configWithExtras.marketingVersion != null) {
+    console.warn(
+      '\tWARNING: klaviyo-expo-plugin: projectVersion and marketingVersion are deprecated in 0.3.0 and are ignored. Use Expo-level version and ios.buildNumber the app config instead.'
+    );
+  }
+
   // Validate badgeAutoclearing
   if (config.badgeAutoclearing !== undefined && typeof config.badgeAutoclearing !== 'boolean') {
     throw new KlaviyoConfigError('iOS badgeAutoclearing must be a boolean');
