@@ -334,6 +334,7 @@ When geofencing is enabled, the plugin will:
 - Import `KlaviyoLocation` and call `KlaviyoSDK().registerGeofencing()` in the app delegate
 - Add `location` to `UIBackgroundModes` in Info.plist
 
+
 ### Requesting Permissions
 
 Users must grant location permissions at runtime. We recommend using `expo-location` (see docs [here](https://docs.expo.dev/versions/latest/sdk/location/)) to request permissions:
