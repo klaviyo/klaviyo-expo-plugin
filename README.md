@@ -111,6 +111,8 @@ npx expo prebuild
 | `android.openTracking` | boolean | optional | Enables tracking when notifications are opened. Default: `true`. Note that this is considered to be a **dangerous** mod, as it directly modifies your MainActivity code. |
 | `android.notificationIconFilePath` | string | optional | Path to the notification icon file. Should be a white, transparent PNG. Default: none specified. Note that you should set this instead of `expo-notifications`, as they can conflict with each other. |
 | `android.notificationColor` | string | optional | Hex color for notification accent. Must be a valid hex value, e.g., `"#FF0000"` Default: `undefined` |
+| `android.geofencingEnabled` | boolean | optional | Controls whether the full location module (with geofencing and permissions) is included. When `false`, only the lightweight location-core module is included (no location permissions). Sets the `klaviyoIncludeLocation` gradle property. Default: `false` |
+| `android.formsEnabled` | boolean | optional | Controls whether the full forms module (in-app forms rendering with WebView) is included. When `false`, only the lightweight forms-core module is included. Sets the `klaviyoIncludeForms` gradle property. Default: `true` |
 | `ios.badgeAutoclearing` | boolean | optional | Enables automatic badge count clearing when app is opened. Default: `true` |
 |`ios.codeSigningStyle`| string | optional | Declares management style for Code Signing Identity, Entitlements, and Provisioning Profile handled through XCode. Must be either "Manual" or "Automatic". Default: `"Automatic"`. Note: We highly recommend using the automatic signing style. If you select manual, you may need to go into your [developer.apple.com](https://developer.apple.com/) console and import the appropriate files and enable capabilities yourself.|
 |`ios.projectVersion`| string | optional | The internal build number for version. Default: `"1"`|
@@ -306,7 +308,7 @@ Geofencing enables location-based marketing by allowing Klaviyo to trigger event
 
 ### Configuration
 
-To enable geofencing support, add the `geofencingEnabled` property to your iOS plugin props:
+To enable geofencing support, add the `geofencingEnabled` property to your plugin props:
 
 ```json
 {
@@ -315,6 +317,9 @@ To enable geofencing support, add the `geofencingEnabled` property to your iOS p
       [
         "klaviyo-expo-plugin",
         {
+          "android": {
+            "geofencingEnabled": true
+          },
           "ios": {
             "geofencingEnabled": true
           }
@@ -327,12 +332,16 @@ To enable geofencing support, add the `geofencingEnabled` property to your iOS p
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `geofencingEnabled` | boolean | optional | Enables geofencing support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. Default: `false` |
+| `ios.geofencingEnabled` | boolean | optional | Enables geofencing support on iOS. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. Default: `false` |
+| `android.geofencingEnabled` | boolean | optional | Enables geofencing support on Android. When `true`, includes the full location module with geofencing and location permissions. When `false`, only the lightweight location-core module is included. Default: `false` |
 
-When geofencing is enabled, the plugin will:
+When geofencing is enabled on iOS, the plugin will:
 - Add the `KlaviyoLocation` pod dependency to the project
 - Import `KlaviyoLocation` and call `KlaviyoSDK().registerGeofencing()` in the app delegate
 - Add `location` to `UIBackgroundModes` in Info.plist
+
+When geofencing is enabled on Android, the plugin will:
+- Set the `klaviyoIncludeLocation` gradle property to `true`, which includes the full location module with geofencing support and location permissions
 
 
 ### Requesting Permissions

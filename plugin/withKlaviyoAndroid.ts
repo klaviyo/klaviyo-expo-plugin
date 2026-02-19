@@ -1,4 +1,4 @@
-import { ConfigPlugin, withDangerousMod, withAndroidManifest, withStringsXml, withPlugins, withMainActivity } from '@expo/config-plugins';
+import { ConfigPlugin, withDangerousMod, withAndroidManifest, withStringsXml, withPlugins, withMainActivity, withGradleProperties } from '@expo/config-plugins';
 import * as fs from 'fs';
 import * as path from 'path';
 import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
@@ -436,6 +436,39 @@ const withNotificationIcon: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, p
   ]);
 };
 
+/**
+ * Controls whether the full location module (with geofencing + permissions) is included.
+ * When false, only location-core is included (lightweight, no permissions).
+ */
+const withLocationGradleProperties: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
+  const enabled = props.geofencingEnabled ?? false;
+  return withGradleProperties(config, (config) => {
+    const key = 'klaviyoIncludeLocation';
+    // Also remove old property name if present
+    config.modResults = config.modResults.filter(
+      (item) => !(item.type === 'property' && (item.key === key || item.key === 'klaviyoIncludeLocationPermissions'))
+    );
+    config.modResults.push({ type: 'property', key, value: enabled.toString() });
+    return config;
+  });
+};
+
+/**
+ * Controls whether the full forms module (in-app forms rendering) is included.
+ * When false, only forms-core is included (lightweight, no WebView deps).
+ */
+const withFormsGradleProperties: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
+  const enabled = props.formsEnabled ?? true;
+  return withGradleProperties(config, (config) => {
+    const key = 'klaviyoIncludeForms';
+    config.modResults = config.modResults.filter(
+      (item) => !(item.type === 'property' && item.key === key)
+    );
+    config.modResults.push({ type: 'property', key, value: enabled.toString() });
+    return config;
+  });
+};
+
 const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   const typedConfig = config as typeof config & { modResults: KlaviyoAndroidModResults };
   if (!typedConfig.modResults) typedConfig.modResults = {};
@@ -443,7 +476,7 @@ const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, pro
     application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [], service: [] }]
   };
   if (!typedConfig.modResults.resources) typedConfig.modResults.resources = { string: [], color: [] };
-  if (!props) props = { logLevel: 1, openTracking: true, notificationIconFilePath: undefined, notificationColor: undefined };
+  if (!props) props = { logLevel: 1, openTracking: true, notificationIconFilePath: undefined, notificationColor: undefined, geofencingEnabled: false, formsEnabled: true };
   KlaviyoLog.log('Starting Android plugin configuration...');
   KlaviyoLog.log('Plugin props:' + JSON.stringify(props));
 
@@ -454,6 +487,8 @@ const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, pro
     withAndroidManifestModifications,
     withMainActivityModifications,
     withKlaviyoPluginNameVersion,
+    withLocationGradleProperties,
+    withFormsGradleProperties,
   ].map(plugin => [plugin, props]));
 };
 
@@ -491,6 +526,6 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
 };
 
 // TEST ONLY exports
-export { withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest, createColorResource, mutateAndroidManifest };
+export { withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest, createColorResource, mutateAndroidManifest, withLocationGradleProperties, withFormsGradleProperties };
 
 export default withKlaviyoAndroid; 
