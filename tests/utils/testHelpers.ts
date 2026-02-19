@@ -54,8 +54,8 @@ export const createMockProps = (options: MockPropsOptions = {}): any => ({
   openTracking: true,
   notificationIconFilePath: './assets/icon.png',
   notificationColor: '#FF0000',
-  geofencingEnabled: options.geofencingEnabled ?? false,
-  formsEnabled: options.formsEnabled ?? true,
+  geofencingEnabled: false,
+  formsEnabled: true,
   ...options,
 });
 

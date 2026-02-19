@@ -4,7 +4,8 @@ import * as path from 'path';
 import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
 import {
   KlaviyoPluginAndroidProps,
-  KlaviyoAndroidModResults
+  KlaviyoAndroidModResults,
+  mergeAndroidProps
 } from './types';
 import * as xml2js from 'xml2js';
 import { KlaviyoLog } from './support/logger';
@@ -476,7 +477,7 @@ const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, pro
     application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [], service: [] }]
   };
   if (!typedConfig.modResults.resources) typedConfig.modResults.resources = { string: [], color: [] };
-  if (!props) props = { logLevel: 1, openTracking: true, notificationIconFilePath: undefined, notificationColor: undefined, geofencingEnabled: false, formsEnabled: true };
+  if (!props) props = mergeAndroidProps();
   KlaviyoLog.log('Starting Android plugin configuration...');
   KlaviyoLog.log('Plugin props:' + JSON.stringify(props));
 
