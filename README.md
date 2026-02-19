@@ -82,8 +82,6 @@ npx expo install klaviyo-expo-plugin
           "ios": {
             "badgeAutoclearing": true,
             "codeSigningStyle": "Automatic",
-            "projectVersion": "1",
-            "marketingVersion": "1.0",
             "devTeam": undefined // your devTeam ID here
           }
         }
@@ -113,8 +111,6 @@ npx expo prebuild
 | `android.notificationColor` | string | optional | Hex color for notification accent. Must be a valid hex value, e.g., `"#FF0000"` Default: `undefined` |
 | `ios.badgeAutoclearing` | boolean | optional | Enables automatic badge count clearing when app is opened. Default: `true` |
 |`ios.codeSigningStyle`| string | optional | Declares management style for Code Signing Identity, Entitlements, and Provisioning Profile handled through XCode. Must be either "Manual" or "Automatic". Default: `"Automatic"`. Note: We highly recommend using the automatic signing style. If you select manual, you may need to go into your [developer.apple.com](https://developer.apple.com/) console and import the appropriate files and enable capabilities yourself.|
-|`ios.projectVersion`| string | optional | The internal build number for version. Default: `"1"`|
-|`ios.marketingVersion`| string | optional| The app version displayed in the App Store. Must be of the format "X.X" or "X.X.X". Default: `"1.0"`|
 |`ios.devTeam`| string | optional| The 10-digit alphanumeric Apple Development Team ID associated with the necessary signing capabilites, provisioning profile, etc. Format: "XXXXXXXXXX" Default: `undefined`|
 |`ios.geofencingEnabled`| boolean | optional | Enables geofencing/location tracking support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. See [Geofencing](#geofencing) below. Default: `false` (geofencing disabled)|
 
@@ -148,8 +144,8 @@ In your configuration file, set the following:
 
 | Property | Details |
 |----------|---------|
-| `version` | Your app version. Corresponds to `CFBundleShortVersionString` on iOS. Format: `"X.X.X"` (e.g. `"1.0"` or `"2.3.1"`) |
-| `ios.buildNumber` | Build number for your iOS app. Corresponds to `CFBundleVersion`. Format: `"42"`|
+| `version` | Your app version. Used by the plugin for `CFBundleShortVersionString` and `MARKETING_VERSION` on iOS. Format: `"X.X.X"` (e.g. `"1.0"` or `"2.3.1"`). Default: `"1.0"` if not set. |
+| `ios.buildNumber` | Build number for your iOS app. Used by the plugin for `CFBundleVersion` and `CURRENT_PROJECT_VERSION`. Format: `"42"`. Default: `"1"` if not set. |
 | `ios.bundleIdentifier` | Bundle identifier for your iOS app. Format: `"com.companyname.appname"` |
 | `ios.infoPlist.UIBackgroundModes` | set this to `["remote-notification"]` to ensure you can receive background push notifications |
 | `android.package` | Package name for your Android app. Format: `"com.companyname.appname"` |

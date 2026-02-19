@@ -6,6 +6,16 @@ import { FileManager } from './support/fileManager';
 import { KlaviyoLog } from './support/logger';
 import { getPluginRoot } from './support/pluginResolver';
 
+/** Get marketing version (CFBundleShortVersionString / MARKETING_VERSION) from Expo config. */
+function getMarketingVersion(config: { version?: string }): string {
+  return config.version ?? '1.0';
+}
+
+/** Get build number (CFBundleVersion / CURRENT_PROJECT_VERSION) from Expo config. */
+function getBuildNumber(config: { ios?: { buildNumber?: string } }): string {
+  return config.ios?.buildNumber ?? '1';
+}
+
 const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   KlaviyoLog.log('Starting iOS plugin configuration...');
   KlaviyoLog.log('Plugin props:' + JSON.stringify(props));
@@ -137,8 +147,8 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
     const actualAppGroupName = `group.${bundleIdentifier}.${NSE_TARGET_NAME}.shared`;
     infoPlist.klaviyo_app_group = actualAppGroupName;
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
-    infoPlist.CFBundleShortVersionString = props.marketingVersion || "1.0";
-    infoPlist.CFBundleVersion = props.projectVersion || "1";
+    infoPlist.CFBundleShortVersionString = getMarketingVersion(config);
+    infoPlist.CFBundleVersion = getBuildNumber(config);
     return config;
   });
 };
@@ -331,12 +341,14 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
     );
     
     const configurations = xcodeProject.pbxXCBuildConfigurationSection();
+    const marketingVersion = getMarketingVersion(config);
+    const buildNumber = getBuildNumber(config);
     for (const key in configurations) {
       if (typeof configurations[key].buildSettings !== "undefined") {
         const buildSettingsObj = configurations[key].buildSettings;
         buildSettingsObj.CODE_SIGN_STYLE = props.codeSigningStyle;
-        buildSettingsObj.CURRENT_PROJECT_VERSION = props.projectVersion;
-        buildSettingsObj.MARKETING_VERSION = props.marketingVersion;
+        buildSettingsObj.CURRENT_PROJECT_VERSION = buildNumber;
+        buildSettingsObj.MARKETING_VERSION = marketingVersion;
         if (props.devTeam != undefined) {
           buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
         }
@@ -395,8 +407,8 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
           }
           
           if (file === `${NSE_TARGET_NAME}-Info.plist`) {
-            const marketingVersion = props.marketingVersion || "1.0";
-            const buildNumber = props.projectVersion || "1";
+            const marketingVersion = getMarketingVersion(config);
+            const buildNumber = getBuildNumber(config);
             const infoPlistPath = path.join(nsePath, file);
             let infoPlistContent = await FileManager.readFile(infoPlistPath);
             infoPlistContent = infoPlistContent.replace(
