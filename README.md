@@ -18,6 +18,7 @@
   - [Geofencing](#geofencing)
     - [Configuration](#geofencing-configuration)
     - [Requesting Permissions](#requesting-permissions)
+  - [In-App Forms](#in-app-forms)
   - [Example app](#example-app)
   - [Troubleshooting](#troubleshooting)
   - [License](#license)
@@ -373,6 +374,31 @@ async function requestLocationPermissions() {
 ```
 
 See the example app for a complete implementation.
+
+## In-App Forms
+
+By default, the full forms module is included, which enables in-app form rendering via WebView. If your app does not use Klaviyo in-app forms, you can exclude the full module to reduce your app size:
+
+```json
+{
+  "expo": {
+    "plugins": [
+      [
+        "klaviyo-expo-plugin",
+        {
+          "android": {
+            "formsEnabled": false
+          }
+        }
+      ]
+    ]
+  }
+}
+```
+
+When disabled on Android, only the lightweight `forms-core` module is included. The SDK will still function normally, but any calls to forms APIs will no-op gracefully.
+
+> **Note:** This toggle currently only applies to Android. iOS always includes the full forms module.
 
 ## Example app
 
