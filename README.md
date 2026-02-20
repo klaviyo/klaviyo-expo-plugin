@@ -18,6 +18,7 @@
   - [Geofencing](#geofencing)
     - [Configuration](#geofencing-configuration)
     - [Requesting Permissions](#requesting-permissions)
+  - [In-App Forms](#in-app-forms)
   - [Example app](#example-app)
   - [Troubleshooting](#troubleshooting)
   - [License](#license)
@@ -109,10 +110,13 @@ npx expo prebuild
 | `android.openTracking` | boolean | optional | Enables tracking when notifications are opened. Default: `true`. Note that this is considered to be a **dangerous** mod, as it directly modifies your MainActivity code. |
 | `android.notificationIconFilePath` | string | optional | Path to the notification icon file. Should be a white, transparent PNG. Default: none specified. Note that you should set this instead of `expo-notifications`, as they can conflict with each other. |
 | `android.notificationColor` | string | optional | Hex color for notification accent. Must be a valid hex value, e.g., `"#FF0000"` Default: `undefined` |
+| `android.geofencingEnabled` | boolean | optional | Controls whether the full location module (with geofencing and permissions) is included. When `false`, only the lightweight location-core module is included (no location permissions). Sets the `klaviyoIncludeLocation` gradle property. Default: `false` |
+| `android.formsEnabled` | boolean | optional | Controls whether the full forms module (in-app forms rendering with WebView) is included. When `false`, only the lightweight forms-core module is included. Sets the `klaviyoIncludeForms` gradle property. Default: `true` |
 | `ios.badgeAutoclearing` | boolean | optional | Enables automatic badge count clearing when app is opened. Default: `true` |
 |`ios.codeSigningStyle`| string | optional | Declares management style for Code Signing Identity, Entitlements, and Provisioning Profile handled through XCode. Must be either "Manual" or "Automatic". Default: `"Automatic"`. Note: We highly recommend using the automatic signing style. If you select manual, you may need to go into your [developer.apple.com](https://developer.apple.com/) console and import the appropriate files and enable capabilities yourself.|
 |`ios.devTeam`| string | optional| The 10-digit alphanumeric Apple Development Team ID associated with the necessary signing capabilites, provisioning profile, etc. Format: "XXXXXXXXXX" Default: `undefined`|
-|`ios.geofencingEnabled`| boolean | optional | Enables geofencing/location tracking support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. See [Geofencing](#geofencing) below. Default: `false` (geofencing disabled)|
+|`ios.geofencingEnabled`| boolean | optional | Enables geofencing/location tracking support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. When `false`, sets the `KLAVIYO_INCLUDE_LOCATION` Podfile ENV var to exclude the KlaviyoLocation pod. See [Geofencing](#geofencing) below. Default: `false` (geofencing disabled)|
+|`ios.formsEnabled`| boolean | optional | Controls whether the full forms module (in-app forms rendering with WebView) is included on iOS. When `false`, sets the `KLAVIYO_INCLUDE_FORMS` Podfile ENV var to exclude the module. Default: `true`|
 
 Note: If you do not need to specify any of these for your project, it will use the defaults defined here. If you do not specify any of these props, you can add the plugin without additional arguments:
 ```
@@ -302,7 +306,7 @@ Geofencing enables location-based marketing by allowing Klaviyo to trigger event
 
 ### Configuration
 
-To enable geofencing support, add the `geofencingEnabled` property to your iOS plugin props:
+To enable geofencing support, add the `geofencingEnabled` property to your plugin props:
 
 ```json
 {
@@ -311,6 +315,9 @@ To enable geofencing support, add the `geofencingEnabled` property to your iOS p
       [
         "klaviyo-expo-plugin",
         {
+          "android": {
+            "geofencingEnabled": true
+          },
           "ios": {
             "geofencingEnabled": true
           }
@@ -323,12 +330,17 @@ To enable geofencing support, add the `geofencingEnabled` property to your iOS p
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `geofencingEnabled` | boolean | optional | Enables geofencing support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. Default: `false` |
+| `ios.geofencingEnabled` | boolean | optional | Enables geofencing support on iOS. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. Default: `false` |
+| `android.geofencingEnabled` | boolean | optional | Enables geofencing support on Android. When `true`, includes the full location module with geofencing and location permissions. When `false`, only the lightweight location-core module is included. Default: `false` |
 
-When geofencing is enabled, the plugin will:
-- Add the `KlaviyoLocation` pod dependency to the project
+When geofencing is enabled on iOS, the plugin will:
 - Import `KlaviyoLocation` and call `KlaviyoSDK().registerGeofencing()` in the app delegate
 - Add `location` to `UIBackgroundModes` in Info.plist
+
+When geofencing is disabled on iOS (default), the plugin sets the `KLAVIYO_INCLUDE_LOCATION` Podfile ENV var to `'false'`, which tells the RN SDK's podspec to exclude the KlaviyoLocation pod dependency.
+
+When geofencing is enabled on Android, the plugin will:
+- Set the `klaviyoIncludeLocation` gradle property to `true`, which includes the full location module with geofencing support and location permissions
 
 
 ### Requesting Permissions
@@ -360,6 +372,32 @@ async function requestLocationPermissions() {
 ```
 
 See the example app for a complete implementation.
+
+## In-App Forms
+
+By default, the full forms module is included on both platforms, which enables in-app form rendering via WebView. If your app does not use Klaviyo in-app forms, you can exclude the full module to reduce your app size:
+
+```json
+{
+  "expo": {
+    "plugins": [
+      [
+        "klaviyo-expo-plugin",
+        {
+          "android": {
+            "formsEnabled": false
+          },
+          "ios": {
+            "formsEnabled": false
+          }
+        }
+      ]
+    ]
+  }
+}
+```
+
+When disabled on Android, only the lightweight `forms-core` module is included. On iOS, the `KLAVIYO_INCLUDE_FORMS` Podfile ENV var is set to `'false'`, which tells the RN SDK's podspec to exclude the KlaviyoForms pod dependency. The SDK will still function normally on both platforms, but any calls to forms APIs will no-op gracefully.
 
 ## Example app
 

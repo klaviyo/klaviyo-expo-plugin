@@ -3,6 +3,8 @@ export interface KlaviyoPluginAndroidBaseProps {
   openTracking?: boolean;
   notificationIconFilePath?: string;
   notificationColor?: string;
+  geofencingEnabled?: boolean;
+  formsEnabled?: boolean;
 }
 
 export interface KlaviyoPluginIosBaseProps  {
@@ -10,6 +12,7 @@ export interface KlaviyoPluginIosBaseProps  {
   codeSigningStyle: string;
   devTeam?: string;
   geofencingEnabled?: boolean;
+  formsEnabled?: boolean;
 }
 
 export interface KlaviyoPluginProps {
@@ -22,6 +25,8 @@ export interface KlaviyoPluginAndroidProps extends KlaviyoPluginAndroidBaseProps
   openTracking: boolean;
   notificationIconFilePath: string | undefined;
   notificationColor: string | undefined;
+  geofencingEnabled: boolean;
+  formsEnabled: boolean;
 }
 
 export interface KlaviyoPluginIosProps extends KlaviyoPluginIosBaseProps {
@@ -29,6 +34,7 @@ export interface KlaviyoPluginIosProps extends KlaviyoPluginIosBaseProps {
   codeSigningStyle: string;
   devTeam: string | undefined;
   geofencingEnabled?: boolean;
+  formsEnabled: boolean;
 }
 
 export interface KlaviyoPluginPropsDefaultValues extends KlaviyoPluginProps {
@@ -40,13 +46,16 @@ const ANDROID_DEFAULTS: KlaviyoPluginAndroidProps = {
   logLevel: 1,
   openTracking: true,
   notificationIconFilePath: undefined,
-  notificationColor: undefined
+  notificationColor: undefined,
+  geofencingEnabled: false,
+  formsEnabled: true
 };
 
 const IOS_DEFAULTS: KlaviyoPluginIosProps = {
   badgeAutoclearing: true,
   codeSigningStyle: "Automatic",
-  devTeam: undefined
+  devTeam: undefined,
+  formsEnabled: true
 };
 
 export const mergeAndroidProps = (props?: KlaviyoPluginAndroidBaseProps): KlaviyoPluginAndroidProps => {

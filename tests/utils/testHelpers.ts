@@ -19,6 +19,8 @@ export interface MockPropsOptions {
   openTracking?: boolean;
   notificationIconFilePath?: string;
   notificationColor?: string;
+  geofencingEnabled?: boolean;
+  formsEnabled?: boolean;
 }
 
 export const createMockConfig = (options: MockConfigOptions = {}): any => ({
@@ -52,6 +54,8 @@ export const createMockProps = (options: MockPropsOptions = {}): any => ({
   openTracking: true,
   notificationIconFilePath: './assets/icon.png',
   notificationColor: '#FF0000',
+  geofencingEnabled: false,
+  formsEnabled: true,
   ...options,
 });
 
@@ -252,6 +256,7 @@ export interface MockIosPropsOptions {
   codeSigningStyle?: string;
   devTeam?: string;
   geofencingEnabled?: boolean;
+  formsEnabled?: boolean;
 }
 
 export const createMockIosConfig = (options: MockIosConfigOptions = {}): any => {
@@ -295,5 +300,6 @@ export const createMockIosProps = (options: MockIosPropsOptions = {}): any => ({
   codeSigningStyle: 'Automatic',
   devTeam: 'XXXXXXXXXX',
   geofencingEnabled: false,
+  formsEnabled: true,
   ...options,
 }); 

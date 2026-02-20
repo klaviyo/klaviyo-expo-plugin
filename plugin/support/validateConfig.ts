@@ -32,6 +32,16 @@ export const validateAndroidConfig = (config: KlaviyoPluginProps['android'], pro
     }
   }
 
+  // Validate geofencingEnabled
+  if (config.geofencingEnabled !== undefined && typeof config.geofencingEnabled !== 'boolean') {
+    throw new KlaviyoConfigError('Android geofencingEnabled must be a boolean');
+  }
+
+  // Validate formsEnabled
+  if (config.formsEnabled !== undefined && typeof config.formsEnabled !== 'boolean') {
+    throw new KlaviyoConfigError('Android formsEnabled must be a boolean');
+  }
+
   // Validate notificationIconFilePath if provided
   if (config.notificationIconFilePath) {
     if (typeof config.notificationIconFilePath !== 'string') {
@@ -81,5 +91,10 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
   // Validate geofencingEnabled
   if (config.geofencingEnabled !== undefined && typeof config.geofencingEnabled !== 'boolean') {
     throw new KlaviyoConfigError('iOS geofencingEnabled must be a boolean');
+  }
+
+  // Validate formsEnabled
+  if (config.formsEnabled !== undefined && typeof config.formsEnabled !== 'boolean') {
+    throw new KlaviyoConfigError('iOS formsEnabled must be a boolean');
   }
 };
