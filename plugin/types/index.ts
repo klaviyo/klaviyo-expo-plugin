@@ -10,8 +10,6 @@ export interface KlaviyoPluginAndroidBaseProps {
 export interface KlaviyoPluginIosBaseProps  {
   badgeAutoclearing: boolean;
   codeSigningStyle: string;
-  projectVersion: string;
-  marketingVersion: string;
   devTeam?: string;
   geofencingEnabled?: boolean;
   formsEnabled?: boolean;
@@ -34,8 +32,6 @@ export interface KlaviyoPluginAndroidProps extends KlaviyoPluginAndroidBaseProps
 export interface KlaviyoPluginIosProps extends KlaviyoPluginIosBaseProps {
   badgeAutoclearing: boolean;
   codeSigningStyle: string;
-  projectVersion: string;
-  marketingVersion: string;
   devTeam: string | undefined;
   geofencingEnabled?: boolean;
   formsEnabled: boolean;
@@ -58,8 +54,6 @@ const ANDROID_DEFAULTS: KlaviyoPluginAndroidProps = {
 const IOS_DEFAULTS: KlaviyoPluginIosProps = {
   badgeAutoclearing: true,
   codeSigningStyle: "Automatic",
-  projectVersion: "1",
-  marketingVersion: "1.0",
   devTeam: undefined,
   formsEnabled: true
 };

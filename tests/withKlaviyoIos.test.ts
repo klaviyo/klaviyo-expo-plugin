@@ -186,45 +186,45 @@ describe('withKlaviyoIos', () => {
 
   describe('version synchronization', () => {
     describe('main app target Info.plist', () => {
-      it('should set CFBundleShortVersionString from props.marketingVersion', () => {
-        const propsWithVersion = createMockIosProps({
-          marketingVersion: '0.11.0',
-          projectVersion: '25',
+      it('should set CFBundleShortVersionString from config.version', () => {
+        const configWithVersion = createMockIosConfig({
+          version: '0.11.0',
+          ios: { buildNumber: '25' },
         });
-        const modifiedConfig = withKlaviyoIos(mockConfig, propsWithVersion) as any;
+        const modifiedConfig = withKlaviyoIos(configWithVersion, mockProps) as any;
         
         expect(modifiedConfig.modResults).toBeDefined();
         expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('0.11.0');
       });
 
-      it('should set CFBundleVersion from props.projectVersion', () => {
-        const propsWithVersion = createMockIosProps({
-          marketingVersion: '0.11.0',
-          projectVersion: '25',
+      it('should set CFBundleVersion from config.ios.buildNumber', () => {
+        const configWithVersion = createMockIosConfig({
+          version: '0.11.0',
+          ios: { buildNumber: '25' },
         });
-        const modifiedConfig = withKlaviyoIos(mockConfig, propsWithVersion) as any;
+        const modifiedConfig = withKlaviyoIos(configWithVersion, mockProps) as any;
         
         expect(modifiedConfig.modResults).toBeDefined();
         expect(modifiedConfig.modResults.CFBundleVersion).toBe('25');
       });
 
-      it('should default CFBundleShortVersionString to "1.0" when marketingVersion is not provided', () => {
-        const propsWithoutVersion = createMockIosProps({
-          marketingVersion: undefined,
-          projectVersion: '25',
+      it('should default CFBundleShortVersionString to "1.0" when config.version is not provided', () => {
+        const configWithoutVersion = createMockIosConfig({
+          version: undefined,
+          ios: { buildNumber: '25' },
         });
-        const modifiedConfig = withKlaviyoIos(mockConfig, propsWithoutVersion) as any;
+        const modifiedConfig = withKlaviyoIos(configWithoutVersion, mockProps) as any;
         
         expect(modifiedConfig.modResults).toBeDefined();
         expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('1.0');
       });
 
-      it('should default CFBundleVersion to "1" when projectVersion is not provided', () => {
-        const propsWithoutVersion = createMockIosProps({
-          marketingVersion: '0.11.0',
-          projectVersion: undefined,
+      it('should default CFBundleVersion to "1" when config.ios.buildNumber is not provided', () => {
+        const configWithoutBuildNumber = createMockIosConfig({
+          version: '0.11.0',
+          ios: { buildNumber: undefined },
         });
-        const modifiedConfig = withKlaviyoIos(mockConfig, propsWithoutVersion) as any;
+        const modifiedConfig = withKlaviyoIos(configWithoutBuildNumber, mockProps) as any;
         
         expect(modifiedConfig.modResults).toBeDefined();
         expect(modifiedConfig.modResults.CFBundleVersion).toBe('1');
@@ -232,16 +232,14 @@ describe('withKlaviyoIos', () => {
 
       it('should override existing CFBundleShortVersionString in Info.plist', () => {
         const configWithExistingVersion = createMockIosConfig({
+          version: '0.11.0',
+          ios: { buildNumber: '25' },
           modResults: {
             CFBundleShortVersionString: '2.0.0',
             CFBundleVersion: '100',
           },
         });
-        const propsWithVersion = createMockIosProps({
-          marketingVersion: '0.11.0',
-          projectVersion: '25',
-        });
-        const modifiedConfig = withKlaviyoIos(configWithExistingVersion, propsWithVersion) as any;
+        const modifiedConfig = withKlaviyoIos(configWithExistingVersion, mockProps) as any;
         
         expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('0.11.0');
         expect(modifiedConfig.modResults.CFBundleVersion).toBe('25');
@@ -277,13 +275,13 @@ describe('withKlaviyoIos', () => {
         FileManager.dirExists.mockReturnValue(true);
       });
 
-      it('should update CFBundleShortVersionString in NSE Info.plist from props.marketingVersion', async () => {
-        const propsWithVersion = createMockIosProps({
-          marketingVersion: '0.11.0',
-          projectVersion: '25',
+      it('should update CFBundleShortVersionString in NSE Info.plist from config.version', async () => {
+        const configWithVersion = createMockIosConfig({
+          version: '0.11.0',
+          ios: { buildNumber: '25' },
         });
         
-        await runIosMod(mockConfig, propsWithVersion);
+        await runIosMod(configWithVersion, mockProps);
         
         expect(FileManager.writeFile).toHaveBeenCalled();
         const writeCall = FileManager.writeFile.mock.calls.find(call => 
@@ -296,13 +294,13 @@ describe('withKlaviyoIos', () => {
         expect(writtenContent).toContain('<string>0.11.0</string>');
       });
 
-      it('should update CFBundleVersion in NSE Info.plist from props.projectVersion', async () => {
-        const propsWithVersion = createMockIosProps({
-          marketingVersion: '0.11.0',
-          projectVersion: '25',
+      it('should update CFBundleVersion in NSE Info.plist from config.ios.buildNumber', async () => {
+        const configWithVersion = createMockIosConfig({
+          version: '0.11.0',
+          ios: { buildNumber: '25' },
         });
         
-        await runIosMod(mockConfig, propsWithVersion);
+        await runIosMod(configWithVersion, mockProps);
         
         expect(FileManager.writeFile).toHaveBeenCalled();
         const writeCall = FileManager.writeFile.mock.calls.find(call => 
@@ -315,13 +313,13 @@ describe('withKlaviyoIos', () => {
         expect(writtenContent).toContain('<string>25</string>');
       });
 
-      it('should default CFBundleShortVersionString to "1.0" in NSE when marketingVersion is not provided', async () => {
-        const propsWithoutVersion = createMockIosProps({
-          marketingVersion: undefined,
-          projectVersion: '25',
+      it('should default CFBundleShortVersionString to "1.0" in NSE when config.version is not provided', async () => {
+        const configWithoutVersion = createMockIosConfig({
+          version: undefined,
+          ios: { buildNumber: '25' },
         });
         
-        await runIosMod(mockConfig, propsWithoutVersion);
+        await runIosMod(configWithoutVersion, mockProps);
         
         expect(FileManager.writeFile).toHaveBeenCalled();
         const writeCall = FileManager.writeFile.mock.calls.find(call => 
@@ -332,13 +330,13 @@ describe('withKlaviyoIos', () => {
         expect(writtenContent).toContain('<string>1.0</string>');
       });
 
-      it('should default CFBundleVersion to "1" in NSE when projectVersion is not provided', async () => {
-        const propsWithoutVersion = createMockIosProps({
-          marketingVersion: '0.11.0',
-          projectVersion: undefined,
+      it('should default CFBundleVersion to "1" in NSE when config.ios.buildNumber is not provided', async () => {
+        const configWithoutBuildNumber = createMockIosConfig({
+          version: '0.11.0',
+          ios: { buildNumber: undefined },
         });
         
-        await runIosMod(mockConfig, propsWithoutVersion);
+        await runIosMod(configWithoutBuildNumber, mockProps);
         
         expect(FileManager.writeFile).toHaveBeenCalled();
         const writeCall = FileManager.writeFile.mock.calls.find(call => 
@@ -350,12 +348,12 @@ describe('withKlaviyoIos', () => {
       });
 
       it('should update both version fields correctly in NSE Info.plist', async () => {
-        const propsWithVersion = createMockIosProps({
-          marketingVersion: '2.5.3',
-          projectVersion: '42',
+        const configWithVersion = createMockIosConfig({
+          version: '2.5.3',
+          ios: { buildNumber: '42' },
         });
         
-        await runIosMod(mockConfig, propsWithVersion);
+        await runIosMod(configWithVersion, mockProps);
         
         expect(FileManager.writeFile).toHaveBeenCalled();
         const writeCall = FileManager.writeFile.mock.calls.find(call => 
@@ -370,12 +368,12 @@ describe('withKlaviyoIos', () => {
       });
 
       it('should ensure main app and NSE extension have matching versions', async () => {
-        const propsWithVersion = createMockIosProps({
-          marketingVersion: '0.11.0',
-          projectVersion: '25',
+        const configWithVersion = createMockIosConfig({
+          version: '0.11.0',
+          ios: { buildNumber: '25' },
         });
         
-        const modifiedConfig = await runIosMod(mockConfig, propsWithVersion) as any;
+        const modifiedConfig = await runIosMod(configWithVersion, mockProps) as any;
         
         // Check main app version
         expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('0.11.0');
@@ -394,7 +392,7 @@ describe('withKlaviyoIos', () => {
     });
   });
 
-  describe('withGeofencingPodspec', () => {
+  describe('withGeofencingAppDelegate', () => {
     describe('UIBackgroundModes configuration', () => {
       it('should add location to UIBackgroundModes when geofencingEnabled is true', () => {
         const propsWithGeofencing = createMockIosProps({
