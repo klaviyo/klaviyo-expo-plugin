@@ -256,6 +256,7 @@ export interface MockIosPropsOptions {
   marketingVersion?: string;
   devTeam?: string;
   geofencingEnabled?: boolean;
+  formsEnabled?: boolean;
 }
 
 export const createMockIosConfig = (options: MockIosConfigOptions = {}): any => {
@@ -293,5 +294,6 @@ export const createMockIosProps = (options: MockIosPropsOptions = {}): any => ({
   marketingVersion: '1.0',
   devTeam: 'XXXXXXXXXX',
   geofencingEnabled: false,
+  formsEnabled: true,
   ...options,
 }); 

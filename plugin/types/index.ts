@@ -14,6 +14,7 @@ export interface KlaviyoPluginIosBaseProps  {
   marketingVersion: string;
   devTeam?: string;
   geofencingEnabled?: boolean;
+  formsEnabled?: boolean;
 }
 
 export interface KlaviyoPluginProps {
@@ -37,6 +38,7 @@ export interface KlaviyoPluginIosProps extends KlaviyoPluginIosBaseProps {
   marketingVersion: string;
   devTeam: string | undefined;
   geofencingEnabled?: boolean;
+  formsEnabled: boolean;
 }
 
 export interface KlaviyoPluginPropsDefaultValues extends KlaviyoPluginProps {
@@ -58,7 +60,8 @@ const IOS_DEFAULTS: KlaviyoPluginIosProps = {
   codeSigningStyle: "Automatic",
   projectVersion: "1",
   marketingVersion: "1.0",
-  devTeam: undefined
+  devTeam: undefined,
+  formsEnabled: true
 };
 
 export const mergeAndroidProps = (props?: KlaviyoPluginAndroidBaseProps): KlaviyoPluginAndroidProps => {

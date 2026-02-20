@@ -94,4 +94,9 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
   if (config.geofencingEnabled !== undefined && typeof config.geofencingEnabled !== 'boolean') {
     throw new KlaviyoConfigError('iOS geofencingEnabled must be a boolean');
   }
+
+  // Validate formsEnabled
+  if (config.formsEnabled !== undefined && typeof config.formsEnabled !== 'boolean') {
+    throw new KlaviyoConfigError('iOS formsEnabled must be a boolean');
+  }
 };

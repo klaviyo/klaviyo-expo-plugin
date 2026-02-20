@@ -92,5 +92,31 @@ describe('validateConfig', () => {
         expect(() => validateIosConfig({ badgeAutoclearing: true, codeSigningStyle: 'Automatic', projectVersion: '1', marketingVersion: '1.0', geofencingEnabled: 'true' as any })).toThrow('iOS geofencingEnabled must be a boolean');
       });
     });
+
+    describe('formsEnabled', () => {
+      it('accepts true', () => {
+        expect(() => validateIosConfig({ badgeAutoclearing: true, codeSigningStyle: 'Automatic', projectVersion: '1', marketingVersion: '1.0', formsEnabled: true })).not.toThrow();
+      });
+
+      it('accepts false', () => {
+        expect(() => validateIosConfig({ badgeAutoclearing: true, codeSigningStyle: 'Automatic', projectVersion: '1', marketingVersion: '1.0', formsEnabled: false })).not.toThrow();
+      });
+
+      it('accepts undefined (optional)', () => {
+        expect(() => validateIosConfig({ badgeAutoclearing: true, codeSigningStyle: 'Automatic', projectVersion: '1', marketingVersion: '1.0', formsEnabled: undefined })).not.toThrow();
+      });
+
+      it('accepts missing property', () => {
+        expect(() => validateIosConfig({ badgeAutoclearing: true, codeSigningStyle: 'Automatic', projectVersion: '1', marketingVersion: '1.0' })).not.toThrow();
+      });
+
+      it('rejects non-boolean values', () => {
+        expect(() => validateIosConfig({ badgeAutoclearing: true, codeSigningStyle: 'Automatic', projectVersion: '1', marketingVersion: '1.0', formsEnabled: 'true' as any })).toThrow('iOS formsEnabled must be a boolean');
+      });
+
+      it('rejects number values', () => {
+        expect(() => validateIosConfig({ badgeAutoclearing: true, codeSigningStyle: 'Automatic', projectVersion: '1', marketingVersion: '1.0', formsEnabled: 0 as any })).toThrow('iOS formsEnabled must be a boolean');
+      });
+    });
   });
 });

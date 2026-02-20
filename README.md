@@ -119,7 +119,8 @@ npx expo prebuild
 |`ios.projectVersion`| string | optional | The internal build number for version. Default: `"1"`|
 |`ios.marketingVersion`| string | optional| The app version displayed in the App Store. Must be of the format "X.X" or "X.X.X". Default: `"1.0"`|
 |`ios.devTeam`| string | optional| The 10-digit alphanumeric Apple Development Team ID associated with the necessary signing capabilites, provisioning profile, etc. Format: "XXXXXXXXXX" Default: `undefined`|
-|`ios.geofencingEnabled`| boolean | optional | Enables geofencing/location tracking support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. See [Geofencing](#geofencing) below. Default: `false` (geofencing disabled)|
+|`ios.geofencingEnabled`| boolean | optional | Enables geofencing/location tracking support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. When `false`, sets the `KLAVIYO_INCLUDE_LOCATION` Podfile ENV var to exclude the KlaviyoLocation pod. See [Geofencing](#geofencing) below. Default: `false` (geofencing disabled)|
+|`ios.formsEnabled`| boolean | optional | Controls whether the full forms module (in-app forms rendering with WebView) is included on iOS. When `false`, sets the `KLAVIYO_INCLUDE_FORMS` Podfile ENV var to exclude the module. Default: `true`|
 
 Note: If you do not need to specify any of these for your project, it will use the defaults defined here. If you do not specify any of these props, you can add the plugin without additional arguments:
 ```
@@ -337,9 +338,10 @@ To enable geofencing support, add the `geofencingEnabled` property to your plugi
 | `android.geofencingEnabled` | boolean | optional | Enables geofencing support on Android. When `true`, includes the full location module with geofencing and location permissions. When `false`, only the lightweight location-core module is included. Default: `false` |
 
 When geofencing is enabled on iOS, the plugin will:
-- Add the `KlaviyoLocation` pod dependency to the project
 - Import `KlaviyoLocation` and call `KlaviyoSDK().registerGeofencing()` in the app delegate
 - Add `location` to `UIBackgroundModes` in Info.plist
+
+When geofencing is disabled on iOS (default), the plugin sets the `KLAVIYO_INCLUDE_LOCATION` Podfile ENV var to `'false'`, which tells the RN SDK's podspec to exclude the KlaviyoLocation pod dependency.
 
 When geofencing is enabled on Android, the plugin will:
 - Set the `klaviyoIncludeLocation` gradle property to `true`, which includes the full location module with geofencing support and location permissions
@@ -377,7 +379,7 @@ See the example app for a complete implementation.
 
 ## In-App Forms
 
-By default, the full forms module is included, which enables in-app form rendering via WebView. If your app does not use Klaviyo in-app forms, you can exclude the full module to reduce your app size:
+By default, the full forms module is included on both platforms, which enables in-app form rendering via WebView. If your app does not use Klaviyo in-app forms, you can exclude the full module to reduce your app size:
 
 ```json
 {
@@ -388,6 +390,9 @@ By default, the full forms module is included, which enables in-app form renderi
         {
           "android": {
             "formsEnabled": false
+          },
+          "ios": {
+            "formsEnabled": false
           }
         }
       ]
@@ -396,9 +401,7 @@ By default, the full forms module is included, which enables in-app form renderi
 }
 ```
 
-When disabled on Android, only the lightweight `forms-core` module is included. The SDK will still function normally, but any calls to forms APIs will no-op gracefully.
-
-> **Note:** This toggle currently only applies to Android. iOS always includes the full forms module.
+When disabled on Android, only the lightweight `forms-core` module is included. On iOS, the `KLAVIYO_INCLUDE_FORMS` Podfile ENV var is set to `'false'`, which tells the RN SDK's podspec to exclude the KlaviyoForms pod dependency. The SDK will still function normally on both platforms, but any calls to forms APIs will no-op gracefully.
 
 ## Example app
 
