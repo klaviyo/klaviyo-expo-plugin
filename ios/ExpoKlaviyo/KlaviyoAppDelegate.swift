@@ -1,21 +1,26 @@
 import ExpoModulesCore
 import KlaviyoSwift
-// KLAVIYO_GEOFENCING_IMPORT
+
+#if canImport(KlaviyoLocation)
+@_spi(KlaviyoPrivate) import KlaviyoLocation
+#endif
 
 public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotificationCenterDelegate {
-    
+
     private weak var originalDelegate: UNUserNotificationCenterDelegate?
-    
+
     public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         // Store the original delegate in order to call expo-notifications handlers
         let center = UNUserNotificationCenter.current()
         originalDelegate = center.delegate
         // Allow Klaviyo to intercept notifications
         center.delegate = self
-        // KLAVIYO_GEOFENCING_REGISTER
+        #if canImport(KlaviyoLocation)
+        KlaviyoSDK().registerGeofencing()
+        #endif
         return true
     }
-    
+
     public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
@@ -25,7 +30,7 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
             originalDelegate.userNotificationCenter?(center, didReceive: response, withCompletionHandler: completionHandler)
         }
     }
-    
+
     public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,

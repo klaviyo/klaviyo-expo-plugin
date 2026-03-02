@@ -23,7 +23,7 @@ const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withPlugins(config, [
     withKlaviyoPluginConfigurationPlist,
     withRemoteNotificationsPermissions,
-    withGeofencingAppDelegate,
+    withGeofencingBackgroundMode,
     withKlaviyoPodfileEnvVars,
     withKlaviyoPodfile,
     withKlaviyoXcodeProject,
@@ -155,85 +155,48 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
 };
 
 /**
- * Configures geofencing by modifying the AppDelegate Swift file and adding location background mode if enabled.
+ * Adds location to UIBackgroundModes if geofencing is enabled.
+ * The Swift source uses #if canImport(KlaviyoLocation) guards; no file mutation needed here.
  */
-const withGeofencingAppDelegate: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
+const withGeofencingBackgroundMode: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   const geofencingEnabled = props.geofencingEnabled ?? false;
-
-  // Handle Swift file modifications (AppDelegate import + registerGeofencing call)
-  config = withDangerousMod(config, [
-    'ios',
-    async config => {
-      const pluginRoot = getPluginRoot();
-      const swiftPath = path.join(pluginRoot, 'ios', 'ExpoKlaviyo', 'KlaviyoAppDelegate.swift');
-
-      try {
-        let swiftContent = await FileManager.readFile(swiftPath);
-        swiftContent = swiftContent.replace(/.*KLAVIYO_GEOFENCING_IMPORT.*\n?/g, '');
-        swiftContent = swiftContent.replace(/.*KLAVIYO_GEOFENCING_REGISTER.*\n?/g, '');
-        swiftContent = swiftContent.replace(
-          /(import KlaviyoSwift\s*\n)/,
-          geofencingEnabled
-            ? "$1import KlaviyoLocation // KLAVIYO_GEOFENCING_IMPORT\n"
-            : "$1// KLAVIYO_GEOFENCING_IMPORT\n"
-        );
-        swiftContent = swiftContent.replace(
-          /(center\.delegate = self\s*\n)/,
-          geofencingEnabled
-            ? "$1        KlaviyoSDK().registerGeofencing() // KLAVIYO_GEOFENCING_REGISTER\n"
-            : "$1        // KLAVIYO_GEOFENCING_REGISTER\n"
-        );
-        await FileManager.writeFile(swiftPath, swiftContent);
-
-        KlaviyoLog.log(`Geofencing ${geofencingEnabled ? 'enabled' : 'disabled'}`);
-      } catch (err) {
-        KlaviyoLog.log('Could not configure geofencing: ' + err);
-      }
-
-      return config;
-    },
-  ]);
 
   if (!geofencingEnabled) {
     KlaviyoLog.log('Geofencing not enabled, skipping background mode configuration');
     return config;
   }
 
-  // Add location to UIBackgroundModes via Info.plist
   return withInfoPlist(config, (config) => {
     const infoPlist = config.modResults;
-    
+
     const existingFromModResults = infoPlist.UIBackgroundModes || [];
     const existingFromConfig = config.ios?.infoPlist?.UIBackgroundModes || [];
-    const existingBackgroundModes = Array.isArray(existingFromModResults) 
-      ? existingFromModResults 
-      : Array.isArray(existingFromConfig) 
-        ? existingFromConfig 
+    const existingBackgroundModes = Array.isArray(existingFromModResults)
+      ? existingFromModResults
+      : Array.isArray(existingFromConfig)
+        ? existingFromConfig
         : [];
-    
+
     const updatedBackgroundModes = [...existingBackgroundModes];
-    
+
     if (!updatedBackgroundModes.includes('location')) {
       updatedBackgroundModes.push('location');
       KlaviyoLog.log('Added location to UIBackgroundModes');
     }
-    
+
     infoPlist.UIBackgroundModes = updatedBackgroundModes;
     KlaviyoLog.log(`Final UIBackgroundModes: ${JSON.stringify(updatedBackgroundModes)}`);
-    
+
     return config;
   });
 };
 
 /**
- * Injects Podfile ENV vars to control optional native module inclusion.
+ * Writes explicit ENV vars to the top of the Podfile so the podspec and the RN SDK
+ * can conditionally include KlaviyoLocation and KlaviyoForms.
  *
- * The RN SDK's podspec conditionally includes KlaviyoLocation and KlaviyoForms
- * based on ENV vars. Both modules are included by default; this plugin only
- * injects an ENV var when the user opts OUT (sets the feature to false).
- *
- * - KLAVIYO_INCLUDE_LOCATION: set to 'false' to exclude the geofencing module
- * - KLAVIYO_INCLUDE_FORMS: set to 'false' to exclude the in-app forms module
+ * - KLAVIYO_INCLUDE_LOCATION: 'true' when geofencingEnabled (default false, opt-in)
+ * - KLAVIYO_INCLUDE_FORMS:    'true' when formsEnabled    (default true, opt-out)
  */
 const withKlaviyoPodfileEnvVars: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withDangerousMod(config, [
@@ -248,19 +211,16 @@ const withKlaviyoPodfileEnvVars: ConfigPlugin<KlaviyoPluginIosProps> = (config, 
         // Remove any existing Klaviyo env vars (idempotent)
         podfileContent = podfileContent.replace(/ENV\['KLAVIYO_INCLUDE_(?:LOCATION|FORMS)'\]\s*=\s*'[^']*'\n?/g, '');
 
-        // Build the list of env vars to inject (only for opt-outs)
-        const envVars: string[] = [];
-        if (!props.geofencingEnabled) {
-          envVars.push("ENV['KLAVIYO_INCLUDE_LOCATION'] = 'false'");
-        }
-        if (props.formsEnabled === false) {
-          envVars.push("ENV['KLAVIYO_INCLUDE_FORMS'] = 'false'");
-        }
+        const locationVal = (props.geofencingEnabled ?? false) ? 'true' : 'false';
+        const formsVal = (props.formsEnabled ?? true) ? 'true' : 'false';
 
-        if (envVars.length > 0) {
-          podfileContent = envVars.join('\n') + '\n' + podfileContent;
-          KlaviyoLog.log(`Injected Podfile ENV vars: ${envVars.join(', ')}`);
-        }
+        const envVars = [
+          `ENV['KLAVIYO_INCLUDE_LOCATION'] = '${locationVal}'`,
+          `ENV['KLAVIYO_INCLUDE_FORMS'] = '${formsVal}'`,
+        ];
+
+        podfileContent = envVars.join('\n') + '\n' + podfileContent;
+        KlaviyoLog.log(`Set Podfile ENV vars: KLAVIYO_INCLUDE_LOCATION=${locationVal}, KLAVIYO_INCLUDE_FORMS=${formsVal}`);
 
         await FileManager.writeFile(podfilePath, podfileContent);
       } catch (err) {
