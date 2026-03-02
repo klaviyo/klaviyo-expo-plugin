@@ -392,7 +392,7 @@ describe('withKlaviyoIos', () => {
     });
   });
 
-  describe('withGeofencingAppDelegate', () => {
+  describe('withGeofencingBackgroundMode', () => {
     describe('UIBackgroundModes configuration', () => {
       it('should add location to UIBackgroundModes when geofencingEnabled is true', () => {
         const propsWithGeofencing = createMockIosProps({
@@ -455,20 +455,8 @@ describe('withKlaviyoIos', () => {
       });
     });
 
-    describe('Swift file modifications', () => {
+    describe('Swift file', () => {
       const { FileManager } = require('../plugin/support/fileManager');
-
-      const mockSwiftContent = `import ExpoModulesCore
-import KlaviyoSwift
-
-public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotificationCenterDelegate {
-    public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-        let center = UNUserNotificationCenter.current()
-        center.delegate = self
-        return true
-    }
-}
-`;
 
       async function runIosMod(config: any, props: any) {
         const result = withKlaviyoIos(config, props) as any;
@@ -480,67 +468,36 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
 
       beforeEach(() => {
         jest.clearAllMocks();
-        FileManager.readFile.mockImplementation((filePath: string) => {
-          if (filePath.includes('KlaviyoAppDelegate.swift')) {
-            return Promise.resolve(mockSwiftContent);
-          }
-          return Promise.resolve('');
-        });
+        FileManager.readFile.mockResolvedValue('');
         FileManager.writeFile.mockResolvedValue(undefined);
+        FileManager.dirExists.mockReturnValue(true);
+        FileManager.copyFile.mockResolvedValue(undefined);
       });
 
-      it('should not modify the podspec (no longer injects s.dependency KlaviyoLocation)', async () => {
-        const propsWithGeofencing = createMockIosProps({
-          geofencingEnabled: true,
-        });
+      it('should not write to KlaviyoAppDelegate.swift regardless of geofencingEnabled', async () => {
+        for (const geofencingEnabled of [true, false, undefined]) {
+          jest.clearAllMocks();
+          FileManager.readFile.mockResolvedValue('');
+          FileManager.writeFile.mockResolvedValue(undefined);
+          FileManager.dirExists.mockReturnValue(true);
+          FileManager.copyFile.mockResolvedValue(undefined);
 
-        await runIosMod(mockConfig, propsWithGeofencing);
+          await runIosMod(mockConfig, createMockIosProps({ geofencingEnabled }));
+
+          const swiftWriteCall = FileManager.writeFile.mock.calls.find((call: any) =>
+            call && call[0] && typeof call[0] === 'string' && call[0].includes('KlaviyoAppDelegate.swift')
+          );
+          expect(swiftWriteCall).toBeUndefined();
+        }
+      });
+
+      it('should not write to ExpoKlaviyo.podspec', async () => {
+        await runIosMod(mockConfig, createMockIosProps({ geofencingEnabled: true }));
 
         const podspecWriteCall = FileManager.writeFile.mock.calls.find((call: any) =>
           call && call[0] && typeof call[0] === 'string' && call[0].includes('ExpoKlaviyo.podspec')
         );
-
         expect(podspecWriteCall).toBeUndefined();
-      });
-
-      it('should inject KlaviyoLocation import and registerGeofencing into Swift file when geofencingEnabled is true', async () => {
-        const propsWithGeofencing = createMockIosProps({
-          geofencingEnabled: true,
-        });
-
-        await runIosMod(mockConfig, propsWithGeofencing);
-
-        // Find the Swift file write call
-        const swiftWriteCall = FileManager.writeFile.mock.calls.find((call: any) =>
-          call && call[0] && typeof call[0] === 'string' && call[0].includes('KlaviyoAppDelegate.swift')
-        );
-
-        expect(swiftWriteCall).toBeDefined();
-        const writtenContent = swiftWriteCall[1];
-        expect(writtenContent).toContain("import KlaviyoLocation");
-        expect(writtenContent).toContain("// KLAVIYO_GEOFENCING_IMPORT");
-        expect(writtenContent).toContain("KlaviyoSDK().registerGeofencing()");
-        expect(writtenContent).toContain("// KLAVIYO_GEOFENCING_REGISTER");
-      });
-
-      it('should not inject KlaviyoLocation import and registerGeofencing into Swift file when geofencingEnabled is false', async () => {
-        const propsWithoutGeofencing = createMockIosProps({
-          geofencingEnabled: false,
-        });
-
-        await runIosMod(mockConfig, propsWithoutGeofencing);
-
-        // Find the Swift file write call
-        const swiftWriteCall = FileManager.writeFile.mock.calls.find((call: any) =>
-          call && call[0] && typeof call[0] === 'string' && call[0].includes('KlaviyoAppDelegate.swift')
-        );
-
-        expect(swiftWriteCall).toBeDefined();
-        const writtenContent = swiftWriteCall[1];
-        expect(writtenContent).not.toContain("import KlaviyoLocation");
-        expect(writtenContent).toContain("// KLAVIYO_GEOFENCING_IMPORT");
-        expect(writtenContent).not.toContain("KlaviyoSDK().registerGeofencing()");
-        expect(writtenContent).toContain("// KLAVIYO_GEOFENCING_REGISTER");
       });
     });
   });
@@ -575,112 +532,92 @@ end
       FileManager.copyFile.mockResolvedValue(undefined);
     });
 
-    it('should inject KLAVIYO_INCLUDE_LOCATION env var when geofencingEnabled is false (default)', async () => {
-      const props = createMockIosProps({
-        geofencingEnabled: false,
-      });
+    it('should always write both KLAVIYO_INCLUDE_LOCATION and KLAVIYO_INCLUDE_FORMS', async () => {
+      await runIosMod(mockConfig, createMockIosProps());
 
-      await runIosMod(mockConfig, props);
-
-      // Find the Podfile write call from the env var plugin
       const podfileWriteCalls = FileManager.writeFile.mock.calls.filter((call: any) =>
         call && call[0] && typeof call[0] === 'string' && call[0].includes('Podfile')
       );
 
-      // At least one Podfile write should contain the env var
+      const bothVarsWrite = podfileWriteCalls.find((call: any) =>
+        call[1].includes("ENV['KLAVIYO_INCLUDE_LOCATION']") &&
+        call[1].includes("ENV['KLAVIYO_INCLUDE_FORMS']")
+      );
+      expect(bothVarsWrite).toBeDefined();
+    });
+
+    it('should set KLAVIYO_INCLUDE_LOCATION to false when geofencingEnabled is false (default)', async () => {
+      await runIosMod(mockConfig, createMockIosProps({ geofencingEnabled: false }));
+
+      const podfileWriteCalls = FileManager.writeFile.mock.calls.filter((call: any) =>
+        call && call[0] && typeof call[0] === 'string' && call[0].includes('Podfile')
+      );
       const envVarWrite = podfileWriteCalls.find((call: any) =>
         call[1].includes("ENV['KLAVIYO_INCLUDE_LOCATION'] = 'false'")
       );
       expect(envVarWrite).toBeDefined();
     });
 
-    it('should NOT inject KLAVIYO_INCLUDE_LOCATION env var when geofencingEnabled is true', async () => {
-      const props = createMockIosProps({
-        geofencingEnabled: true,
-      });
-
-      await runIosMod(mockConfig, props);
+    it('should set KLAVIYO_INCLUDE_LOCATION to true when geofencingEnabled is true', async () => {
+      await runIosMod(mockConfig, createMockIosProps({ geofencingEnabled: true }));
 
       const podfileWriteCalls = FileManager.writeFile.mock.calls.filter((call: any) =>
         call && call[0] && typeof call[0] === 'string' && call[0].includes('Podfile')
       );
-
       const envVarWrite = podfileWriteCalls.find((call: any) =>
-        call[1].includes("ENV['KLAVIYO_INCLUDE_LOCATION'] = 'false'")
+        call[1].includes("ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'")
       );
-      expect(envVarWrite).toBeUndefined();
+      expect(envVarWrite).toBeDefined();
     });
 
-    it('should inject KLAVIYO_INCLUDE_FORMS env var when formsEnabled is false', async () => {
-      const props = createMockIosProps({
-        formsEnabled: false,
-      });
-
-      await runIosMod(mockConfig, props);
+    it('should set KLAVIYO_INCLUDE_FORMS to false when formsEnabled is false', async () => {
+      await runIosMod(mockConfig, createMockIosProps({ formsEnabled: false }));
 
       const podfileWriteCalls = FileManager.writeFile.mock.calls.filter((call: any) =>
         call && call[0] && typeof call[0] === 'string' && call[0].includes('Podfile')
       );
-
       const envVarWrite = podfileWriteCalls.find((call: any) =>
         call[1].includes("ENV['KLAVIYO_INCLUDE_FORMS'] = 'false'")
       );
       expect(envVarWrite).toBeDefined();
     });
 
-    it('should NOT inject KLAVIYO_INCLUDE_FORMS env var when formsEnabled is true (default)', async () => {
-      const props = createMockIosProps({
-        formsEnabled: true,
-      });
-
-      await runIosMod(mockConfig, props);
+    it('should set KLAVIYO_INCLUDE_FORMS to true when formsEnabled is true (default)', async () => {
+      await runIosMod(mockConfig, createMockIosProps({ formsEnabled: true }));
 
       const podfileWriteCalls = FileManager.writeFile.mock.calls.filter((call: any) =>
         call && call[0] && typeof call[0] === 'string' && call[0].includes('Podfile')
       );
-
       const envVarWrite = podfileWriteCalls.find((call: any) =>
-        call[1].includes("ENV['KLAVIYO_INCLUDE_FORMS'] = 'false'")
+        call[1].includes("ENV['KLAVIYO_INCLUDE_FORMS'] = 'true'")
       );
-      expect(envVarWrite).toBeUndefined();
+      expect(envVarWrite).toBeDefined();
     });
 
-    it('should inject both env vars when both geofencing and forms are disabled', async () => {
-      const props = createMockIosProps({
-        geofencingEnabled: false,
-        formsEnabled: false,
-      });
-
-      await runIosMod(mockConfig, props);
+    it('should set both vars to false when geofencing and forms are both disabled', async () => {
+      await runIosMod(mockConfig, createMockIosProps({ geofencingEnabled: false, formsEnabled: false }));
 
       const podfileWriteCalls = FileManager.writeFile.mock.calls.filter((call: any) =>
         call && call[0] && typeof call[0] === 'string' && call[0].includes('Podfile')
       );
-
-      const bothEnvVarsWrite = podfileWriteCalls.find((call: any) =>
+      const envVarWrite = podfileWriteCalls.find((call: any) =>
         call[1].includes("ENV['KLAVIYO_INCLUDE_LOCATION'] = 'false'") &&
         call[1].includes("ENV['KLAVIYO_INCLUDE_FORMS'] = 'false'")
       );
-      expect(bothEnvVarsWrite).toBeDefined();
+      expect(envVarWrite).toBeDefined();
     });
 
-    it('should NOT inject any env vars when both geofencing and forms are enabled', async () => {
-      const props = createMockIosProps({
-        geofencingEnabled: true,
-        formsEnabled: true,
-      });
-
-      await runIosMod(mockConfig, props);
+    it('should set both vars to true when geofencing and forms are both enabled', async () => {
+      await runIosMod(mockConfig, createMockIosProps({ geofencingEnabled: true, formsEnabled: true }));
 
       const podfileWriteCalls = FileManager.writeFile.mock.calls.filter((call: any) =>
         call && call[0] && typeof call[0] === 'string' && call[0].includes('Podfile')
       );
-
-      // Podfile should be written (by env var plugin) but without any KLAVIYO_INCLUDE env vars
       const envVarWrite = podfileWriteCalls.find((call: any) =>
-        call[1].includes("ENV['KLAVIYO_INCLUDE_")
+        call[1].includes("ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'") &&
+        call[1].includes("ENV['KLAVIYO_INCLUDE_FORMS'] = 'true'")
       );
-      expect(envVarWrite).toBeUndefined();
+      expect(envVarWrite).toBeDefined();
     });
 
     it('should remove existing env vars before re-injecting (idempotent)', async () => {
@@ -695,47 +632,39 @@ end
 `;
       FileManager.readFile.mockResolvedValue(podfileWithExistingVars);
 
-      const props = createMockIosProps({
-        geofencingEnabled: true,
-        formsEnabled: false,
-      });
-
-      await runIosMod(mockConfig, props);
+      await runIosMod(mockConfig, createMockIosProps({ geofencingEnabled: true, formsEnabled: false }));
 
       const podfileWriteCalls = FileManager.writeFile.mock.calls.filter((call: any) =>
         call && call[0] && typeof call[0] === 'string' && call[0].includes('Podfile')
       );
 
-      // Should have FORMS but NOT LOCATION env var (since geofencing is now enabled)
+      // LOCATION should now be 'true', FORMS should be 'false'
       const envVarWrite = podfileWriteCalls.find((call: any) =>
-        call[1].includes("ENV['KLAVIYO_INCLUDE_FORMS'] = 'false'") &&
-        !call[1].includes("ENV['KLAVIYO_INCLUDE_LOCATION'] = 'false'")
+        call[1].includes("ENV['KLAVIYO_INCLUDE_LOCATION'] = 'true'") &&
+        call[1].includes("ENV['KLAVIYO_INCLUDE_FORMS'] = 'false'")
       );
       expect(envVarWrite).toBeDefined();
     });
 
-    it('should prepend env vars at the top of the Podfile', async () => {
-      const props = createMockIosProps({
-        geofencingEnabled: false,
-        formsEnabled: false,
-      });
-
-      await runIosMod(mockConfig, props);
+    it('should prepend both env vars at the top of the Podfile', async () => {
+      await runIosMod(mockConfig, createMockIosProps({ geofencingEnabled: false, formsEnabled: true }));
 
       const podfileWriteCalls = FileManager.writeFile.mock.calls.filter((call: any) =>
         call && call[0] && typeof call[0] === 'string' && call[0].includes('Podfile')
       );
-
       const envVarWrite = podfileWriteCalls.find((call: any) =>
-        call[1].includes("ENV['KLAVIYO_INCLUDE_LOCATION'] = 'false'")
+        call[1].includes("ENV['KLAVIYO_INCLUDE_LOCATION']") &&
+        call[1].includes("ENV['KLAVIYO_INCLUDE_FORMS']")
       );
       expect(envVarWrite).toBeDefined();
       const content = envVarWrite[1];
 
-      // The env vars should appear before the platform declaration
+      // Both env vars should appear before the platform declaration
       const locationIdx = content.indexOf("ENV['KLAVIYO_INCLUDE_LOCATION']");
+      const formsIdx = content.indexOf("ENV['KLAVIYO_INCLUDE_FORMS']");
       const platformIdx = content.indexOf('platform :ios');
       expect(locationIdx).toBeLessThan(platformIdx);
+      expect(formsIdx).toBeLessThan(platformIdx);
     });
   });
 
