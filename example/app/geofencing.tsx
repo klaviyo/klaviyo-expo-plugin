@@ -11,12 +11,12 @@ interface Geofence {
   radius: number;
 }
 
-// Read ios.geofencingEnabled from the plugin options in app config (no extra prop needed)
 const klaviyoPluginOptions = Constants.expoConfig?.plugins?.find(
   (p): p is [string, Record<string, unknown>] =>
     Array.isArray(p) && p[0] === 'klaviyo-expo-plugin' && p[1] != null
 )?.[1];
-const geofencingEnabledInBuild = (klaviyoPluginOptions?.ios as { geofencingEnabled?: boolean } | undefined)?.geofencingEnabled ?? false;
+const platformOptions = (klaviyoPluginOptions?.[Platform.OS] as { geofencingEnabled?: boolean } | undefined);
+const geofencingEnabledInBuild = platformOptions?.geofencingEnabled ?? false;
 
 export default function GeofencingScreen() {
   const [geofencingEnabled, setGeofencingEnabled] = useState(false);
@@ -159,7 +159,7 @@ export default function GeofencingScreen() {
         {!geofencingEnabledInBuild && (
           <View style={styles.disabledBanner}>
             <Text style={styles.disabledBannerText}>
-              Geofencing is disabled (ios.geofencingEnabled is false). Enable it in app.config.js to use these features.
+              Geofencing is disabled ({Platform.OS}.geofencingEnabled is false). Enable it in app.config.js to use these features.
             </Text>
           </View>
         )}
