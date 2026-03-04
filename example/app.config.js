@@ -9,7 +9,8 @@ module.exports = () => {
     userInterfaceStyle: 'automatic',
     newArchEnabled: false,
     ios: {
-      buildNumber: '3',
+      // Make sure to increment this and the version as needed when making builds
+      buildNumber: '1',
       bundleIdentifier: 'com.klaviyo.expoexample',
       infoPlist: {
         UIBackgroundModes: ['remote-notification'],
@@ -46,6 +47,7 @@ module.exports = () => {
             codeSigningStyle: 'Automatic',
             devTeam: 'XXXXXXXXXX',
             geofencingEnabled: true,
+            formsEnabled: true
           },
         },
       ],
