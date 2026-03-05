@@ -41,6 +41,8 @@ module.exports = () => {
             openTracking: true,
             notificationIconFilePath: './assets/images/ic_notification.png',
             notificationColor: '#FF0000',
+            geofencingEnabled: true,
+            formsEnabled: true
           },
           ios: {
             badgeAutoclearing: true,
