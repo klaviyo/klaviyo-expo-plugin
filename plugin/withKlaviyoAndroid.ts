@@ -520,7 +520,7 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
     }
 
     setStringResource('klaviyo_sdk_plugin_name_override', 'klaviyo-expo');
-    setStringResource('klaviyo_sdk_plugin_version_override', '0.0.2');
+    setStringResource('klaviyo_sdk_plugin_version_override', '0.3.0');
 
     return config;
   });
