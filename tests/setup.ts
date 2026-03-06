@@ -78,6 +78,10 @@ jest.mock('@expo/config-plugins', () => ({
     const result = mod(modifiedConfig);
     return result || modifiedConfig;
   }),
+  withGradleProperties: jest.fn().mockImplementation((config, mod) => {
+    config.modResults = config.modResults || [];
+    return mod(config);
+  }),
   withXcodeProject: jest.fn().mockImplementation((config, mod) => config),
   withMainActivity: jest.fn().mockImplementation((config, action) => {
     const modifiedConfig = {

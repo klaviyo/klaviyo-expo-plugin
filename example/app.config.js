@@ -2,13 +2,15 @@ module.exports = () => {
   return {
     name: 'klaviyo plugin example',
     slug: 'klaviyo-plugin-example',
-    version: '0.2.0',
+    version: '0.3.0',
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'expoexample',
     userInterfaceStyle: 'automatic',
     newArchEnabled: false,
     ios: {
+      // Make sure to increment this and the version as needed when making builds
+      buildNumber: '1',
       bundleIdentifier: 'com.klaviyo.expoexample',
       infoPlist: {
         UIBackgroundModes: ['remote-notification'],
@@ -39,14 +41,15 @@ module.exports = () => {
             openTracking: true,
             notificationIconFilePath: './assets/images/ic_notification.png',
             notificationColor: '#FF0000',
+            geofencingEnabled: true,
+            formsEnabled: true
           },
           ios: {
             badgeAutoclearing: true,
             codeSigningStyle: 'Automatic',
-            projectVersion: '3',
-            marketingVersion: '0.2.0',
             devTeam: 'XXXXXXXXXX',
             geofencingEnabled: true,
+            formsEnabled: true
           },
         },
       ],

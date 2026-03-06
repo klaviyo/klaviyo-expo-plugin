@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Alert, ScrollView, Platform, PermissionsAndroid } from 'react-native';
+import Constants from 'expo-constants';
 import { Klaviyo } from 'klaviyo-react-native-sdk';
 import * as Location from 'expo-location';
 
@@ -10,12 +11,20 @@ interface Geofence {
   radius: number;
 }
 
+const klaviyoPluginOptions = Constants.expoConfig?.plugins?.find(
+  (p): p is [string, Record<string, unknown>] =>
+    Array.isArray(p) && p[0] === 'klaviyo-expo-plugin' && p[1] != null
+)?.[1];
+const platformOptions = (klaviyoPluginOptions?.[Platform.OS] as { geofencingEnabled?: boolean } | undefined);
+const geofencingEnabledInBuild = platformOptions?.geofencingEnabled ?? false;
+
 export default function GeofencingScreen() {
   const [geofencingEnabled, setGeofencingEnabled] = useState(false);
   const [locationPermission, setLocationPermission] = useState<string | null>(null);
   const [currentGeofences, setCurrentGeofences] = useState<Geofence[]>([]);
 
   useEffect(() => {
+    if (!geofencingEnabledInBuild) return;
     checkLocationPermission();
     fetchCurrentGeofences();
   }, []);
@@ -146,11 +155,20 @@ export default function GeofencingScreen() {
     <ScrollView style={styles.container}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Geofencing</Text>
+
+        {!geofencingEnabledInBuild && (
+          <View style={styles.disabledBanner}>
+            <Text style={styles.disabledBannerText}>
+              Geofencing is disabled ({Platform.OS}.geofencingEnabled is false). Enable it in app.config.js to use these features.
+            </Text>
+          </View>
+        )}
+
         <Text style={styles.description}>
           Enable geofencing to track location-based events. This will request location permissions if not already granted.
         </Text>
 
-        {locationPermission && (
+        {locationPermission && geofencingEnabledInBuild && (
           <View style={styles.permissionContainer}>
             <Text style={styles.permissionText}>
               Location Permission: {locationPermission}
@@ -160,30 +178,38 @@ export default function GeofencingScreen() {
 
         {!geofencingEnabled ? (
           <TouchableOpacity
-            style={[styles.button, styles.fullWidthButton]}
-            onPress={handleRegisterGeofences}
+            style={[styles.button, styles.fullWidthButton, !geofencingEnabledInBuild && styles.buttonDisabled]}
+            onPress={geofencingEnabledInBuild ? handleRegisterGeofences : undefined}
+            disabled={!geofencingEnabledInBuild}
           >
-            <Text style={styles.buttonText}>Enable Geofencing</Text>
+            <Text style={[styles.buttonText, !geofencingEnabledInBuild && styles.buttonTextDisabled]}>
+              Enable Geofencing
+            </Text>
           </TouchableOpacity>
         ) : (
           <>
             <TouchableOpacity
-              style={[styles.button, styles.fullWidthButton, styles.buttonSuccess]}
+              style={[styles.button, styles.fullWidthButton, styles.buttonSuccess, !geofencingEnabledInBuild && styles.buttonDisabled]}
               disabled
             >
-              <Text style={styles.buttonText}>✓ Geofencing Enabled</Text>
+              <Text style={[styles.buttonText, !geofencingEnabledInBuild && styles.buttonTextDisabled]}>
+                ✓ Geofencing Enabled
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.button, styles.fullWidthButton, styles.buttonDanger]}
-              onPress={handleUnregisterGeofences}
+              style={[styles.button, styles.fullWidthButton, styles.buttonDanger, !geofencingEnabledInBuild && styles.buttonDisabled]}
+              onPress={geofencingEnabledInBuild ? handleUnregisterGeofences : undefined}
+              disabled={!geofencingEnabledInBuild}
             >
-              <Text style={styles.buttonText}>Disable Geofencing</Text>
+              <Text style={[styles.buttonText, !geofencingEnabledInBuild && styles.buttonTextDisabled]}>
+                Disable Geofencing
+              </Text>
             </TouchableOpacity>
           </>
         )}
 
-        <View style={styles.statusContainer}>
+        <View style={[styles.statusContainer, !geofencingEnabledInBuild && styles.statusContainerDisabled]}>
           <Text style={styles.statusText}>
             {geofencingEnabled ? '✓ Geofencing is active' : 'Geofencing Status'}
           </Text>
@@ -197,10 +223,13 @@ export default function GeofencingScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.button, styles.fullWidthButton, styles.buttonSecondary]}
-          onPress={fetchCurrentGeofences}
+          style={[styles.button, styles.fullWidthButton, styles.buttonSecondary, !geofencingEnabledInBuild && styles.buttonDisabled]}
+          onPress={geofencingEnabledInBuild ? fetchCurrentGeofences : undefined}
+          disabled={!geofencingEnabledInBuild}
         >
-          <Text style={styles.buttonText}>Refresh Geofences</Text>
+          <Text style={[styles.buttonText, !geofencingEnabledInBuild && styles.buttonTextDisabled]}>
+            Refresh Geofences
+          </Text>
         </TouchableOpacity>
 
         <View style={styles.geofenceListContainer}>
@@ -275,6 +304,29 @@ const styles = StyleSheet.create({
   },
   buttonSecondary: {
     backgroundColor: '#5856D6',
+  },
+  buttonDisabled: {
+    backgroundColor: '#C7C7CC',
+    opacity: 0.8,
+  },
+  buttonTextDisabled: {
+    color: '#8E8E93',
+  },
+  disabledBanner: {
+    padding: 12,
+    marginBottom: 12,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFB74D',
+  },
+  disabledBannerText: {
+    fontSize: 14,
+    color: '#E65100',
+  },
+  statusContainerDisabled: {
+    backgroundColor: '#F5F5F5',
+    borderColor: '#E0E0E0',
   },
   permissionContainer: {
     padding: 10,

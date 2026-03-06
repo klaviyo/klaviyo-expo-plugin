@@ -6,6 +6,16 @@ import { FileManager } from './support/fileManager';
 import { KlaviyoLog } from './support/logger';
 import { getPluginRoot } from './support/pluginResolver';
 
+/** Get marketing version (CFBundleShortVersionString / MARKETING_VERSION) from Expo config. */
+function getMarketingVersion(config: { version?: string }): string {
+  return config.version ?? '1.0';
+}
+
+/** Get build number (CFBundleVersion / CURRENT_PROJECT_VERSION) from Expo config. */
+function getBuildNumber(config: { ios?: { buildNumber?: string } }): string {
+  return config.ios?.buildNumber ?? '1';
+}
+
 const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   KlaviyoLog.log('Starting iOS plugin configuration...');
   KlaviyoLog.log('Plugin props:' + JSON.stringify(props));
@@ -13,7 +23,8 @@ const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withPlugins(config, [
     withKlaviyoPluginConfigurationPlist,
     withRemoteNotificationsPermissions,
-    withGeofencingPodspec,
+    withGeofencingBackgroundMode,
+    withKlaviyoPodfileEnvVars,
     withKlaviyoPodfile,
     withKlaviyoXcodeProject,
     withKlaviyoNSE,
@@ -137,92 +148,88 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
     const actualAppGroupName = `group.${bundleIdentifier}.${NSE_TARGET_NAME}.shared`;
     infoPlist.klaviyo_app_group = actualAppGroupName;
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
-    infoPlist.CFBundleShortVersionString = props.marketingVersion || "1.0";
-    infoPlist.CFBundleVersion = props.projectVersion || "1";
+    infoPlist.CFBundleShortVersionString = getMarketingVersion(config);
+    infoPlist.CFBundleVersion = getBuildNumber(config);
     return config;
   });
 };
 
 /**
- * Injects KlaviyoLocation dependency into the podspec and adds location background mode if geofencing is enabled.
+ * Adds location to UIBackgroundModes if geofencing is enabled.
+ * The Swift source uses #if canImport(KlaviyoLocation) guards; no file mutation needed here.
  */
-const withGeofencingPodspec: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
+const withGeofencingBackgroundMode: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   const geofencingEnabled = props.geofencingEnabled ?? false;
-  
-  // Handle podspec and Swift file modifications
-  config = withDangerousMod(config, [
-    'ios',
-    async config => {
-      const pluginRoot = getPluginRoot();
-      const podspecPath = path.join(pluginRoot, 'ios', 'ExpoKlaviyo.podspec');
-      const swiftPath = path.join(pluginRoot, 'ios', 'ExpoKlaviyo', 'KlaviyoAppDelegate.swift');
-      
-      try {
-        let podspecContent = await FileManager.readFile(podspecPath);
-        podspecContent = podspecContent.replace(/.*KLAVIYO_LOCATION_DEPENDENCY.*\n?/g, '');
-        podspecContent = podspecContent.replace(
-          /(s\.dependency 'KlaviyoSwift'\s*\n)/,
-          geofencingEnabled 
-            ? "$1  s.dependency 'KlaviyoLocation' # KLAVIYO_LOCATION_DEPENDENCY\n"
-            : "$1  # KLAVIYO_LOCATION_DEPENDENCY\n"
-        );
-        await FileManager.writeFile(podspecPath, podspecContent);
-        
-        let swiftContent = await FileManager.readFile(swiftPath);
-        swiftContent = swiftContent.replace(/.*KLAVIYO_GEOFENCING_IMPORT.*\n?/g, '');
-        swiftContent = swiftContent.replace(/.*KLAVIYO_GEOFENCING_REGISTER.*\n?/g, '');
-        swiftContent = swiftContent.replace(
-          /(import KlaviyoSwift\s*\n)/,
-          geofencingEnabled 
-            ? "$1import KlaviyoLocation // KLAVIYO_GEOFENCING_IMPORT\n"
-            : "$1// KLAVIYO_GEOFENCING_IMPORT\n"
-        );
-        swiftContent = swiftContent.replace(
-          /(center\.delegate = self\s*\n)/,
-          geofencingEnabled 
-            ? "$1        KlaviyoSDK().registerGeofencing() // KLAVIYO_GEOFENCING_REGISTER\n"
-            : "$1        // KLAVIYO_GEOFENCING_REGISTER\n"
-        );
-        await FileManager.writeFile(swiftPath, swiftContent);
-        
-        KlaviyoLog.log(`Geofencing ${geofencingEnabled ? 'enabled' : 'disabled'}`);
-      } catch (err) {
-        KlaviyoLog.log('Could not configure geofencing: ' + err);
-      }
-      
-      return config;
-    },
-  ]);
 
   if (!geofencingEnabled) {
     KlaviyoLog.log('Geofencing not enabled, skipping background mode configuration');
     return config;
   }
 
-  // Add location to UIBackgroundModes via Info.plist
   return withInfoPlist(config, (config) => {
     const infoPlist = config.modResults;
-    
+
     const existingFromModResults = infoPlist.UIBackgroundModes || [];
     const existingFromConfig = config.ios?.infoPlist?.UIBackgroundModes || [];
-    const existingBackgroundModes = Array.isArray(existingFromModResults) 
-      ? existingFromModResults 
-      : Array.isArray(existingFromConfig) 
-        ? existingFromConfig 
+    const existingBackgroundModes = Array.isArray(existingFromModResults)
+      ? existingFromModResults
+      : Array.isArray(existingFromConfig)
+        ? existingFromConfig
         : [];
-    
+
     const updatedBackgroundModes = [...existingBackgroundModes];
-    
+
     if (!updatedBackgroundModes.includes('location')) {
       updatedBackgroundModes.push('location');
       KlaviyoLog.log('Added location to UIBackgroundModes');
     }
-    
+
     infoPlist.UIBackgroundModes = updatedBackgroundModes;
     KlaviyoLog.log(`Final UIBackgroundModes: ${JSON.stringify(updatedBackgroundModes)}`);
-    
+
     return config;
   });
+};
+
+/**
+ * Writes explicit ENV vars to the top of the Podfile so the podspec and the RN SDK
+ * can conditionally include KlaviyoLocation and KlaviyoForms.
+ *
+ * - KLAVIYO_INCLUDE_LOCATION: 'true' when geofencingEnabled (default false, opt-in)
+ * - KLAVIYO_INCLUDE_FORMS:    'true' when formsEnabled    (default true, opt-out)
+ */
+const withKlaviyoPodfileEnvVars: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
+  return withDangerousMod(config, [
+    'ios',
+    async config => {
+      const iosRoot = path.join(config.modRequest.projectRoot, 'ios');
+      const podfilePath = path.join(iosRoot, 'Podfile');
+
+      try {
+        let podfileContent = await FileManager.readFile(podfilePath);
+
+        // Remove any existing Klaviyo env vars (idempotent)
+        podfileContent = podfileContent.replace(/ENV\['KLAVIYO_INCLUDE_(?:LOCATION|FORMS)'\]\s*=\s*'[^']*'\n?/g, '');
+
+        const locationVal = (props.geofencingEnabled ?? false) ? 'true' : 'false';
+        const formsVal = (props.formsEnabled ?? true) ? 'true' : 'false';
+
+        const envVars = [
+          `ENV['KLAVIYO_INCLUDE_LOCATION'] = '${locationVal}'`,
+          `ENV['KLAVIYO_INCLUDE_FORMS'] = '${formsVal}'`,
+        ];
+
+        podfileContent = envVars.join('\n') + '\n' + podfileContent;
+        KlaviyoLog.log(`Set Podfile ENV vars: KLAVIYO_INCLUDE_LOCATION=${locationVal}, KLAVIYO_INCLUDE_FORMS=${formsVal}`);
+
+        await FileManager.writeFile(podfilePath, podfileContent);
+      } catch (err) {
+        KlaviyoLog.log('Could not write Klaviyo ENV vars to Podfile: ' + err);
+      }
+
+      return config;
+    },
+  ]);
 };
 
 /**
@@ -331,12 +338,14 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
     );
     
     const configurations = xcodeProject.pbxXCBuildConfigurationSection();
+    const marketingVersion = getMarketingVersion(config);
+    const buildNumber = getBuildNumber(config);
     for (const key in configurations) {
       if (typeof configurations[key].buildSettings !== "undefined") {
         const buildSettingsObj = configurations[key].buildSettings;
         buildSettingsObj.CODE_SIGN_STYLE = props.codeSigningStyle;
-        buildSettingsObj.CURRENT_PROJECT_VERSION = props.projectVersion;
-        buildSettingsObj.MARKETING_VERSION = props.marketingVersion;
+        buildSettingsObj.CURRENT_PROJECT_VERSION = buildNumber;
+        buildSettingsObj.MARKETING_VERSION = marketingVersion;
         if (props.devTeam != undefined) {
           buildSettingsObj.DEVELOPMENT_TEAM = props.devTeam;
         }
@@ -395,8 +404,8 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
           }
           
           if (file === `${NSE_TARGET_NAME}-Info.plist`) {
-            const marketingVersion = props.marketingVersion || "1.0";
-            const buildNumber = props.projectVersion || "1";
+            const marketingVersion = getMarketingVersion(config);
+            const buildNumber = getBuildNumber(config);
             const infoPlistPath = path.join(nsePath, file);
             let infoPlistContent = await FileManager.readFile(infoPlistPath);
             infoPlistContent = infoPlistContent.replace(

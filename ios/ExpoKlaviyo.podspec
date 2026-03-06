@@ -20,7 +20,13 @@ Pod::Spec.new do |s|
   s.dependency 'ExpoModulesCore'
   s.dependency 'React-Core'
   s.dependency 'KlaviyoSwift'
-  # KLAVIYO_LOCATION_DEPENDENCY
+
+  # Conditional location dependency based on environment variable
+  # Default is FALSE (opt-in for geofencing)
+  include_location = ENV['KLAVIYO_INCLUDE_LOCATION'] == 'true'
+  if include_location
+    s.dependency 'KlaviyoLocation'
+  end
 
   # Swift/Objective-C compatibility
   s.pod_target_xcconfig = {

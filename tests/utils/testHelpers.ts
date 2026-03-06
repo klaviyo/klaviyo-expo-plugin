@@ -19,6 +19,8 @@ export interface MockPropsOptions {
   openTracking?: boolean;
   notificationIconFilePath?: string;
   notificationColor?: string;
+  geofencingEnabled?: boolean;
+  formsEnabled?: boolean;
 }
 
 export const createMockConfig = (options: MockConfigOptions = {}): any => ({
@@ -52,6 +54,8 @@ export const createMockProps = (options: MockPropsOptions = {}): any => ({
   openTracking: true,
   notificationIconFilePath: './assets/icon.png',
   notificationColor: '#FF0000',
+  geofencingEnabled: false,
+  formsEnabled: true,
   ...options,
 });
 
@@ -228,8 +232,10 @@ export const testSimpleIntegration = <T>(
 
 // iOS-specific mock functions
 export interface MockIosConfigOptions {
+  version?: string;
   ios?: {
     bundleIdentifier?: string;
+    buildNumber?: string;
   };
   modRequest?: {
     projectName?: string;
@@ -248,10 +254,9 @@ export interface MockIosConfigOptions {
 export interface MockIosPropsOptions {
   badgeAutoclearing?: boolean;
   codeSigningStyle?: string;
-  projectVersion?: string;
-  marketingVersion?: string;
   devTeam?: string;
   geofencingEnabled?: boolean;
+  formsEnabled?: boolean;
 }
 
 export const createMockIosConfig = (options: MockIosConfigOptions = {}): any => {
@@ -265,12 +270,21 @@ export const createMockIosConfig = (options: MockIosConfigOptions = {}): any => 
   const mergedModResults = hasModResults
     ? { ...defaultModResults, ...options.modResults }
     : defaultModResults;
+  const hasVersion = options && Object.prototype.hasOwnProperty.call(options, 'version');
+  const hasBuildNumber = options?.ios && Object.prototype.hasOwnProperty.call(options.ios, 'buildNumber');
+  // Allow explicit ios: {} for tests that expect no bundleIdentifier
+  const isEmptyIos = options?.ios && Object.keys(options.ios).length === 0;
+  const ios = isEmptyIos
+    ? {}
+    : {
+        bundleIdentifier: 'com.test.app',
+        ...(hasBuildNumber ? { buildNumber: options!.ios!.buildNumber } : { buildNumber: '1' }),
+        ...options.ios,
+      };
   return {
     name: 'TestApp',
-    ios: {
-      bundleIdentifier: 'com.test.app',
-      ...options.ios,
-    },
+    ...(hasVersion ? { version: options.version } : { version: '1.0' }),
+    ios,
     modRequest: {
       projectName: 'TestApp',
       platformProjectRoot: '/test/project/ios',
@@ -278,16 +292,14 @@ export const createMockIosConfig = (options: MockIosConfigOptions = {}): any => 
       ...options.modRequest,
     },
     modResults: mergedModResults,
-    ...options,
   };
 };
 
 export const createMockIosProps = (options: MockIosPropsOptions = {}): any => ({
   badgeAutoclearing: true,
   codeSigningStyle: 'Automatic',
-  projectVersion: '1',
-  marketingVersion: '1.0',
   devTeam: 'XXXXXXXXXX',
   geofencingEnabled: false,
+  formsEnabled: true,
   ...options,
 }); 
