@@ -3,9 +3,10 @@
 This file provides guidance to AI coding agents (Claude Code, Cursor, GitHub Copilot, etc.) when
 working with code in this repository.
 
-You should assume the role of a seasoned Expo plugin developer with deep expertise in config plugins,
-native code manipulation, and cross-platform development. You understand the evolution of Expo SDK
-updates and know the difference between what should go in `withXxx` functions versus plugin support files.
+You should assume the role of a seasoned React Native and Expo plugin developer with deep expertise in
+config plugins, native code manipulation, and cross-platform development. You understand the evolution
+of Expo SDK updates and know the difference between what should go in `withXxx` functions versus plugin
+support files.
 
 You will be asked to help with plugin architecture decisions, native configuration implementations,
 cross-platform compatibility issues, and debugging Expo's config plugin system.
@@ -33,6 +34,7 @@ and enables:
 - Rich push notification support with images and actions
 - Badge count management (iOS)
 - Notification service extension setup (NSE on iOS)
+- Geofencing permissions (iOS, via `expo-location`)
 - Icon and color configuration for notifications (Android)
 - Deep linking and data parsing
 
@@ -52,11 +54,13 @@ and enables:
   - `withKlaviyo.ts`: Root config plugin that orchestrates iOS and Android setup
   - `withKlaviyoIos.ts`: iOS-specific native code modifications
   - `withKlaviyoAndroid.ts`: Android-specific native code modifications
-  - `types/`: TypeScript interfaces for plugin configuration
+  - `types/`: TypeScript interfaces and defaults for plugin configuration
   - `support/`: Utility functions (validators, logger, XML/Gradle parsing)
 - `/ios/`: Native iOS module and notification service extension
 - `/example/`: Example Expo app demonstrating plugin usage and integration
 - `/KlaviyoNotificationServiceExtension/`: iOS notification service extension
+- `/scripts/`: Utility scripts (e.g., peer dependency testing)
+- `/__tests__/`: Jest test suite (when present)
 
 ## Development Guidelines
 
@@ -67,34 +71,8 @@ and enables:
 3. **Idempotency**: Plugin should be safe to run multiple times without breaking things.
 4. **Clear Validation**: Validate user config early and provide actionable error messages.
 5. **Minimal Footprint**: Make the smallest necessary changes to native files.
-6. **Documentation**: Keep inline docs current—future you will appreciate it.
 
-### Plugin Architecture
-
-Expo config plugins follow a modular pattern:
-
-```typescript
-// Root plugin orchestrates the work
-const withKlaviyo: ConfigPlugin<KlaviyoPluginProps> = (config, props) => {
-  config = withKlaviyoIos(config, props.ios);
-  config = withKlaviyoAndroid(config, props.android);
-  return config;
-};
-
-// Platform-specific functions modify native files
-const withKlaviyoAndroid: ConfigPlugin<AndroidConfig> = (config, androidProps) => {
-  return withAndroidManifest(config, async (config) => {
-    // Modify AndroidManifest.xml, Gradle files, etc.
-    return config;
-  });
-};
-```
-
-Keep this separation—it makes debugging and testing far easier.
-
-### Common Development Tasks
-
-#### Building and Testing
+### Building and Testing
 
 ```bash
 # Install dependencies
@@ -106,173 +84,83 @@ npm run build
 # Verify TypeScript types
 npx tsc --noEmit
 
-# Clean build artifacts
-npm run clean
+# Run tests
+npm test
 
 # Full prepare (clean + build)
 npm run prepare
 ```
 
-#### Testing with Example App
+### Testing with Example App
+
+The example app has scripts that handle the full clean-build-run cycle. Prefer these over
+running raw expo commands.
 
 ```bash
-# Preview plugin in example app (make changes here to test)
 cd example
 npm install
 
-# Build for iOS development
+# Build and run (incremental)
 npm run ios
-
-# Build for Android development
 npm run android
 
-# Clean and rebuild (when native cache is wonky)
-expo prebuild --clean
-expo run:ios
-expo run:android
+# Full clean rebuild (rebuilds plugin, wipes native dirs, prebuilds with debug logging)
+npm run clean-ios
+npm run clean-android
+
+# EAS local builds (for testing production-like builds)
+npm run eas-ios-local
+npm run eas-android-local
+
+# Nuclear reset (wipes all node_modules and reinstalls from scratch)
+npm run reset-all
 ```
 
-#### Debugging Plugin Execution
+## Plugin Configuration
 
-```bash
-# See verbose plugin output
-expo prebuild --verbose
+The plugin is configured in `app.json` or `app.config.js` under the `plugins` array.
+See `plugin/types/index.ts` for the full type definitions and defaults, and
+`example/app.config.js` for a working example.
 
-# Inspect generated native files
-cd example
-ls ios/Pods/* | grep -i klaviyo
-cat android/app/build.gradle | grep -i klaviyo
+```json
+[
+  "klaviyo-expo-plugin",
+  {
+    "ios": {
+      "badgeAutoclearing": true,
+      "codeSigningStyle": "Automatic",
+      "projectVersion": "3",
+      "marketingVersion": "0.2.0",
+      "devTeam": "YOUR_TEAM_ID",
+      "geofencingEnabled": true
+    },
+    "android": {
+      "logLevel": 1,
+      "openTracking": true,
+      "notificationIconFilePath": "./assets/images/ic_notification.png",
+      "notificationColor": "#FF0000"
+    }
+  }
+]
 ```
 
-## Key Plugin Concepts
+## Platform Details
 
-### Configuration Flow
+### iOS
 
-1. **User defines plugin config** in `app.json`:
-   ```json
-   {
-     "plugins": [
-       [
-         "klaviyo-expo-plugin",
-         {
-           "ios": { "apiKey": "abc123", ... },
-           "android": { "apiKey": "abc123", ... }
-         }
-       ]
-     ]
-   }
-   ```
+The iOS plugin (`withKlaviyoIos.ts`) modifies:
 
-2. **Plugin validates** the provided configuration
-3. **Platform-specific modifications** are applied during `expo prebuild`
-4. **Native build** uses the modified configuration
+- `Info.plist` — push notification handlers and background modes
+- Entitlements — push notification and app group capabilities
+- Podfile — Klaviyo Swift SDK dependency
+- Xcode project — notification service extension target, code signing settings
+- Location permissions — when `geofencingEnabled` is true, adds `expo-location` background
+  location permissions for geofencing support
 
-### iOS Configuration Modifications
+### Android
 
-The iOS portion handles:
+The Android plugin (`withKlaviyoAndroid.ts`) modifies:
 
-- Adding Klaviyo push notification handlers to `Info.plist`
-- Configuring notification service extension
-- Setting entitlements for push notifications
-- Linking the native Klaviyo Swift SDK
-
-Check `withKlaviyoIos.ts` for the implementation. Key utilities:
-- `withInfoPlist()` - Modify plist files
-- `withEntitlements()` - Add entitlements (critical for push!)
-- `withPodfile()` - Modify Cocoapods dependencies
-
-### Android Configuration Modifications
-
-The Android portion handles:
-
-- Modifying `AndroidManifest.xml` for push receivers
-- Updating `build.gradle` for SDK dependencies
-- Configuring notification icons and colors
-- Adding required permissions
-
-Check `withKlaviyoAndroid.ts`. Key utilities:
-- `withAndroidManifest()` - Modify manifest XML
-- XML parsing for safe attribute insertion
-- Gradle configuration for dependencies and configurations
-
-## Common Issues & Solutions
-
-### iOS Plugin Issues
-
-**Problem**: Notification service extension not being created
-- **Solution**: Verify `PushNotificationExtension` target exists in project. Check logs for "Adding notification service extension" message.
-
-**Problem**: Push notifications not working after plugin runs
-- **Solution**: Check entitlements were added. Run `cat ios/Podfile.lock | grep Klaviyo` to verify SDK was linked.
-
-**Problem**: Info.plist conflicts
-- **Solution**: Plugin merges config, but existing keys may conflict. Validate your `app.json` config keys don't duplicate native setup.
-
-### Android Plugin Issues
-
-**Problem**: Build fails with "cannot resolve symbol Klaviyo"
-- **Solution**: Run `npm run build`, then `expo prebuild --clean`. Gradle caching can be aggressive.
-
-**Problem**: AndroidManifest.xml changes not reflected
-- **Solution**: Check XML parsing in support utilities. XML can be fragile—use `xml2js` consistently.
-
-**Problem**: Permissions not being added
-- **Solution**: Verify permission strings match Android manifest requirements. Check `withAndroidManifest` implementation for correct XML paths.
-
-### General Plugin Issues
-
-**Problem**: "expo prebuild" succeeds but native build fails
-- **Solution**: Plugin only modifies configuration. Verify:
-  1. Dependencies are correct (check Gradle/Podfile)
-  2. Native module linking is working
-  3. Run full prebuild with `--clean` flag
-  4. Check example app builds successfully
-
-**Problem**: Plugin runs multiple times, changes double up
-- **Solution**: Plugin should be idempotent. If it's not, check for:
-  - Unconditional array pushes instead of upserts
-  - Missing existence checks before modifying XML/Gradle
-  - Validate logic in support utilities
-
-## Testing Your Changes
-
-When modifying the plugin:
-
-1. **Build TypeScript**: `npm run build`
-2. **Test with example app**:
-   ```bash
-   cd example
-   npm install
-   expo prebuild --clean
-   expo run:ios  # or run:android
-   ```
-3. **Inspect generated files** to ensure changes are correct
-4. **Verify both platforms** work before committing
-5. **Check for regressions** with existing configurations
-
-## Useful Resources
-
-- [Expo Config Plugins Documentation](https://docs.expo.dev/config-plugins/introduction/)
-- [Expo Config Plugins API Reference](https://docs.expo.dev/config-plugins/plugins-and-mods/)
-- [@expo/config-plugins GitHub](https://github.com/expo/expo/tree/main/packages/@expo/config-plugins)
-- [Klaviyo React Native SDK](https://github.com/klaviyo/klaviyo-react-native-sdk)
-- [Expo EAS Build Documentation](https://docs.expo.dev/build/introduction/)
-
-## Code Style Notes
-
-- Use `const` for immutability
-- Leverage TypeScript's type system heavily
-- Keep functions focused and testable
-- Validate early, fail loudly
-- Use descriptive variable names (`.androidManifestConfig` not `.config`)
-- Comment why, not what (the code says what)
-
-## When You're Unsure
-
-This is Expo plugin territory, which is inherently finicky:
-
-- Check the generated native files before and after running the plugin
-- Look at how other plugins handle similar modifications
-- Test on actual devices/simulators, not just `expo prebuild` output
-- Read Expo's own plugins as reference implementations
-- When in doubt, don't make assumptions—test it
+- `AndroidManifest.xml` — push receivers, services, and permissions
+- `build.gradle` — SDK dependencies and configuration
+- Resources — notification icon drawable and color values
