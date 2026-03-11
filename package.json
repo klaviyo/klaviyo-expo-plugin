@@ -40,7 +40,9 @@
     "tmp": "^0.2.3",
     "ts-jest": "^29.1.0",
     "typescript": "^5.0.0",
-    "typescript-eslint": "^8.35.1",
+    "typescript-eslint": "^8.35.1"
+  },
+  "dependencies": {
     "xml2js": "^0.6.2"
   },
   "peerDependencies": {
