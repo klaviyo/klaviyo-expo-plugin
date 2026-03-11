@@ -2,16 +2,6 @@ import { withLocationGradleProperties, withFormsGradleProperties } from '../plug
 import { createMockProps } from './utils/testHelpers';
 import { KlaviyoPluginAndroidProps } from '../plugin/types';
 
-// Mock xml2js module
-jest.mock('xml2js', () => ({
-  parseStringPromise: jest.fn().mockResolvedValue({
-    resources: { color: [] }
-  }),
-  Builder: jest.fn().mockImplementation(() => ({
-    buildObject: jest.fn().mockReturnValue('<xml>test</xml>')
-  }))
-}));
-
 // Mock file system operations
 jest.mock('fs', () => ({
   existsSync: jest.fn(() => true),
