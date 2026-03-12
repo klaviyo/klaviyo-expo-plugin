@@ -1,13 +1,3 @@
-// Mock xml2js module
-jest.mock('xml2js', () => ({
-  parseStringPromise: jest.fn().mockResolvedValue({
-    resources: { color: [] }
-  }),
-  Builder: jest.fn().mockImplementation(() => ({
-    buildObject: jest.fn().mockReturnValue('<resources><color name="klaviyo_notification_color">#FF0000</color></resources>')
-  }))
-}));
-
 import { withNotificationIcon, withKlaviyoPluginNameVersion, modifyMainActivity } from '../plugin/withKlaviyoAndroid';
 import { createMockConfig, createMockProps, testPluginFunction } from './utils/testHelpers';
 

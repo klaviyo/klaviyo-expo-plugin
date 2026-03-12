@@ -24,16 +24,21 @@ jest.mock('glob', () => ({
   sync: jest.fn(),
 }));
 
-// Mock xml2js module
-jest.mock('xml2js', () => ({
-  parseString: jest.fn(),
-  Builder: jest.fn().mockImplementation(() => ({
-    buildObject: jest.fn().mockReturnValue('<xml>test</xml>'),
-  })),
-}));
-
 // Mock @expo/config-plugins
 jest.mock('@expo/config-plugins', () => ({
+  AndroidConfig: {
+    Colors: {
+      // Pure function: set or remove a color entry by name
+      assignColorValue: (xml: any, { value, name }: { value?: string | null; name: string }) => {
+        const result = { ...xml };
+        if (!result.resources) result.resources = {};
+        if (!Array.isArray(result.resources.color)) result.resources.color = [];
+        result.resources.color = result.resources.color.filter((c: any) => c.$.name !== name);
+        if (value) result.resources.color.push({ $: { name }, _: value });
+        return result;
+      },
+    },
+  },
   withDangerousMod: jest.fn().mockImplementation((config, [platform, action]) => {
     const existingMod = config.mods?.[platform];
     const chainedMod = existingMod
@@ -55,6 +60,9 @@ jest.mock('@expo/config-plugins', () => ({
     return mod(config);
   }),
   withStringsXml: jest.fn().mockImplementation((config, mod) => (config: any, props: any) => config),
+  withAndroidColors: jest.fn().mockImplementation((config, action) => {
+    return action(config);
+  }),
   withPlugins: jest.fn().mockImplementation((config, plugins) => {
     let result = config;
     for (const entry of plugins) {
