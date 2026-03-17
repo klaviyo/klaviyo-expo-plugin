@@ -478,6 +478,6 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
 };
 
 // TEST ONLY exports
-export { withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest, mutateAndroidManifest, withLocationGradleProperties, withFormsGradleProperties };
+export { withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest, mutateAndroidManifest, withLocationGradleProperties, withFormsGradleProperties, withNotificationResources };
 
 export default withKlaviyoAndroid; 
