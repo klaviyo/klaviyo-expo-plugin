@@ -1,4 +1,4 @@
-import { ConfigPlugin, withDangerousMod, withAndroidManifest, withStringsXml, withPlugins, withMainActivity, withGradleProperties } from '@expo/config-plugins';
+import { ConfigPlugin, withDangerousMod, withAndroidManifest, withStringsXml, withAndroidColors, withPlugins, withMainActivity, withGradleProperties, AndroidConfig } from '@expo/config-plugins';
 import * as fs from 'fs';
 import * as path from 'path';
 import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
@@ -7,7 +7,6 @@ import {
   KlaviyoAndroidModResults,
   mergeAndroidProps
 } from './types';
-import * as xml2js from 'xml2js';
 import { KlaviyoLog } from './support/logger';
 import { ExportedConfigWithProps } from '@expo/config-plugins';
 import {
@@ -242,63 +241,15 @@ const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (
   });
 };
 
-interface ColorResourceConfig {
-  modRequest: { platformProjectRoot: string };
-}
-
-const createColorResource = async (
-  config: ColorResourceConfig,
-  color: string | undefined
-) => {
-  KlaviyoLog.log(`Creating color resource for: ${color}`);
-  const colorsDir = path.join(config.modRequest.platformProjectRoot, 'app', 'src', 'main', 'res', 'values');
-  if (!fs.existsSync(colorsDir)) {
-    fs.mkdirSync(colorsDir, { recursive: true });
-  }
-
-  const colorsXmlPath = path.join(colorsDir, 'colors.xml');
-  let colorsObj: { resources: { color: { $: { name: string }, _: string }[] } } = { resources: { color: [] } };
-
-  if (fs.existsSync(colorsXmlPath)) {
-    const xml = fs.readFileSync(colorsXmlPath, 'utf-8');
-    const parsed = await xml2js.parseStringPromise(xml);
-    colorsObj = parsed;
-  }
-
-  // Remove any existing klaviyo_notification_color
-  colorsObj.resources.color = (colorsObj.resources.color || []).filter(
-    (c) => c.$.name !== 'klaviyo_notification_color'
-  );
-
-  // Only add the new color if it's truthy
-  if (color) {
-    colorsObj.resources.color.push({ $: { name: 'klaviyo_notification_color' }, _: color });
-  }
-
-  // Build XML
-  const builder = new xml2js.Builder();
-  const newXml = builder.buildObject(colorsObj);
-
-  fs.writeFileSync(colorsXmlPath, newXml);
-  KlaviyoLog.log('Merged colors.xml with notification color');
-};
-
 const withNotificationResources: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
-  return withDangerousMod(config, [
-    'android',
-    async (config) => {
-      KlaviyoLog.log('Adding notification resources to Android Manifest');
-      KlaviyoLog.log('Notification props:' + {
-        iconPath: props.notificationIconFilePath,
-        color: props.notificationColor
-      });
-
-      // Always call createColorResource with the notificationColor (which may be undefined)
-      await createColorResource(config, props.notificationColor);
-
-      return config;
-    },
-  ]);
+  return withAndroidColors(config, (config) => {
+    KlaviyoLog.log(`Setting notification color resource: ${props.notificationColor}`);
+    config.modResults = AndroidConfig.Colors.assignColorValue(config.modResults, {
+      name: 'klaviyo_notification_color',
+      value: props.notificationColor,
+    });
+    return config;
+  });
 };
 
 const mutateNotificationManifest = (config: ExportedConfigWithProps<AndroidManifest>, props: KlaviyoPluginAndroidProps) => {
@@ -527,6 +478,6 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
 };
 
 // TEST ONLY exports
-export { withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest, createColorResource, mutateAndroidManifest, withLocationGradleProperties, withFormsGradleProperties };
+export { withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest, mutateAndroidManifest, withLocationGradleProperties, withFormsGradleProperties, withNotificationResources };
 
 export default withKlaviyoAndroid; 

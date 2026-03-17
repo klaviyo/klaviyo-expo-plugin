@@ -1,14 +1,4 @@
-// Mock xml2js module
-jest.mock('xml2js', () => ({
-  parseStringPromise: jest.fn().mockResolvedValue({
-    resources: { color: [] }
-  }),
-  Builder: jest.fn().mockImplementation(() => ({
-    buildObject: jest.fn().mockReturnValue('<resources><color name="klaviyo_notification_color">#FF0000</color></resources>')
-  }))
-}));
-
-import { withNotificationIcon, withKlaviyoPluginNameVersion, modifyMainActivity } from '../plugin/withKlaviyoAndroid';
+import { withNotificationIcon, withKlaviyoPluginNameVersion, modifyMainActivity, withNotificationResources } from '../plugin/withKlaviyoAndroid';
 import { createMockConfig, createMockProps, testPluginFunction } from './utils/testHelpers';
 
 // Mock file system operations
@@ -1141,6 +1131,90 @@ public class MainActivity extends ReactActivity {
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '1')).toBe(true);
       expect(logger.log).toHaveBeenCalledWith('Setting Klaviyo log level to 1');
+    });
+  });
+
+  describe('withNotificationResources', () => {
+    const COLOR_NAME = 'klaviyo_notification_color';
+
+    function getColors(result: any): any[] {
+      return result.modResults?.resources?.color ?? [];
+    }
+
+    it('adds the color entry when notificationColor is provided', () => {
+      const config = createMockConfig();
+      const props = createMockProps({ notificationColor: '#FF0000' });
+      const result = withNotificationResources(config, props);
+      const colors = getColors(result);
+      expect(colors).toContainEqual({ $: { name: COLOR_NAME }, _: '#FF0000' });
+    });
+
+    it('does not add a color entry when notificationColor is undefined', () => {
+      const config = createMockConfig();
+      const props = createMockProps({ notificationColor: undefined });
+      const result = withNotificationResources(config, props);
+      const colors = getColors(result);
+      expect(colors.some((c: any) => c.$?.name === COLOR_NAME)).toBe(false);
+    });
+
+    it('does not add a color entry when notificationColor is empty string', () => {
+      const config = createMockConfig();
+      const props = createMockProps({ notificationColor: '' as any });
+      const result = withNotificationResources(config, props);
+      const colors = getColors(result);
+      expect(colors.some((c: any) => c.$?.name === COLOR_NAME)).toBe(false);
+    });
+
+    it('removes an existing color entry when notificationColor is undefined', () => {
+      const config = createMockConfig({
+        modResults: { resources: { color: [{ $: { name: COLOR_NAME }, _: '#FF0000' }] } },
+      });
+      const props = createMockProps({ notificationColor: undefined });
+      const result = withNotificationResources(config, props);
+      const colors = getColors(result);
+      expect(colors.some((c: any) => c.$?.name === COLOR_NAME)).toBe(false);
+    });
+
+    it('replaces an existing color entry when the color changes', () => {
+      const config = createMockConfig({
+        modResults: { resources: { color: [{ $: { name: COLOR_NAME }, _: '#00FF00' }] } },
+      });
+      const props = createMockProps({ notificationColor: '#0000FF' });
+      const result = withNotificationResources(config, props);
+      const colors = getColors(result);
+      const matches = colors.filter((c: any) => c.$?.name === COLOR_NAME);
+      expect(matches).toHaveLength(1);
+      expect(matches[0]._).toBe('#0000FF');
+    });
+
+    it('produces exactly one entry when the same color is applied twice (idempotency)', () => {
+      const config = createMockConfig({
+        modResults: { resources: { color: [{ $: { name: COLOR_NAME }, _: '#FF0000' }] } },
+      });
+      const props = createMockProps({ notificationColor: '#FF0000' });
+      const result = withNotificationResources(config, props);
+      const colors = getColors(result);
+      const matches = colors.filter((c: any) => c.$?.name === COLOR_NAME);
+      expect(matches).toHaveLength(1);
+      expect(matches[0]._).toBe('#FF0000');
+    });
+
+    it('does not affect other color entries in the resource file', () => {
+      const config = createMockConfig({
+        modResults: {
+          resources: {
+            color: [
+              { $: { name: 'primary_color' }, _: '#123456' },
+              { $: { name: 'accent_color' }, _: '#654321' },
+            ],
+          },
+        },
+      });
+      const props = createMockProps({ notificationColor: '#FF0000' });
+      const result = withNotificationResources(config, props);
+      const colors = getColors(result);
+      expect(colors.some((c: any) => c.$?.name === 'primary_color' && c._ === '#123456')).toBe(true);
+      expect(colors.some((c: any) => c.$?.name === 'accent_color' && c._ === '#654321')).toBe(true);
     });
   });
 }); 
