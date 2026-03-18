@@ -6,6 +6,7 @@
  *   - example/package.json
  *   - ios/klaviyo-plugin-configuration.plist  (klaviyo_sdk_plugin_version_override)
  *   - plugin/withKlaviyoAndroid.ts            (klaviyo_sdk_plugin_version_override)
+ *   - tests/withKlaviyoAndroid.internal.test.ts (version assertions)
  *
  * Usage:
  *   node scripts/bump-version.js <new-version>
@@ -48,6 +49,34 @@ function bumpPlist(filePath, version) {
   console.log(`  ${path.relative(ROOT, filePath)}: ${old} -> ${version}`);
 }
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function bumpTestVersionAssertions(filePath, oldVersion, newVersion) {
+  let content = fs.readFileSync(filePath, 'utf8');
+  let count = 0;
+
+  // Match `_: 'X.Y.Z'` that immediately follows a klaviyo_sdk_plugin_version_override name line.
+  // Targets toContainEqual assertions — not the 'old_version' input strings used as test data.
+  const p1 = new RegExp(
+    `(name:\\s*'klaviyo_sdk_plugin_version_override'\\s*\\}[^\\n]*\\n[^\\n]*_:\\s*')${escapeRegex(oldVersion)}(')`,
+    'g'
+  );
+  content = content.replace(p1, (_, pre, post) => { count++; return `${pre}${newVersion}${post}`; });
+
+  // Match expect(versionString._).toBe('X.Y.Z') assertions
+  const p2 = new RegExp(`(versionString\\._\\)\\.toBe\\(')${escapeRegex(oldVersion)}(')`, 'g');
+  content = content.replace(p2, (_, pre, post) => { count++; return `${pre}${newVersion}${post}`; });
+
+  if (count === 0) {
+    console.warn(`  WARNING: no version assertions found in ${path.relative(ROOT, filePath)} — update manually`);
+    return;
+  }
+  fs.writeFileSync(filePath, content);
+  console.log(`  ${path.relative(ROOT, filePath)}: ${oldVersion} -> ${newVersion} (${count} assertion(s))`);
+}
+
 function bumpAndroidTs(filePath, version) {
   let content = fs.readFileSync(filePath, 'utf8');
   const pattern = /(setStringResource\('klaviyo_sdk_plugin_version_override',\s*')[^']+(')/;
@@ -83,12 +112,20 @@ async function main() {
     process.exit(1);
   }
 
+  const rootPkg = path.join(ROOT, 'package.json');
+  const oldVersion = JSON.parse(fs.readFileSync(rootPkg, 'utf8')).version;
+
   console.log(`Bumping to version ${newVersion}...\n`);
 
-  bumpJson(path.join(ROOT, 'package.json'), newVersion);
+  bumpJson(rootPkg, newVersion);
   bumpJson(path.join(ROOT, 'example', 'package.json'), newVersion);
   bumpPlist(path.join(ROOT, 'ios', 'klaviyo-plugin-configuration.plist'), newVersion);
   bumpAndroidTs(path.join(ROOT, 'plugin', 'withKlaviyoAndroid.ts'), newVersion);
+  bumpTestVersionAssertions(
+    path.join(ROOT, 'tests', 'withKlaviyoAndroid.internal.test.ts'),
+    oldVersion,
+    newVersion
+  );
 
   console.log('\nAll files updated. Run `npm install` and `cd example && npm install` to update lock files.');
 }
