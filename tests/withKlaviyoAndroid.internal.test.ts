@@ -257,7 +257,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           const result = modifier(testConfig);
           expect(result.modResults.resources.string).toContainEqual({
             $: { name: 'klaviyo_sdk_plugin_version_override' },
-            _: '0.3.0'
+            _: '0.3.1'
           });
           return result;
         });
@@ -288,9 +288,9 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           });
           expect(result.modResults.resources.string).toContainEqual({
             $: { name: 'klaviyo_sdk_plugin_version_override' },
-            _: '0.3.0'
+            _: '0.3.1'
           });
-          
+
           return result;
         });
 
@@ -426,7 +426,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           expect(nameString).toBeDefined();
           expect(nameString._).toBe('klaviyo-expo');
           expect(versionString).toBeDefined();
-          expect(versionString._).toBe('0.3.0');
+          expect(versionString._).toBe('0.3.1');
           
           return result;
         });
