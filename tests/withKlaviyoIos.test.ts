@@ -724,4 +724,80 @@ end
       expect(writtenContent).toContain("pod 'KlaviyoSwiftExtension'");
     });
   });
+
+  describe('notificationServiceExtensionEnabled: false', () => {
+    const { FileManager } = require('../plugin/support/fileManager');
+    const mockPodfileContent = `platform :ios, '13.0'
+use_frameworks! :linkage => :static
+
+target 'TestApp' do
+  config = use_native_modules!
+end
+`;
+
+    async function runIosMod(config: any, props: any) {
+      const result = withKlaviyoIos(config, props) as any;
+      if (result.mods && result.mods.ios) {
+        return await result.mods.ios(result);
+      }
+      return result;
+    }
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      FileManager.readFile.mockResolvedValue(mockPodfileContent);
+      FileManager.writeFile.mockResolvedValue(undefined);
+      FileManager.dirExists.mockReturnValue(true);
+      FileManager.copyFile.mockResolvedValue(undefined);
+    });
+
+    it('should not inject NSE target into Podfile', async () => {
+      const props = createMockIosProps({ notificationServiceExtensionEnabled: false });
+      await runIosMod(mockConfig, props);
+
+      const allWriteCalls = FileManager.writeFile.mock.calls;
+      const nseWrite = allWriteCalls.find((call: any) =>
+        call && call[1] && typeof call[1] === 'string' &&
+        call[1].includes("target 'KlaviyoNotificationServiceExtension'")
+      );
+      expect(nseWrite).toBeUndefined();
+    });
+
+    it('should not add KlaviyoSwiftExtension pod to Podfile', async () => {
+      const props = createMockIosProps({ notificationServiceExtensionEnabled: false });
+      await runIosMod(mockConfig, props);
+
+      const allWriteCalls = FileManager.writeFile.mock.calls;
+      const swiftExtWrite = allWriteCalls.find((call: any) =>
+        call && call[1] && typeof call[1] === 'string' &&
+        call[1].includes("pod 'KlaviyoSwiftExtension'")
+      );
+      expect(swiftExtWrite).toBeUndefined();
+    });
+
+    it('should not copy NSE files', async () => {
+      const props = createMockIosProps({ notificationServiceExtensionEnabled: false });
+      await runIosMod(mockConfig, props);
+
+      const nseCopyCalls = FileManager.copyFile.mock.calls.filter((call: any) =>
+        call && call[1] && typeof call[1] === 'string' &&
+        call[1].includes('KlaviyoNotificationServiceExtension')
+      );
+      expect(nseCopyCalls).toHaveLength(0);
+    });
+
+    it('should still set badge autoclearing in Info.plist', () => {
+      const props = createMockIosProps({ notificationServiceExtensionEnabled: false, badgeAutoclearing: false });
+      const result = withKlaviyoIos(mockConfig, props) as any;
+      expect(result.modResults.klaviyo_badge_autoclearing).toBe(false);
+    });
+
+    it('should still set version in Info.plist', () => {
+      const configWithVersion = createMockIosConfig({ version: '2.0.0', ios: { buildNumber: '42' } });
+      const props = createMockIosProps({ notificationServiceExtensionEnabled: false });
+      const result = withKlaviyoIos(configWithVersion, props) as any;
+      expect(result.modResults.CFBundleShortVersionString).toBe('2.0.0');
+      expect(result.modResults.CFBundleVersion).toBe('42');
+    });
+  });
 }); 
