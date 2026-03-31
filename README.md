@@ -117,6 +117,7 @@ npx expo prebuild
 |`ios.devTeam`| string | optional| The 10-digit alphanumeric Apple Development Team ID associated with the necessary signing capabilites, provisioning profile, etc. Format: "XXXXXXXXXX" Default: `undefined`|
 |`ios.geofencingEnabled`| boolean | optional | Enables geofencing/location tracking support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. When `false`, sets the `KLAVIYO_INCLUDE_LOCATION` Podfile ENV var to exclude the KlaviyoLocation pod. See [Geofencing](#geofencing) below. Default: `false` (geofencing disabled)|
 |`ios.formsEnabled`| boolean | optional | Controls whether the full forms module (in-app forms rendering with WebView) is included on iOS. When `false`, sets the `KLAVIYO_INCLUDE_FORMS` Podfile ENV var to exclude the module. Default: `true`|
+|`ios.notificationServiceExtensionEnabled`| boolean | optional | Controls whether the `KlaviyoNotificationServiceExtension` target is added to the Xcode project. When `false`, the iOS Notification Service Extension (NSE) will not be added to the project. The NSE is needed for badge count management and rich push notification support. Opting out will disable these capabilities. Default: `true`|
 
 Note: If you do not need to specify any of these for your project, it will use the defaults defined here. If you do not specify any of these props, you can add the plugin without additional arguments:
 ```

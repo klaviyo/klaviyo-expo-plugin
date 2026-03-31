@@ -97,4 +97,9 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
   if (config.formsEnabled !== undefined && typeof config.formsEnabled !== 'boolean') {
     throw new KlaviyoConfigError('iOS formsEnabled must be a boolean');
   }
+
+  // Validate notificationServiceExtensionEnabled
+  if (config.notificationServiceExtensionEnabled !== undefined && typeof config.notificationServiceExtensionEnabled !== 'boolean') {
+    throw new KlaviyoConfigError('iOS notificationServiceExtensionEnabled must be a boolean');
+  }
 };

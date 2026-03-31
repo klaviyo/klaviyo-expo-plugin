@@ -235,7 +235,8 @@ const withKlaviyoPodfileEnvVars: ConfigPlugin<KlaviyoPluginIosProps> = (config, 
 /**
  * Adds necessary Klaviyo pods to the Podfile setup.
  */
-const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
+const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
+  if (props.notificationServiceExtensionEnabled === false) return config;
   return withDangerousMod(config, [
     'ios',
     async config => {
@@ -280,63 +281,64 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
 const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   return withXcodeProject(config, async (config) => {
     const xcodeProject = config.modResults;
-    if (xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
-      KlaviyoLog.log(`⚠️ ${NSE_TARGET_NAME} already exists in project. Skipping...`);
-      return config;
-    }
 
-    // create the NSE group
-    const extGroup = xcodeProject.addPbxGroup(
-      NSE_EXT_FILES,
-      NSE_TARGET_NAME, 
-      NSE_TARGET_NAME
-    );
+    if (props.notificationServiceExtensionEnabled !== false) {
+      if (xcodeProject.pbxGroupByName(NSE_TARGET_NAME)) {
+        KlaviyoLog.log(`⚠️ ${NSE_TARGET_NAME} already exists in project. Skipping...`);
+      } else {
+        // create the NSE group
+        const extGroup = xcodeProject.addPbxGroup(
+          NSE_EXT_FILES,
+          NSE_TARGET_NAME,
+          NSE_TARGET_NAME
+        );
 
-    // add the group to the main group
-    const groups = xcodeProject.hash.project.objects["PBXGroup"];
-    Object.keys(groups).forEach(function(key) {
-      if (typeof groups[key] === "object" && groups[key].name === undefined && groups[key].path === undefined) {
-        xcodeProject.addToPbxGroup(extGroup.uuid, key);
+        // add the group to the main group
+        const groups = xcodeProject.hash.project.objects["PBXGroup"];
+        Object.keys(groups).forEach(function(key) {
+          if (typeof groups[key] === "object" && groups[key].name === undefined && groups[key].path === undefined) {
+            xcodeProject.addToPbxGroup(extGroup.uuid, key);
+          }
+        });
+
+        const projObjects = config.modResults.hash.project.objects;
+        projObjects['PBXTargetDependency'] = projObjects['PBXTargetDependency'] || {};
+        projObjects['PBXContainerItemProxy'] = projObjects['PBXTargetDependency'] || {};
+
+        // add the NSE target
+        const parentBundleId = config.ios?.bundleIdentifier;
+        if (!parentBundleId) {
+          throw new Error('⚠️ Parent app bundle identifier is required');
+        }
+        const nseBundleId = `${parentBundleId}.${NSE_TARGET_NAME}`;
+        const nseTarget = xcodeProject.addTarget(
+          NSE_TARGET_NAME,
+          "app_extension",
+          NSE_TARGET_NAME,
+          nseBundleId
+        );
+
+        xcodeProject.addBuildPhase(
+          ["KlaviyoNotificationService.swift"],
+          "PBXSourcesBuildPhase",
+          "Sources",
+          nseTarget.uuid
+        );
+        xcodeProject.addBuildPhase(
+          [],
+          "PBXResourcesBuildPhase",
+          "Resources",
+          nseTarget.uuid
+        );
+        xcodeProject.addBuildPhase(
+          [],
+          "PBXFrameworksBuildPhase",
+          "Frameworks",
+          nseTarget.uuid
+        );
       }
-    });
-    
-    const projObjects = config.modResults.hash.project.objects;
-    projObjects['PBXTargetDependency'] = projObjects['PBXTargetDependency'] || {};
-    projObjects['PBXContainerItemProxy'] = projObjects['PBXTargetDependency'] || {};
-
-    // add the NSE target
-    const parentBundleId = config.ios?.bundleIdentifier;
-    if (!parentBundleId) {
-      throw new Error('⚠️ Parent app bundle identifier is required');
     }
-    const nseBundleId = `${parentBundleId}.${NSE_TARGET_NAME}`;
-    const nseTarget = xcodeProject.addTarget(
-      NSE_TARGET_NAME,
-      "app_extension", 
-      NSE_TARGET_NAME, 
-      nseBundleId
-    );
 
-    xcodeProject.addBuildPhase(
-      ["KlaviyoNotificationService.swift"],
-      "PBXSourcesBuildPhase",
-      "Sources",
-      nseTarget.uuid
-    );
-    xcodeProject.addBuildPhase(
-      [], 
-      "PBXResourcesBuildPhase", 
-      "Resources", 
-      nseTarget.uuid
-    );
-
-    xcodeProject.addBuildPhase(
-      [],
-      "PBXFrameworksBuildPhase",
-      "Frameworks",
-      nseTarget.uuid
-    );
-    
     const configurations = xcodeProject.pbxXCBuildConfigurationSection();
     const marketingVersion = getMarketingVersion(config);
     const buildNumber = getBuildNumber(config);
@@ -364,6 +366,7 @@ const withKlaviyoXcodeProject: ConfigPlugin<KlaviyoPluginIosProps> = (config, pr
  * Adds the Klaviyo files to the NotificationServiceExtension target.
  */
 const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
+  if (props.notificationServiceExtensionEnabled === false) return config;
   return withDangerousMod(config, [
     'ios',
     async config => {
@@ -435,6 +438,7 @@ const withKlaviyoNSE: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
  * Adds the app group to target entitlements.
  */
 const withKlaviyoAppGroup: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
+  if (props.notificationServiceExtensionEnabled === false) return config;
   return withEntitlementsPlist(config, (config) => {
     const appGroupsKey = 'com.apple.security.application-groups';
     const bundleIdentifier = config.ios?.bundleIdentifier;
