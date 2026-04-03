@@ -724,4 +724,59 @@ end
       expect(writtenContent).toContain("pod 'KlaviyoSwiftExtension'");
     });
   });
+
+  describe('includeNotificationServiceExtension', () => {
+    const { FileManager } = require('../plugin/support/fileManager');
+    const mockPodfileContent = `platform :ios, '13.0'\n\ntarget 'TestApp' do\nend\n`;
+
+    async function runIosMod(config: any, props: any) {
+      const result = withKlaviyoIos(config, props) as any;
+      if (result.mods && result.mods.ios) {
+        return await result.mods.ios(result);
+      }
+      return result;
+    }
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      FileManager.readFile.mockResolvedValue(mockPodfileContent);
+      FileManager.writeFile.mockResolvedValue(undefined);
+      FileManager.copyFile.mockResolvedValue(undefined);
+      FileManager.dirExists.mockReturnValue(true);
+    });
+
+    it('should include NSE setup when includeNotificationServiceExtension is true', async () => {
+      await runIosMod(mockConfig, createMockIosProps({ includeNotificationServiceExtension: true }));
+
+      const podfileWrite = FileManager.writeFile.mock.calls.find(
+        (call: any) => call && call[0] && typeof call[0] === 'string' && call[0].includes('Podfile') &&
+          call[1].includes("target 'KlaviyoNotificationServiceExtension'")
+      );
+      expect(podfileWrite).toBeDefined();
+      expect(FileManager.copyFile).toHaveBeenCalled();
+    });
+
+    it('should skip NSE setup when includeNotificationServiceExtension is false', async () => {
+      await runIosMod(mockConfig, createMockIosProps({ includeNotificationServiceExtension: false }));
+
+      const podfileWrite = FileManager.writeFile.mock.calls.find(
+        (call: any) => call && call[0] && typeof call[0] === 'string' && call[0].includes('Podfile') &&
+          call[1].includes("target 'KlaviyoNotificationServiceExtension'")
+      );
+      expect(podfileWrite).toBeUndefined();
+      expect(FileManager.copyFile).not.toHaveBeenCalled();
+    });
+
+    it('should default to including NSE setup when includeNotificationServiceExtension is not specified', async () => {
+      const propsWithDefault = createMockIosProps();
+      // default is true, so NSE should be included
+      await runIosMod(mockConfig, propsWithDefault);
+
+      const podfileWrite = FileManager.writeFile.mock.calls.find(
+        (call: any) => call && call[0] && typeof call[0] === 'string' && call[0].includes('Podfile') &&
+          call[1].includes("target 'KlaviyoNotificationServiceExtension'")
+      );
+      expect(podfileWrite).toBeDefined();
+    });
+  });
 }); 
