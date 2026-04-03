@@ -20,16 +20,21 @@ const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   KlaviyoLog.log('Starting iOS plugin configuration...');
   KlaviyoLog.log('Plugin props:' + JSON.stringify(props));
 
-  return withPlugins(config, [
+  const plugins: Array<ConfigPlugin<any>> = [
     withKlaviyoPluginConfigurationPlist,
     withRemoteNotificationsPermissions,
     withGeofencingBackgroundMode,
     withKlaviyoPodfileEnvVars,
-    withKlaviyoPodfile,
-    withKlaviyoXcodeProject,
-    withKlaviyoNSE,
-    withKlaviyoAppGroup,
-  ].map(plugin => [plugin, props]));
+  ];
+
+  if (props.includeNotificationServiceExtension) {
+    plugins.push(withKlaviyoPodfile);
+    plugins.push(withKlaviyoXcodeProject);
+    plugins.push(withKlaviyoNSE);
+    plugins.push(withKlaviyoAppGroup);
+  }
+
+  return withPlugins(config, plugins.map(plugin => [plugin, props]));
 };
 
 export default withKlaviyoIos;
