@@ -49,7 +49,8 @@ module.exports = () => {
             codeSigningStyle: 'Automatic',
             devTeam: 'XXXXXXXXXX',
             geofencingEnabled: true,
-            formsEnabled: true
+            formsEnabled: true,
+            includeNotificationServiceExtension: true,
           },
         },
       ],

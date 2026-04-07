@@ -13,6 +13,7 @@ export interface KlaviyoPluginIosBaseProps  {
   devTeam?: string;
   geofencingEnabled?: boolean;
   formsEnabled?: boolean;
+  includeNotificationServiceExtension?: boolean;
 }
 
 export interface KlaviyoPluginProps {
@@ -35,6 +36,7 @@ export interface KlaviyoPluginIosProps extends KlaviyoPluginIosBaseProps {
   devTeam: string | undefined;
   geofencingEnabled?: boolean;
   formsEnabled: boolean;
+  includeNotificationServiceExtension: boolean;
 }
 
 export interface KlaviyoPluginPropsDefaultValues extends KlaviyoPluginProps {
@@ -55,7 +57,8 @@ const IOS_DEFAULTS: KlaviyoPluginIosProps = {
   badgeAutoclearing: true,
   codeSigningStyle: "Automatic",
   devTeam: undefined,
-  formsEnabled: true
+  formsEnabled: true,
+  includeNotificationServiceExtension: true
 };
 
 export const mergeAndroidProps = (props?: KlaviyoPluginAndroidBaseProps): KlaviyoPluginAndroidProps => {

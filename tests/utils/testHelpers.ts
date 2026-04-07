@@ -257,6 +257,7 @@ export interface MockIosPropsOptions {
   devTeam?: string;
   geofencingEnabled?: boolean;
   formsEnabled?: boolean;
+  includeNotificationServiceExtension?: boolean;
 }
 
 export const createMockIosConfig = (options: MockIosConfigOptions = {}): any => {
@@ -301,5 +302,6 @@ export const createMockIosProps = (options: MockIosPropsOptions = {}): any => ({
   devTeam: 'XXXXXXXXXX',
   geofencingEnabled: false,
   formsEnabled: true,
+  includeNotificationServiceExtension: true,
   ...options,
 }); 
