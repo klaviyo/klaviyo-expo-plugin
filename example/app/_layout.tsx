@@ -25,7 +25,7 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error, execu
 
   if (data) {
     const notification = (data as any).notification;
-    const aps = notification?.data?.aps as Record<string, unknown> | undefined;
+    const aps = notification?.request?.content?.data?.aps as Record<string, unknown> | undefined;
     const isSilentPush = aps?.contentAvailable === 1 && aps?.alert == null;
 
     if (isSilentPush) {
