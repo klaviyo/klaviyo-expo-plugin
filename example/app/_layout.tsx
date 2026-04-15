@@ -23,14 +23,27 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error, execu
     return;
   }
 
-  // Store the notification data in global variable for later retrieval
   if (data) {
+    const notification = (data as any).notification;
+    const aps = notification?.data?.aps as Record<string, unknown> | undefined;
+    const isSilentPush = aps?.contentAvailable === 1 && aps?.alert == null;
+
+    if (isSilentPush) {
+      // True silent push — no visible notification was shown. Add any background
+      // processing logic here, e.g. prefetch content or sync state.
+      console.log('Background task: true silent push received (content-available=1, no alert)');
+    } else {
+      // Standard push with content-available — a visible notification was shown and
+      // iOS also woke the app for background fetch. Add any background processing
+      // logic here, e.g. cache media or update local data before the user taps.
+      console.log('Background task: standard push with content-available received (alert was shown)');
+    }
+
     const notificationData = {
       ...data,
       receivedAt: new Date().toISOString(),
       isBackground: true
     };
-    // Store in global variable
     global.lastBackgroundNotification = notificationData;
     console.log('Stored background notification:', notificationData);
   }
@@ -48,8 +61,11 @@ export const checkForBackgroundNotifications = () => {
 // Configure notification handler
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
-    // Check for silent push by looking at content-available in APS payload
-    const isSilentPush = notification.request.content.data?.aps?.contentAvailable === 1;
+    // A push is only a true silent push if content-available=1 AND there is no visible
+    // alert content. A standard push can also carry content-available=1 to request a
+    // background fetch — that is NOT a silent push and should still show an alert.
+    const aps = notification.request.content.data?.aps as Record<string, unknown> | undefined;
+    const isSilentPush = aps?.contentAvailable === 1 && aps?.alert == null;
     
     console.log('Notification received:', {
       isSilentPush,
@@ -115,7 +131,8 @@ export default function AppLayout() {
     // Foreground notification listener
     console.log('Setting up foreground notification listener');
     const foregroundSubscription = Notifications.addNotificationReceivedListener(notification => {
-      const isSilentPush = notification.request.content.data?.aps?.contentAvailable === 1;
+      const aps = notification.request.content.data?.aps as Record<string, unknown> | undefined;
+      const isSilentPush = aps?.contentAvailable === 1 && aps?.alert == null;
       
       console.log('Received foreground notification:', JSON.stringify({
         actionIdentifier: 'foreground',

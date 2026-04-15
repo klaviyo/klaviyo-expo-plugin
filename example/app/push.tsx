@@ -113,7 +113,8 @@ export default function PushScreen() {
 
     const content = notification.request?.content || notification;
     const data = content.data || {};
-    const isSilent = content.data?.aps?.contentAvailable === 1;
+    const aps = data?.aps as Record<string, unknown> | undefined;
+    const isSilent = aps?.contentAvailable === 1 && aps?.alert == null;
 
     // Helper function to safely stringify objects
     const safeStringify = (obj: any) => {
