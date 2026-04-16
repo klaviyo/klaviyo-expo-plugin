@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Platform} from 'react-native';
+import { StyleSheet, Platform, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import { Tabs } from 'expo-router';
@@ -153,11 +153,14 @@ export default function AppLayout() {
 
       // Store the notification in the app's state
       if (isSilentPush) {
+        Alert.alert('Silent Push (Foreground)', 'content-available=1, no alert payload.');
         // Store the notification data globally
         global.lastBackgroundNotification = {
           ...notification.request.content.data,
           receivedAt: new Date().toISOString()
         };
+      } else if (aps?.contentAvailable === 1) {
+        Alert.alert('Standard Push + content-available (Foreground)', 'content-available=1 WITH alert payload.');
       }
     });
 
