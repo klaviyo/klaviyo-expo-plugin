@@ -63,7 +63,7 @@ export const validateAndroidConfig = (config: KlaviyoPluginProps['android'], pro
 export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
   if (!config) return;
 
-  // Warn if deprecated version props are used (duplicated in 0.3.0; use Expo-level build numbers instead)
+  // Warn if deprecated version props are used (deprecated in 0.3.0; use Expo-level build numbers instead)
   const configWithExtras = config as unknown as Record<string, unknown>;
   if (configWithExtras.projectVersion != null || configWithExtras.marketingVersion != null) {
     console.warn(
