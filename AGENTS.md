@@ -109,3 +109,9 @@ The Android plugin (`withKlaviyoAndroid.ts`) modifies:
 - `AndroidManifest.xml` — push receivers, services, and permissions
 - `build.gradle` — SDK dependencies and configuration
 - Resources — notification icon drawable and color values
+
+## Code Review
+
+CodeRabbit is active on this repo and auto-reviews PRs. It reads this file as a code guidelines
+source. When performing code reviews, avoid re-surfacing findings CodeRabbit may have already flagged.
+If you notice patterns worth encoding as review guidance, suggest adding them to `.coderabbit.yaml`.

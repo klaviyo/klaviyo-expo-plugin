@@ -1,0 +1,17 @@
+reviews:
+  profile: assertive
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/build/**"
+    - "!**/lib/**"
+    - "!**/package-lock.json"
+    - "!**/Pods/**"
+    - "!**/*.xcodeproj/**"
+    - "!example/**"
+  auto_review:
+    drafts: false
+    base_branches:
+      - ".*"
+  tools:
+    eslint:
+      enabled: true
