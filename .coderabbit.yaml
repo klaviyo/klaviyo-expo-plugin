@@ -6,7 +6,6 @@ reviews:
     - "!**/lib/**"
     - "!**/package-lock.json"
     - "!**/Pods/**"
-    - "!**/*.xcodeproj/**"
   auto_review:
     drafts: false
     base_branches:
