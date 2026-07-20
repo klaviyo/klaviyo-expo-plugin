@@ -19,6 +19,16 @@ export const validateAndroidConfig = (config: KlaviyoPluginProps['android'], pro
     }
   }
 
+  // Reject removed openTracking prop — was removed as a breaking change in v1.0.0
+  const androidConfigWithExtras = config as unknown as Record<string, unknown>;
+  if (androidConfigWithExtras.openTracking !== undefined) {
+    throw new KlaviyoConfigError(
+      'Android openTracking was removed in v1.0.0. ' +
+      'Use automaticPushOpenTracking instead. ' +
+      'See MIGRATION_GUIDE.md for details.'
+    );
+  }
+
   // Validate notificationColor if provided
   if (config.notificationColor) {
     const hexColorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;

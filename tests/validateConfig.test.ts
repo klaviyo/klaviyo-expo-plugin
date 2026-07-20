@@ -68,6 +68,14 @@ describe('validateConfig', () => {
         expect(() => validateAndroidConfig({ logLevel: -1 })).toThrow('Android logLevel must be an integer between 0 and 6');
       });
 
+      it('rejects openTracking with migration error (removed in v1.0.0)', () => {
+        expect(() => validateAndroidConfig({ openTracking: true } as any)).toThrow('Android openTracking was removed in v1.0.0');
+      });
+
+      it('rejects openTracking regardless of value type', () => {
+        expect(() => validateAndroidConfig({ openTracking: false } as any)).toThrow('Use automaticPushOpenTracking instead');
+      });
+
       it('rejects invalid notificationColor', () => {
         expect(() => validateAndroidConfig({ notificationColor: 'red' })).toThrow('Android notificationColor must be a valid hex color code');
       });
