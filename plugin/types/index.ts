@@ -32,15 +32,16 @@ export interface KlaviyoPluginIosBaseProps  {
   formsEnabled?: boolean;
   includeNotificationServiceExtension?: boolean;
   /**
-   * Controls automatic push token forwarding via the `automatic_push_token_forwarding` Info.plist
-   * key.
+   * Controls automatic push token forwarding via the `klaviyo_automatic_push_token_forwarding`
+   * Info.plist key.
    *
    * When `true`, injects the key with value `true` to opt in. Omitted (default) means the key is
    * not written — native iOS defaults to OFF.
    */
   automaticPushTokenForwarding?: boolean;
   /**
-   * Controls automatic push open tracking via the `automatic_push_open_tracking` Info.plist key.
+   * Controls automatic push open tracking via the `klaviyo_automatic_push_open_tracking`
+   * Info.plist key.
    *
    * When `true`, injects the key with value `true` to opt in. Omitted (default) means the key is
    * not written — native iOS defaults to OFF.

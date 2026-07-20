@@ -77,63 +77,63 @@ describe('withKlaviyoIos', () => {
     });
 
     describe('automaticPushTokenForwarding', () => {
-      it('should not write automatic_push_token_forwarding when prop is omitted', () => {
+      it('should not write klaviyo_automatic_push_token_forwarding when prop is omitted', () => {
         const modifiedConfig = withKlaviyoIos(mockConfig, mockProps) as any;
-        expect(modifiedConfig.modResults.automatic_push_token_forwarding).toBeUndefined();
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_token_forwarding).toBeUndefined();
       });
 
-      it('should not write automatic_push_token_forwarding when prop is false', () => {
+      it('should not write klaviyo_automatic_push_token_forwarding when prop is false', () => {
         const props = createMockIosProps({ automaticPushTokenForwarding: false });
         const modifiedConfig = withKlaviyoIos(mockConfig, props) as any;
-        expect(modifiedConfig.modResults.automatic_push_token_forwarding).toBeUndefined();
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_token_forwarding).toBeUndefined();
       });
 
-      it('should write automatic_push_token_forwarding=true when prop is true (opt-in)', () => {
+      it('should write klaviyo_automatic_push_token_forwarding=true when prop is true (opt-in)', () => {
         const props = createMockIosProps({ automaticPushTokenForwarding: true });
         const modifiedConfig = withKlaviyoIos(mockConfig, props) as any;
-        expect(modifiedConfig.modResults.automatic_push_token_forwarding).toBe(true);
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_token_forwarding).toBe(true);
       });
 
-      it('should remove automatic_push_token_forwarding from plist when prop becomes omitted (idempotency)', () => {
+      it('should remove klaviyo_automatic_push_token_forwarding from plist when prop becomes omitted (idempotency)', () => {
         const configWithExistingFlag = createMockIosConfig({
-          modResults: { ...mockConfig.modResults, automatic_push_token_forwarding: true },
+          modResults: { ...mockConfig.modResults, klaviyo_automatic_push_token_forwarding: true },
         });
         const modifiedConfig = withKlaviyoIos(configWithExistingFlag, mockProps) as any;
-        expect(modifiedConfig.modResults.automatic_push_token_forwarding).toBeUndefined();
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_token_forwarding).toBeUndefined();
       });
     });
 
     describe('automaticPushOpenTracking', () => {
-      it('should not write automatic_push_open_tracking when prop is omitted', () => {
+      it('should not write klaviyo_automatic_push_open_tracking when prop is omitted', () => {
         const modifiedConfig = withKlaviyoIos(mockConfig, mockProps) as any;
-        expect(modifiedConfig.modResults.automatic_push_open_tracking).toBeUndefined();
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_open_tracking).toBeUndefined();
       });
 
-      it('should not write automatic_push_open_tracking when prop is false', () => {
+      it('should not write klaviyo_automatic_push_open_tracking when prop is false', () => {
         const props = createMockIosProps({ automaticPushOpenTracking: false });
         const modifiedConfig = withKlaviyoIos(mockConfig, props) as any;
-        expect(modifiedConfig.modResults.automatic_push_open_tracking).toBeUndefined();
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_open_tracking).toBeUndefined();
       });
 
-      it('should write automatic_push_open_tracking=true when prop is true (opt-in)', () => {
+      it('should write klaviyo_automatic_push_open_tracking=true when prop is true (opt-in)', () => {
         const props = createMockIosProps({ automaticPushOpenTracking: true });
         const modifiedConfig = withKlaviyoIos(mockConfig, props) as any;
-        expect(modifiedConfig.modResults.automatic_push_open_tracking).toBe(true);
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_open_tracking).toBe(true);
       });
 
-      it('should remove automatic_push_open_tracking from plist when prop becomes omitted (idempotency)', () => {
+      it('should remove klaviyo_automatic_push_open_tracking from plist when prop becomes omitted (idempotency)', () => {
         const configWithExistingFlag = createMockIosConfig({
-          modResults: { ...mockConfig.modResults, automatic_push_open_tracking: true },
+          modResults: { ...mockConfig.modResults, klaviyo_automatic_push_open_tracking: true },
         });
         const modifiedConfig = withKlaviyoIos(configWithExistingFlag, mockProps) as any;
-        expect(modifiedConfig.modResults.automatic_push_open_tracking).toBeUndefined();
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_open_tracking).toBeUndefined();
       });
 
       it('should write both automatic push flags when both are true', () => {
         const props = createMockIosProps({ automaticPushTokenForwarding: true, automaticPushOpenTracking: true });
         const modifiedConfig = withKlaviyoIos(mockConfig, props) as any;
-        expect(modifiedConfig.modResults.automatic_push_token_forwarding).toBe(true);
-        expect(modifiedConfig.modResults.automatic_push_open_tracking).toBe(true);
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_token_forwarding).toBe(true);
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_open_tracking).toBe(true);
       });
     });
   });
