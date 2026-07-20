@@ -63,46 +63,9 @@ describe('validateConfig', () => {
       });
     });
 
-    describe('openTracking deprecation warning', () => {
-      let warnSpy: jest.SpyInstance;
-
-      beforeEach(() => {
-        warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-      });
-
-      afterEach(() => {
-        warnSpy.mockRestore();
-      });
-
-      it('emits a deprecation warning when openTracking is true', () => {
-        validateAndroidConfig({ openTracking: true });
-        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('android.openTracking is deprecated'));
-        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('automaticPushOpenTracking'));
-      });
-
-      it('emits a deprecation warning when openTracking is false', () => {
-        validateAndroidConfig({ openTracking: false });
-        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('android.openTracking is deprecated'));
-      });
-
-      it('does not warn when openTracking is omitted', () => {
-        validateAndroidConfig({});
-        expect(warnSpy).not.toHaveBeenCalled();
-      });
-
-      it('does not warn when openTracking is undefined', () => {
-        validateAndroidConfig({ openTracking: undefined });
-        expect(warnSpy).not.toHaveBeenCalled();
-      });
-    });
-
     describe('existing validations still work', () => {
       it('rejects invalid logLevel', () => {
         expect(() => validateAndroidConfig({ logLevel: -1 })).toThrow('Android logLevel must be an integer between 0 and 6');
-      });
-
-      it('rejects non-boolean openTracking', () => {
-        expect(() => validateAndroidConfig({ openTracking: 'yes' as any })).toThrow('Android openTracking must be a boolean value');
       });
 
       it('rejects invalid notificationColor', () => {
