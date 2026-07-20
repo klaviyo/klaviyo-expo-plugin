@@ -24,6 +24,16 @@ export const validateAndroidConfig = (config: KlaviyoPluginProps['android'], pro
     throw new KlaviyoConfigError('Android openTracking must be a boolean value');
   }
 
+  // Warn if deprecated openTracking is used
+  if (config.openTracking !== undefined) {
+    console.warn(
+      '\tWARNING: klaviyo-expo-plugin: android.openTracking is deprecated. ' +
+      'Use android.automaticPushOpenTracking instead — it sets the ' +
+      'com.klaviyo.push.automatic_push_open_tracking manifest flag, which lets the native SDK ' +
+      'own push open tracking without modifying your MainActivity.'
+    );
+  }
+
   // Validate notificationColor if provided
   if (config.notificationColor) {
     const hexColorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;

@@ -1,5 +1,11 @@
 export interface KlaviyoPluginAndroidBaseProps {
   logLevel?: number;
+  /**
+   * @deprecated Use `automaticPushOpenTracking` instead. Setting this to `true` injects
+   * `Klaviyo.handlePush` into your MainActivity via a dangerous mod. The manifest-flag approach
+   * (`automaticPushOpenTracking: true`) lets the native SDK own push open tracking without
+   * modifying generated Activity code. This prop will be removed in a future major version.
+   */
   openTracking?: boolean;
   notificationIconFilePath?: string;
   notificationColor?: string;

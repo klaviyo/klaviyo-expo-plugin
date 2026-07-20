@@ -107,7 +107,7 @@ npx expo prebuild
 | Plugin prop | Type | Required | Description |
 |-------------|------|----|-------------|
 | `android.logLevel` | int | optional | Sets the logging level for the Klaviyo Android SDK. Default: `1` (DEBUG). Values: `0` (NONE), `1` (VERBOSE), `2` (DEBUG), `3` (INFO), `4` (WARNING), `5` (ERROR), `6` (ASSERT) |
-| `android.openTracking` | boolean | optional | Enables tracking when notifications are opened. Default: `true`. Note that this is considered to be a **dangerous** mod, as it directly modifies your MainActivity code. |
+| `android.openTracking` | boolean | optional | **Deprecated.** Use `android.automaticPushOpenTracking` instead. Enables tracking when notifications are opened by injecting `Klaviyo.handlePush` into your MainActivity — a **dangerous** mod that directly modifies generated Activity code. The `automaticPushOpenTracking` flag-based path is the preferred replacement and avoids any MainActivity modification. Will be removed in a future major version. Default: `true`. |
 | `android.notificationIconFilePath` | string | optional | Path to the notification icon file. Should be a white, transparent PNG. Default: none specified. Note that you should set this instead of `expo-notifications`, as they can conflict with each other. |
 | `android.notificationColor` | string | optional | Hex color for notification accent. Must be a valid hex value, e.g., `"#FF0000"` Default: `undefined` |
 | `android.geofencingEnabled` | boolean | optional | Controls whether the full location module (with geofencing and permissions) is included. When `false`, only the lightweight location-core module is included (no location permissions). Sets the `klaviyoIncludeLocation` gradle property. Default: `false` |
