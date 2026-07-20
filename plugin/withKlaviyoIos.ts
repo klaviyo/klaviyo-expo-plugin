@@ -155,6 +155,25 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
     infoPlist.CFBundleShortVersionString = getMarketingVersion(config);
     infoPlist.CFBundleVersion = getBuildNumber(config);
+
+    // Manage automatic_push_token_forwarding flag (opt-in; native iOS defaults to OFF).
+    // Write only when true; remove the key when omitted so the native default applies.
+    if (props.automaticPushTokenForwarding === true) {
+      KlaviyoLog.log('Injecting automatic_push_token_forwarding=true into Info.plist (opt-in)');
+      infoPlist.automatic_push_token_forwarding = true;
+    } else {
+      delete infoPlist.automatic_push_token_forwarding;
+    }
+
+    // Manage automatic_push_open_tracking flag (opt-in; native iOS defaults to OFF).
+    // Write only when true; remove the key when omitted so the native default applies.
+    if (props.automaticPushOpenTracking === true) {
+      KlaviyoLog.log('Injecting automatic_push_open_tracking=true into Info.plist (opt-in)');
+      infoPlist.automatic_push_open_tracking = true;
+    } else {
+      delete infoPlist.automatic_push_open_tracking;
+    }
+
     return config;
   });
 };

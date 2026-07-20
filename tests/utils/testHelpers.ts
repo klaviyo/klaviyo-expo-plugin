@@ -21,6 +21,8 @@ export interface MockPropsOptions {
   notificationColor?: string;
   geofencingEnabled?: boolean;
   formsEnabled?: boolean;
+  automaticPushTokenForwarding?: boolean;
+  automaticPushOpenTracking?: boolean;
 }
 
 export const createMockConfig = (options: MockConfigOptions = {}): any => ({
@@ -258,6 +260,8 @@ export interface MockIosPropsOptions {
   geofencingEnabled?: boolean;
   formsEnabled?: boolean;
   includeNotificationServiceExtension?: boolean;
+  automaticPushTokenForwarding?: boolean;
+  automaticPushOpenTracking?: boolean;
 }
 
 export const createMockIosConfig = (options: MockIosConfigOptions = {}): any => {
