@@ -158,7 +158,7 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
 
     // Manage klaviyo_automatic_push_token_forwarding flag (opt-in; native iOS defaults to OFF).
     // Write only when true; remove the key when omitted so the native default applies.
-    if (props.automaticPushTokenForwarding === true) {
+    if (props.automaticPushTokenForwarding) {
       KlaviyoLog.log('Injecting klaviyo_automatic_push_token_forwarding=true into Info.plist (opt-in)');
       infoPlist.klaviyo_automatic_push_token_forwarding = true;
     } else {
@@ -167,7 +167,7 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
 
     // Manage klaviyo_automatic_push_open_tracking flag (opt-in; native iOS defaults to OFF).
     // Write only when true; remove the key when omitted so the native default applies.
-    if (props.automaticPushOpenTracking === true) {
+    if (props.automaticPushOpenTracking) {
       KlaviyoLog.log('Injecting klaviyo_automatic_push_open_tracking=true into Info.plist (opt-in)');
       infoPlist.klaviyo_automatic_push_open_tracking = true;
     } else {
