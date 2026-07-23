@@ -47,6 +47,34 @@ const mutateAndroidManifest = (config: ExportedConfigWithProps<AndroidManifest>,
     }
   } as ManifestMetaData);
 
+  // Manage automatic_push_token_forwarding flag.
+  // The flag is only written when explicitly set to false (opt-out from the native Android SDK's
+  // default-ON token forwarding). When omitted the key is removed so the native default applies.
+  const TOKEN_FORWARDING_KEY = 'com.klaviyo.push.automatic_push_token_forwarding';
+  application['meta-data'] = (application['meta-data'] || []).filter(
+    (item: ManifestMetaData) => item.$['android:name'] !== TOKEN_FORWARDING_KEY
+  );
+  if (props.automaticPushTokenForwarding === false) {
+    KlaviyoLog.log('Injecting automatic_push_token_forwarding=false (opt-out)');
+    application['meta-data'].push({
+      $: { 'android:name': TOKEN_FORWARDING_KEY, 'android:value': 'false' }
+    } as ManifestMetaData);
+  }
+
+  // Manage automatic_push_open_tracking flag.
+  // The flag is only written when explicitly set to true (opt-in; native default is OFF).
+  // When omitted the key is removed so the native default applies.
+  const OPEN_TRACKING_KEY = 'com.klaviyo.push.automatic_push_open_tracking';
+  application['meta-data'] = (application['meta-data'] || []).filter(
+    (item: ManifestMetaData) => item.$['android:name'] !== OPEN_TRACKING_KEY
+  );
+  if (props.automaticPushOpenTracking === true) {
+    KlaviyoLog.log('Injecting automatic_push_open_tracking=true (opt-in)');
+    application['meta-data'].push({
+      $: { 'android:name': OPEN_TRACKING_KEY, 'android:value': 'true' }
+    } as ManifestMetaData);
+  }
+
   // Add KlaviyoPushService to the manifest
   if (!application.service) {
     application.service = [];

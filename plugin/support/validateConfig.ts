@@ -29,6 +29,16 @@ export const validateAndroidConfig = (config: KlaviyoPluginProps['android'], pro
     );
   }
 
+  // Validate automaticPushOpenTracking
+  if (config.automaticPushOpenTracking !== undefined && typeof config.automaticPushOpenTracking !== 'boolean') {
+    throw new KlaviyoConfigError('Android automaticPushOpenTracking must be a boolean');
+  }
+
+  // Validate automaticPushTokenForwarding
+  if (config.automaticPushTokenForwarding !== undefined && typeof config.automaticPushTokenForwarding !== 'boolean') {
+    throw new KlaviyoConfigError('Android automaticPushTokenForwarding must be a boolean');
+  }
+
   // Validate notificationColor if provided
   if (config.notificationColor) {
     const hexColorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
@@ -101,6 +111,16 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
   // Validate formsEnabled
   if (config.formsEnabled !== undefined && typeof config.formsEnabled !== 'boolean') {
     throw new KlaviyoConfigError('iOS formsEnabled must be a boolean');
+  }
+
+  // Validate automaticPushOpenTracking
+  if (config.automaticPushOpenTracking !== undefined && typeof config.automaticPushOpenTracking !== 'boolean') {
+    throw new KlaviyoConfigError('iOS automaticPushOpenTracking must be a boolean');
+  }
+
+  // Validate automaticPushTokenForwarding
+  if (config.automaticPushTokenForwarding !== undefined && typeof config.automaticPushTokenForwarding !== 'boolean') {
+    throw new KlaviyoConfigError('iOS automaticPushTokenForwarding must be a boolean');
   }
 
   // Validate includeNotificationServiceExtension

@@ -4,6 +4,8 @@ export interface KlaviyoPluginAndroidBaseProps {
   notificationColor?: string;
   geofencingEnabled?: boolean;
   formsEnabled?: boolean;
+  automaticPushTokenForwarding?: boolean;
+  automaticPushOpenTracking?: boolean;
 }
 
 export interface KlaviyoPluginIosBaseProps  {
@@ -13,6 +15,8 @@ export interface KlaviyoPluginIosBaseProps  {
   geofencingEnabled?: boolean;
   formsEnabled?: boolean;
   includeNotificationServiceExtension?: boolean;
+  automaticPushTokenForwarding?: boolean;
+  automaticPushOpenTracking?: boolean;
 }
 
 export interface KlaviyoPluginProps {

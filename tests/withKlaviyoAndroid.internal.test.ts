@@ -688,6 +688,161 @@ describe('withKlaviyoAndroid Internal Functions', () => {
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '1')).toBe(true);
       expect(logger.log).toHaveBeenCalledWith('Setting Klaviyo log level to 1');
     });
+
+    describe('automaticPushTokenForwarding flag', () => {
+      const TOKEN_FORWARDING_KEY = 'com.klaviyo.push.automatic_push_token_forwarding';
+
+      it('does not inject the flag when automaticPushTokenForwarding is omitted', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps();
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.some(m => m.$['android:name'] === TOKEN_FORWARDING_KEY)).toBe(false);
+      });
+
+      it('does not inject the flag when automaticPushTokenForwarding is true', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps({ automaticPushTokenForwarding: true });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.some(m => m.$['android:name'] === TOKEN_FORWARDING_KEY)).toBe(false);
+      });
+
+      it('injects automatic_push_token_forwarding="false" when set to false (opt-out)', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps({ automaticPushTokenForwarding: false });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        const entry = metaData.find(m => m.$['android:name'] === TOKEN_FORWARDING_KEY);
+        expect(entry).toBeDefined();
+        expect(entry.$['android:value']).toBe('false');
+        expect(logger.log).toHaveBeenCalledWith('Injecting automatic_push_token_forwarding=false (opt-out)');
+      });
+
+      it('removes an existing token forwarding entry when prop is omitted (idempotency)', () => {
+        const config = createMockConfig({
+          modResults: {
+            manifest: {
+              application: [{
+                $: { 'android:name': '.MainApplication' },
+                'meta-data': [{ $: { 'android:name': TOKEN_FORWARDING_KEY, 'android:value': 'false' } }]
+              }]
+            }
+          }
+        });
+        const props = createMockProps();
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.some(m => m.$['android:name'] === TOKEN_FORWARDING_KEY)).toBe(false);
+      });
+
+      it('produces exactly one token forwarding entry on repeated runs (idempotency)', () => {
+        const config = createMockConfig({
+          modResults: {
+            manifest: {
+              application: [{
+                $: { 'android:name': '.MainApplication' },
+                'meta-data': [{ $: { 'android:name': TOKEN_FORWARDING_KEY, 'android:value': 'false' } }]
+              }]
+            }
+          }
+        });
+        const props = createMockProps({ automaticPushTokenForwarding: false });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.filter(m => m.$['android:name'] === TOKEN_FORWARDING_KEY)).toHaveLength(1);
+      });
+    });
+
+    describe('automaticPushOpenTracking flag', () => {
+      const OPEN_TRACKING_KEY = 'com.klaviyo.push.automatic_push_open_tracking';
+
+      it('does not inject the flag when automaticPushOpenTracking is omitted', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps();
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.some(m => m.$['android:name'] === OPEN_TRACKING_KEY)).toBe(false);
+      });
+
+      it('does not inject the flag when automaticPushOpenTracking is false', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps({ automaticPushOpenTracking: false });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.some(m => m.$['android:name'] === OPEN_TRACKING_KEY)).toBe(false);
+      });
+
+      it('injects automatic_push_open_tracking="true" when set to true (opt-in)', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps({ automaticPushOpenTracking: true });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        const entry = metaData.find(m => m.$['android:name'] === OPEN_TRACKING_KEY);
+        expect(entry).toBeDefined();
+        expect(entry.$['android:value']).toBe('true');
+        expect(logger.log).toHaveBeenCalledWith('Injecting automatic_push_open_tracking=true (opt-in)');
+      });
+
+      it('removes an existing open tracking entry when prop is omitted (idempotency)', () => {
+        const config = createMockConfig({
+          modResults: {
+            manifest: {
+              application: [{
+                $: { 'android:name': '.MainApplication' },
+                'meta-data': [{ $: { 'android:name': OPEN_TRACKING_KEY, 'android:value': 'true' } }]
+              }]
+            }
+          }
+        });
+        const props = createMockProps();
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.some(m => m.$['android:name'] === OPEN_TRACKING_KEY)).toBe(false);
+      });
+
+      it('produces exactly one open tracking entry on repeated runs (idempotency)', () => {
+        const config = createMockConfig({
+          modResults: {
+            manifest: {
+              application: [{
+                $: { 'android:name': '.MainApplication' },
+                'meta-data': [{ $: { 'android:name': OPEN_TRACKING_KEY, 'android:value': 'true' } }]
+              }]
+            }
+          }
+        });
+        const props = createMockProps({ automaticPushOpenTracking: true });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.filter(m => m.$['android:name'] === OPEN_TRACKING_KEY)).toHaveLength(1);
+      });
+
+      it('injects both flags independently when both are set', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps({ automaticPushTokenForwarding: false, automaticPushOpenTracking: true });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        const tokenEntry = metaData.find(m => m.$['android:name'] === 'com.klaviyo.push.automatic_push_token_forwarding');
+        const openEntry = metaData.find(m => m.$['android:name'] === OPEN_TRACKING_KEY);
+        expect(tokenEntry?.$['android:value']).toBe('false');
+        expect(openEntry?.$['android:value']).toBe('true');
+      });
+    });
   });
 
   describe('withNotificationResources', () => {
