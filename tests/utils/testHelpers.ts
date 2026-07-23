@@ -16,7 +16,6 @@ export interface MockConfigOptions {
 
 export interface MockPropsOptions {
   logLevel?: number;
-  openTracking?: boolean;
   notificationIconFilePath?: string;
   notificationColor?: string;
   geofencingEnabled?: boolean;
@@ -51,42 +50,12 @@ export const createMockConfig = (options: MockConfigOptions = {}): any => ({
 
 export const createMockProps = (options: MockPropsOptions = {}): any => ({
   logLevel: 1,
-  openTracking: true,
   notificationIconFilePath: './assets/icon.png',
   notificationColor: '#FF0000',
   geofencingEnabled: false,
   formsEnabled: true,
   ...options,
 });
-
-export const createMockMainActivityContent = (isKotlin: boolean = false): string => {
-  if (isKotlin) {
-    return `
-package com.example.test
-
-import com.facebook.react.ReactActivity
-
-class MainActivity : ReactActivity() {
-    override fun getMainComponentName(): String {
-        return "main"
-    }
-}
-    `;
-  } else {
-    return `
-package com.example.test;
-
-import com.facebook.react.ReactActivity;
-
-public class MainActivity extends ReactActivity {
-  @Override
-  protected String getMainComponentName() {
-    return "main";
-  }
-}
-    `;
-  }
-};
 
 export const createMockAndroidManifest = (overrides: any = {}): any => ({
   manifest: {

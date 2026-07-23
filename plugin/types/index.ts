@@ -1,6 +1,5 @@
 export interface KlaviyoPluginAndroidBaseProps {
   logLevel?: number;
-  openTracking?: boolean;
   notificationIconFilePath?: string;
   notificationColor?: string;
   geofencingEnabled?: boolean;
@@ -23,7 +22,6 @@ export interface KlaviyoPluginProps {
 
 export interface KlaviyoPluginAndroidProps extends KlaviyoPluginAndroidBaseProps {
   logLevel: number;
-  openTracking: boolean;
   notificationIconFilePath: string | undefined;
   notificationColor: string | undefined;
   geofencingEnabled: boolean;
@@ -46,7 +44,6 @@ export interface KlaviyoPluginPropsDefaultValues extends KlaviyoPluginProps {
 
 const ANDROID_DEFAULTS: KlaviyoPluginAndroidProps = {
   logLevel: 1,
-  openTracking: true,
   notificationIconFilePath: undefined,
   notificationColor: undefined,
   geofencingEnabled: false,
