@@ -19,9 +19,14 @@ export const validateAndroidConfig = (config: KlaviyoPluginProps['android'], pro
     }
   }
 
-  // Validate openTracking
-  if (config.openTracking !== undefined && typeof config.openTracking !== 'boolean') {
-    throw new KlaviyoConfigError('Android openTracking must be a boolean value');
+  // Reject removed openTracking prop — was removed as a breaking change in v1.0.0
+  const androidConfigWithExtras = config as unknown as Record<string, unknown>;
+  if (androidConfigWithExtras.openTracking !== undefined) {
+    throw new KlaviyoConfigError(
+      'Android openTracking was removed in v1.0.0. ' +
+      'Use automaticPushOpenTracking instead. ' +
+      'See MIGRATION_GUIDE.md for details.'
+    );
   }
 
   // Validate automaticPushOpenTracking
