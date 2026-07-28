@@ -2,7 +2,7 @@ module.exports = () => {
   return {
     name: 'klaviyo plugin example',
     slug: 'klaviyo-plugin-example',
-    version: '0.4.0',
+    version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'expoexample',
