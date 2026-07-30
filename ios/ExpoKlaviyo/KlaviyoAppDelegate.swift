@@ -37,15 +37,18 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
         // SDK ≥ 5.4.0) owns tracking. Skip the manual call so there is no duplicate event,
         // even in the case where this delegate sits between KlaviyoNotificationDelegate and
         // expo-notifications in the forwarding chain.
+        let handledByKlaviyo: Bool
         if !isAutomaticPushOpenTrackingEnabled {
-            _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: completionHandler)
+            handledByKlaviyo = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: completionHandler)
+        } else {
+            handledByKlaviyo = false
         }
 
         let didReceiveSelector = #selector(UNUserNotificationCenterDelegate.userNotificationCenter(_:didReceive:withCompletionHandler:))
         if let originalDelegate, originalDelegate.responds(to: didReceiveSelector) {
             originalDelegate.userNotificationCenter?(center, didReceive: response, withCompletionHandler: completionHandler)
-        } else {
-            // No downstream handler will call it, so honor the completion contract here.
+        } else if !handledByKlaviyo {
+            // No downstream handler and Klaviyo didn't consume the completion.
             completionHandler()
         }
     }
