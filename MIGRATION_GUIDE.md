@@ -2,6 +2,47 @@
 
 This guide outlines how to migrate when upgrading to newer versions of the Klaviyo Expo plugin.
 
+## Migrating to v1.0.0
+
+### `android.openTracking` removed
+
+The `openTracking` plugin prop has been removed. It previously injected `Klaviyo.handlePush` calls
+into your `MainActivity` via a dangerous mod — directly modifying generated Activity source code at
+prebuild time.
+
+**Replace it with the manifest-flag approach**, which lets the native Android SDK own push open
+tracking entirely (no MainActivity modification):
+
+**Before (v0.x):**
+
+```js
+["klaviyo-expo-plugin", {
+  "android": { "openTracking": true }
+}]
+```
+
+**After (v1.0.0+):**
+
+```js
+["klaviyo-expo-plugin", {
+  "android": { "automaticPushOpenTracking": true }
+}]
+```
+
+Setting `automaticPushOpenTracking: true` writes the
+`com.klaviyo.push.automatic_push_open_tracking="true"` meta-data entry to your
+`AndroidManifest.xml`. The native Klaviyo SDK reads this flag at notification-build time and
+routes notification taps through its own `KlaviyoTrampolineActivity`, which calls
+`Klaviyo.handlePush` automatically — no manual Activity code needed.
+
+If you had previously set `openTracking: false` to suppress the MainActivity injection, remove
+the `openTracking` property entirely and leave `automaticPushOpenTracking` unset. The native
+default is OFF, so no key is written and no automatic tracking occurs.
+
+> **Note:** If your `MainActivity` still contains `// @generated begin klaviyo-` blocks from a
+> previous prebuild with `openTracking: true`, run `expo prebuild --clean` once to regenerate
+> clean native files.
+
 ## Migrating to v0.3.0
 
 ### Version and build number (iOS)

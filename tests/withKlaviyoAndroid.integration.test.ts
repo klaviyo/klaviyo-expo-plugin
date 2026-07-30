@@ -537,10 +537,12 @@ describe('withKlaviyoAndroid Integration Tests', () => {
     it('should handle all props combinations', () => {
       const config = testSimpleIntegration(withKlaviyoAndroid);
       const testCases = [
-        { openTracking: true, logLevel: 1 },
-        { openTracking: false, logLevel: 2 },
-        { openTracking: true, logLevel: 3, notificationColor: '#FF0000' },
-        { openTracking: false, notificationIconFilePath: './icon.png' },
+        { logLevel: 1 },
+        { automaticPushTokenForwarding: false },
+        { automaticPushOpenTracking: true },
+        { automaticPushTokenForwarding: false, automaticPushOpenTracking: true },
+        { logLevel: 3, notificationColor: '#FF0000' },
+        { notificationIconFilePath: './icon.png' },
         { logLevel: 0, notificationColor: '#00FF00', notificationIconFilePath: './icon.png' },
       ];
 

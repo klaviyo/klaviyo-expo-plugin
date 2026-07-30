@@ -1,7 +1,6 @@
-import { ConfigPlugin, withDangerousMod, withAndroidManifest, withStringsXml, withAndroidColors, withPlugins, withMainActivity, withGradleProperties, AndroidConfig } from '@expo/config-plugins';
+import { ConfigPlugin, withDangerousMod, withAndroidManifest, withStringsXml, withAndroidColors, withPlugins, withGradleProperties, AndroidConfig } from '@expo/config-plugins';
 import * as fs from 'fs';
 import * as path from 'path';
-import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
 import {
   KlaviyoPluginAndroidProps,
   KlaviyoAndroidModResults,
@@ -48,6 +47,34 @@ const mutateAndroidManifest = (config: ExportedConfigWithProps<AndroidManifest>,
     }
   } as ManifestMetaData);
 
+  // Manage automatic_push_token_forwarding flag.
+  // The flag is only written when explicitly set to false (opt-out from the native Android SDK's
+  // default-ON token forwarding). When omitted the key is removed so the native default applies.
+  const TOKEN_FORWARDING_KEY = 'com.klaviyo.push.automatic_push_token_forwarding';
+  application['meta-data'] = (application['meta-data'] || []).filter(
+    (item: ManifestMetaData) => item.$['android:name'] !== TOKEN_FORWARDING_KEY
+  );
+  if (props.automaticPushTokenForwarding === false) {
+    KlaviyoLog.log('Injecting automatic_push_token_forwarding=false (opt-out)');
+    application['meta-data'].push({
+      $: { 'android:name': TOKEN_FORWARDING_KEY, 'android:value': 'false' }
+    } as ManifestMetaData);
+  }
+
+  // Manage automatic_push_open_tracking flag.
+  // The flag is only written when explicitly set to true (opt-in; native default is OFF).
+  // When omitted the key is removed so the native default applies.
+  const OPEN_TRACKING_KEY = 'com.klaviyo.push.automatic_push_open_tracking';
+  application['meta-data'] = (application['meta-data'] || []).filter(
+    (item: ManifestMetaData) => item.$['android:name'] !== OPEN_TRACKING_KEY
+  );
+  if (props.automaticPushOpenTracking === true) {
+    KlaviyoLog.log('Injecting automatic_push_open_tracking=true (opt-in)');
+    application['meta-data'].push({
+      $: { 'android:name': OPEN_TRACKING_KEY, 'android:value': 'true' }
+    } as ManifestMetaData);
+  }
+
   // Add KlaviyoPushService to the manifest
   if (!application.service) {
     application.service = [];
@@ -84,161 +111,6 @@ const mutateAndroidManifest = (config: ExportedConfigWithProps<AndroidManifest>,
 
 const withAndroidManifestModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
   return withAndroidManifest(config, (config) => mutateAndroidManifest(config, props));
-};
-
-export function modifyMainActivity(
-  language: 'kt' | 'java',
-  props: KlaviyoPluginAndroidProps,
-  mainActivityContents: string
-) {
-  KlaviyoLog.log('Modifying MainActivity');
-  KlaviyoLog.log(`OpenTracking setting: ${props.openTracking}`);
-  
-  const isKotlin = language === 'kt';
-
-  // Read the current content
-  const mainActivityContent = mainActivityContents;
-
-  // Find the package declaration line to use as our anchor
-  const packageMatch = mainActivityContent.match(/^package .+$/m);
-  if (!packageMatch) {
-    throw new Error('Could not find package declaration in MainActivity');
-  }
-
-  // Find the class declaration line to use as our anchor
-  const classMatch = mainActivityContent.match(/^(?:public\s+)?class\s+MainActivity\s+(?:extends|:)\s+ReactActivity\s*(?:\(\))?\s*\{/m);
-  if (!classMatch) {
-    throw new Error('Could not find MainActivity class declaration');
-  }
-
-  // Split the content into lines for more precise manipulation
-  const lines = mainActivityContent.split('\n');
-
-  // Remove Klaviyo-related imports and generated blocks
-  const newLines: string[] = [];
-  let skipLines = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    
-    // Skip Klaviyo-related imports
-    if (line.trim().startsWith('import') && 
-        (line.includes('android.content.Intent') || 
-         line.includes('com.klaviyo.analytics.Klaviyo'))) {
-      continue;
-    }
-
-    // Handle generated blocks
-    if (line.includes('// @generated begin klaviyo-')) {
-      skipLines = true;
-      continue;
-    }
-    if (line.includes('// @generated end klaviyo-')) {
-      skipLines = false;
-      continue;
-    }
-    if (!skipLines) {
-      newLines.push(line);
-    }
-  }
-
-  // Clean up multiple empty lines
-  const cleanedContent = newLines.join('\n').replace(/\n{3,}/g, '\n\n');
-
-  // Only add the code if openTracking is enabled
-  if (props.openTracking) {
-    KlaviyoLog.log('Adding push tracking code to MainActivity...');
-    
-    // First, remove any existing generated content
-    const contentWithoutGenerated = cleanedContent.replace(
-      /\/\/ @generated begin klaviyo-[\s\S]*?\/\/ @generated end klaviyo-/g,
-      ''
-    ).trim();
-
-    // Add imports right after the package declaration
-    const importContents = mergeContents({
-      tag: 'klaviyo-imports',
-      src: contentWithoutGenerated,
-      newSrc: isKotlin ? 
-        `import android.content.Intent\nimport com.klaviyo.analytics.Klaviyo` :
-        `import android.content.Intent;\nimport com.klaviyo.analytics.Klaviyo;`,
-      anchor: /^package .+$/m,
-      offset: 1,
-      comment: '//',
-    });
-
-    // Add the onNewIntent override right after the class declaration
-    const methodContents = mergeContents({
-      tag: 'klaviyo-onNewIntent',
-      src: importContents.contents,
-      newSrc: isKotlin ?
-        `\n    override fun onNewIntent(intent: Intent) {\n        super.onNewIntent(intent)\n\n        // Tracks when a system tray notification is opened\n        Klaviyo.handlePush(intent)\n    }` :
-        `\n    @Override\n    public void onNewIntent(Intent intent) {\n        super.onNewIntent(intent);\n\n        // Tracks when a system tray notification is opened\n        Klaviyo.handlePush(intent);\n    }`,
-      anchor: isKotlin ?
-        /^class MainActivity : ReactActivity\(\) \{$/m :
-        /^(?:public\s+)?class\s+MainActivity\s+(?:extends|:)\s+ReactActivity\s*(?:\(\))?\s*\{/m,
-      offset: 1,
-      comment: '//',
-    });
-
-    // Check if onCreate already exists
-    const hasOnCreate = isKotlin ?
-      /override fun onCreate\(/m.test(methodContents.contents) :
-      /@Override[\s\S]*?protected void onCreate\(/m.test(methodContents.contents);
-
-    let finalContents = methodContents.contents;
-
-    if (hasOnCreate) {
-      // If onCreate exists, inject the Klaviyo.handlePush call after super.onCreate
-      KlaviyoLog.log('Found existing onCreate, injecting Klaviyo.handlePush call...');
-      const onCreateInjection = isKotlin ?
-        'super.onCreate($1)\n        // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate\n        Klaviyo.handlePush(intent)\n        // @generated end klaviyo-onCreate' :
-        'super.onCreate($1);$2\n        // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate\n        Klaviyo.handlePush(getIntent());\n        // @generated end klaviyo-onCreate';
-
-      const onCreateReplacement = isKotlin ?
-        /super\.onCreate\(([^)]*)\)/m :
-        /super\.onCreate\(([^)]*)\)(;?)/m;
-
-      // Remove any existing onCreate injection first
-      finalContents = finalContents.replace(
-        /\/\/ @generated begin klaviyo-onCreate[\s\S]*?\/\/ @generated end klaviyo-onCreate\n?\s*/g,
-        ''
-      );
-
-      finalContents = finalContents.replace(onCreateReplacement, onCreateInjection);
-    } else {
-      // If onCreate doesn't exist, add it after onNewIntent
-      KlaviyoLog.log('No onCreate found, adding new onCreate method...');
-      const onCreateContents = mergeContents({
-        tag: 'klaviyo-onCreate',
-        src: methodContents.contents,
-        newSrc: isKotlin ?
-          `\n    override fun onCreate(savedInstanceState: android.os.Bundle?) {\n        super.onCreate(savedInstanceState)\n\n        // Tracks when a system tray notification is opened while app is killed\n        Klaviyo.handlePush(intent)\n    }` :
-          `\n    @Override\n    protected void onCreate(android.os.Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n\n        // Tracks when a system tray notification is opened while app is killed\n        Klaviyo.handlePush(getIntent());\n    }`,
-        anchor: isKotlin ?
-          /override fun onNewIntent\(intent: Intent\) \{[\s\S]*?\n {4}\}/m :
-          /@Override\s+public void onNewIntent\(Intent intent\) \{[\s\S]*?\n {4}\}/m,
-        offset: 1,
-        comment: '//',
-      });
-      finalContents = onCreateContents.contents;
-    }
-
-    // Write the modified content back to the file
-    return finalContents;
-  } else {
-    KlaviyoLog.log('Removing push tracking code from MainActivity...');
-    // Write the cleaned content back
-    return cleanedContent;
-  }
-}
-
-const withMainActivityModifications: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
-  return withMainActivity(config, async (conf) => {
-    const language = conf.modResults.language;
-    conf.modResults.contents = modifyMainActivity(language, props, conf.modResults.contents);
-    return conf;
-  });
 };
 
 const withNotificationResources: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, props) => {
@@ -437,7 +309,6 @@ const withKlaviyoAndroid: ConfigPlugin<KlaviyoPluginAndroidProps> = (config, pro
     withNotificationManifest,
     withNotificationResources,
     withAndroidManifestModifications,
-    withMainActivityModifications,
     withKlaviyoPluginNameVersion,
     withLocationGradleProperties,
     withFormsGradleProperties,
@@ -478,6 +349,6 @@ export const withKlaviyoPluginNameVersion: ConfigPlugin = config => {
 };
 
 // TEST ONLY exports
-export { withMainActivityModifications, withNotificationIcon, withNotificationManifest, mutateNotificationManifest, mutateAndroidManifest, withLocationGradleProperties, withFormsGradleProperties, withNotificationResources };
+export { withNotificationIcon, withNotificationManifest, mutateNotificationManifest, mutateAndroidManifest, withLocationGradleProperties, withFormsGradleProperties, withNotificationResources };
 
 export default withKlaviyoAndroid; 
