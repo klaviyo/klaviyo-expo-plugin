@@ -35,9 +35,9 @@ Setting `automaticPushOpenTracking: true` writes the
 routes notification taps through its own `KlaviyoTrampolineActivity`, which calls
 `Klaviyo.handlePush` automatically — no manual Activity code needed.
 
-If you had previously set `openTracking: false` to suppress the MainActivity injection, simply
-omit `automaticPushOpenTracking` (or don't set it). The native default is OFF, so no key is
-written and no automatic tracking occurs.
+If you had previously set `openTracking: false` to suppress the MainActivity injection, remove
+the `openTracking` property entirely and leave `automaticPushOpenTracking` unset. The native
+default is OFF, so no key is written and no automatic tracking occurs.
 
 > **Note:** If your `MainActivity` still contains `// @generated begin klaviyo-` blocks from a
 > previous prebuild with `openTracking: true`, run `expo prebuild --clean` once to regenerate
