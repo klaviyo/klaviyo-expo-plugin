@@ -34,25 +34,29 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         // When automatic push-open tracking is enabled, KlaviyoNotificationDelegate (native
-        // SDK ≥ 5.4.0) owns tracking. Skip the manual call so there is no duplicate event,
-        // even in the case where this delegate sits between KlaviyoNotificationDelegate and
-        // expo-notifications in the forwarding chain.
-        let handledByKlaviyo: Bool
-        if !isAutomaticPushOpenTrackingEnabled {
-            handledByKlaviyo = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: completionHandler)
+        // SDK ≥ 5.4.0) owns tracking via its own proxy — the manual handle() call is skipped
+        // to avoid a duplicate event. The completionHandler has not been consumed in that case.
+        // When automatic push-open tracking is enabled, KlaviyoNotificationDelegate (native
+        // SDK ≥ 5.4.0) owns tracking via its own proxy — skip the manual handle() call to
+        // avoid a duplicate event. The completionHandler has not been consumed in that case.
+        // When disabled, call handle() directly; it returns true and consumes the
+        // completionHandler if the notification was a Klaviyo push.
+        let handled: Bool
+        if isAutomaticPushOpenTrackingEnabled {
+            handled = false
         } else {
-            handledByKlaviyo = false
+            handled = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: completionHandler)
         }
 
         let didReceiveSelector = #selector(UNUserNotificationCenterDelegate.userNotificationCenter(_:didReceive:withCompletionHandler:))
         if let originalDelegate, originalDelegate.responds(to: didReceiveSelector) {
-            // If Klaviyo already consumed the completion handler, forward with a no-op so
+            // If handle() already consumed the completionHandler, forward with a no-op so
             // expo-notifications can still observe the response (firing any JS listeners)
             // without invoking the real handler a second time.
-            let downstream: () -> Void = handledByKlaviyo ? {} : completionHandler
+            let downstream: () -> Void = handled ? {} : completionHandler
             originalDelegate.userNotificationCenter?(center, didReceive: response, withCompletionHandler: downstream)
-        } else if !handledByKlaviyo {
-            // No downstream handler and Klaviyo didn't consume the completion.
+        } else if !handled {
+            // No downstream handler and the completionHandler hasn't been consumed yet.
             completionHandler()
         }
     }
