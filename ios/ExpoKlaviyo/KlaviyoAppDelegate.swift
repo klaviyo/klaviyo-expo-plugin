@@ -46,7 +46,11 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
 
         let didReceiveSelector = #selector(UNUserNotificationCenterDelegate.userNotificationCenter(_:didReceive:withCompletionHandler:))
         if let originalDelegate, originalDelegate.responds(to: didReceiveSelector) {
-            originalDelegate.userNotificationCenter?(center, didReceive: response, withCompletionHandler: completionHandler)
+            // If Klaviyo already consumed the completion handler, forward with a no-op so
+            // expo-notifications can still observe the response (firing any JS listeners)
+            // without invoking the real handler a second time.
+            let downstream: () -> Void = handledByKlaviyo ? {} : completionHandler
+            originalDelegate.userNotificationCenter?(center, didReceive: response, withCompletionHandler: downstream)
         } else if !handledByKlaviyo {
             // No downstream handler and Klaviyo didn't consume the completion.
             completionHandler()
