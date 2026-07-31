@@ -34,9 +34,6 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         // When automatic push-open tracking is enabled, KlaviyoNotificationDelegate (native
-        // SDK ≥ 5.4.0) owns tracking via its own proxy — the manual handle() call is skipped
-        // to avoid a duplicate event. The completionHandler has not been consumed in that case.
-        // When automatic push-open tracking is enabled, KlaviyoNotificationDelegate (native
         // SDK ≥ 5.4.0) owns tracking — no manual handle() call needed.
         // When disabled, call handle() directly; it returns true and consumes the
         // completionHandler if the notification was a Klaviyo push.
