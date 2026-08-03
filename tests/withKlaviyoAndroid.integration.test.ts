@@ -538,7 +538,7 @@ describe('withKlaviyoAndroid Integration Tests', () => {
       const config = testSimpleIntegration(withKlaviyoAndroid);
       const testCases = [
         { logLevel: 1 },
-        { automaticPushTokenForwarding: false },
+        { automaticPushTokenForwarding: false, logLevel: 2 },
         { automaticPushOpenTracking: true },
         { automaticPushTokenForwarding: false, automaticPushOpenTracking: true },
         { logLevel: 3, notificationColor: '#FF0000' },
