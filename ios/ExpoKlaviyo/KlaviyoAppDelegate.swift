@@ -9,13 +9,6 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
 
     private weak var originalDelegate: UNUserNotificationCenterDelegate?
 
-    // True when the `ios.automaticPushOpenTracking` plugin prop is set, meaning the native
-    // Klaviyo SDK (≥ 5.4.0) owns push-open tracking via its own delegate proxy. When false
-    // (the default), this delegate is responsible for calling handle(notificationResponse:).
-    private var isAutomaticPushOpenTrackingEnabled: Bool {
-        Bundle.main.object(forInfoDictionaryKey: "klaviyo_automatic_push_open_tracking") as? Bool ?? false
-    }
-
     public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         // Store the original delegate so we can forward to expo-notifications' handlers.
         let center = UNUserNotificationCenter.current()
@@ -33,16 +26,7 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        // When automatic push-open tracking is enabled, KlaviyoNotificationDelegate (native
-        // SDK ≥ 5.4.0) owns tracking — no manual handle() call needed.
-        // When disabled, call handle() directly; it returns true and consumes the
-        // completionHandler if the notification was a Klaviyo push.
-        let handled: Bool
-        if isAutomaticPushOpenTrackingEnabled {
-            handled = false
-        } else {
-            handled = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: completionHandler)
-        }
+        let handled = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: completionHandler)
 
         let didReceiveSelector = #selector(UNUserNotificationCenterDelegate.userNotificationCenter(_:didReceive:withCompletionHandler:))
         if let originalDelegate, originalDelegate.responds(to: didReceiveSelector) {
