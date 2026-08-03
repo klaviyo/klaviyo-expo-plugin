@@ -24,7 +24,8 @@ export const validateAndroidConfig = (config: KlaviyoPluginProps['android'], pro
   if (androidConfigWithExtras.openTracking !== undefined) {
     throw new KlaviyoConfigError(
       'Android openTracking was removed in v1.0.0. ' +
-      'Use automaticPushOpenTracking instead. ' +
+      'For openTracking: true, set automaticPushOpenTracking: true. ' +
+      'For openTracking: false, remove openTracking and leave automaticPushOpenTracking unset. ' +
       'See MIGRATION_GUIDE.md for details.'
     );
   }

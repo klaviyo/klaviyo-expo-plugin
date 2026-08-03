@@ -109,7 +109,7 @@ describe('validateConfig', () => {
       });
 
       it('rejects openTracking regardless of value type', () => {
-        expect(() => validateAndroidConfig({ openTracking: false } as unknown as Record<string, unknown>)).toThrow('Use automaticPushOpenTracking instead');
+        expect(() => validateAndroidConfig({ openTracking: false } as unknown as Record<string, unknown>)).toThrow('remove openTracking and leave automaticPushOpenTracking unset');
       });
 
       it('rejects invalid notificationColor', () => {
