@@ -63,13 +63,57 @@ describe('validateConfig', () => {
       });
     });
 
+    describe('automaticPushOpenTracking', () => {
+      it('accepts true', () => {
+        expect(() => validateAndroidConfig({ automaticPushOpenTracking: true })).not.toThrow();
+      });
+
+      it('accepts false', () => {
+        expect(() => validateAndroidConfig({ automaticPushOpenTracking: false })).not.toThrow();
+      });
+
+      it('accepts undefined (optional)', () => {
+        expect(() => validateAndroidConfig({ automaticPushOpenTracking: undefined })).not.toThrow();
+      });
+
+      it('rejects non-boolean values', () => {
+        expect(() => validateAndroidConfig({ automaticPushOpenTracking: 'true' as unknown as boolean })).toThrow('Android automaticPushOpenTracking must be a boolean');
+      });
+    });
+
+    describe('automaticPushTokenForwarding', () => {
+      it('accepts true', () => {
+        expect(() => validateAndroidConfig({ automaticPushTokenForwarding: true })).not.toThrow();
+      });
+
+      it('accepts false', () => {
+        expect(() => validateAndroidConfig({ automaticPushTokenForwarding: false })).not.toThrow();
+      });
+
+      it('accepts undefined (optional)', () => {
+        expect(() => validateAndroidConfig({ automaticPushTokenForwarding: undefined })).not.toThrow();
+      });
+
+      it('rejects non-boolean values', () => {
+        expect(() => validateAndroidConfig({ automaticPushTokenForwarding: 1 as unknown as boolean })).toThrow('Android automaticPushTokenForwarding must be a boolean');
+      });
+    });
+
     describe('existing validations still work', () => {
       it('rejects invalid logLevel', () => {
         expect(() => validateAndroidConfig({ logLevel: -1 })).toThrow('Android logLevel must be an integer between 0 and 6');
       });
 
-      it('rejects non-boolean openTracking', () => {
-        expect(() => validateAndroidConfig({ openTracking: 'yes' as any })).toThrow('Android openTracking must be a boolean value');
+      it('rejects openTracking with migration error (removed in v1.0.0)', () => {
+        expect(() => validateAndroidConfig({ openTracking: true } as unknown as Record<string, unknown>)).toThrow('Android openTracking was removed in v1.0.0');
+      });
+
+      it('rejects openTracking regardless of value type', () => {
+        expect(() => validateAndroidConfig({ openTracking: false } as unknown as Record<string, unknown>)).toThrow('replace it with automaticPushOpenTracking: false');
+      });
+
+      it('rejects an explicitly undefined openTracking rather than ignoring it', () => {
+        expect(() => validateAndroidConfig({ openTracking: undefined } as unknown as Record<string, unknown>)).toThrow('Android openTracking was removed in v1.0.0');
       });
 
       it('rejects invalid notificationColor', () => {
@@ -116,6 +160,24 @@ describe('validateConfig', () => {
 
       it('rejects number values', () => {
         expect(() => validateIosConfig({ badgeAutoclearing: true, codeSigningStyle: 'Automatic', projectVersion: '1', marketingVersion: '1.0', formsEnabled: 0 as any })).toThrow('iOS formsEnabled must be a boolean');
+      });
+    });
+
+    describe('automaticPushTokenForwarding', () => {
+      it('accepts true', () => {
+        expect(() => validateIosConfig({ automaticPushTokenForwarding: true })).not.toThrow();
+      });
+
+      it('accepts false', () => {
+        expect(() => validateIosConfig({ automaticPushTokenForwarding: false })).not.toThrow();
+      });
+
+      it('accepts undefined (optional)', () => {
+        expect(() => validateIosConfig({ automaticPushTokenForwarding: undefined })).not.toThrow();
+      });
+
+      it('rejects non-boolean values', () => {
+        expect(() => validateIosConfig({ automaticPushTokenForwarding: 1 as unknown as boolean })).toThrow('iOS automaticPushTokenForwarding must be a boolean');
       });
     });
   });

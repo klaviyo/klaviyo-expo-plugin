@@ -19,9 +19,27 @@ export const validateAndroidConfig = (config: KlaviyoPluginProps['android'], pro
     }
   }
 
-  // Validate openTracking
-  if (config.openTracking !== undefined && typeof config.openTracking !== 'boolean') {
-    throw new KlaviyoConfigError('Android openTracking must be a boolean value');
+  // Reject removed openTracking prop — was removed as a breaking change in v1.0.0.
+  // Keyed on presence, not value, so `openTracking: undefined` still gets the migration message
+  // rather than being silently ignored.
+  const androidConfigWithExtras = config as unknown as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(androidConfigWithExtras, 'openTracking')) {
+    throw new KlaviyoConfigError(
+      'Android openTracking was removed in v1.0.0. ' +
+      'For openTracking: true, just remove it — automaticPushOpenTracking defaults to true. ' +
+      'For openTracking: false, replace it with automaticPushOpenTracking: false. ' +
+      'See MIGRATION_GUIDE.md for details.'
+    );
+  }
+
+  // Validate automaticPushOpenTracking
+  if (config.automaticPushOpenTracking !== undefined && typeof config.automaticPushOpenTracking !== 'boolean') {
+    throw new KlaviyoConfigError('Android automaticPushOpenTracking must be a boolean');
+  }
+
+  // Validate automaticPushTokenForwarding
+  if (config.automaticPushTokenForwarding !== undefined && typeof config.automaticPushTokenForwarding !== 'boolean') {
+    throw new KlaviyoConfigError('Android automaticPushTokenForwarding must be a boolean');
   }
 
   // Validate notificationColor if provided
@@ -96,6 +114,11 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
   // Validate formsEnabled
   if (config.formsEnabled !== undefined && typeof config.formsEnabled !== 'boolean') {
     throw new KlaviyoConfigError('iOS formsEnabled must be a boolean');
+  }
+
+  // Validate automaticPushTokenForwarding
+  if (config.automaticPushTokenForwarding !== undefined && typeof config.automaticPushTokenForwarding !== 'boolean') {
+    throw new KlaviyoConfigError('iOS automaticPushTokenForwarding must be a boolean');
   }
 
   // Validate includeNotificationServiceExtension

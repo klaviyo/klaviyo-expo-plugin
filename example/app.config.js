@@ -38,7 +38,7 @@ module.exports = () => {
         {
           android: {
             logLevel: 1,
-            openTracking: true,
+            automaticPushOpenTracking: true,
             notificationIconFilePath: './assets/images/ic_notification.png',
             notificationColor: '#FF0000',
             geofencingEnabled: true,

@@ -2,6 +2,64 @@
 
 This guide outlines how to migrate when upgrading to newer versions of the Klaviyo Expo plugin.
 
+## Migrating to v1.0.0
+
+### `android.openTracking` removed
+
+The `openTracking` prop has been removed. It generated push-handling code into your `MainActivity`;
+the native Klaviyo SDK now tracks notification opens itself, so no Activity code is needed. Its
+replacement is `android.automaticPushOpenTracking`.
+
+> **⚠️ Important:** This requires `klaviyo-react-native-sdk` version **2.5.0 or higher**. Open
+> tracking is now driven by a manifest flag that only the native Android SDK bundled with 2.5.0+
+> reads. On older versions that flag is ignored, and because the `MainActivity` code generation is
+> gone, Android open tracking stops silently after a clean prebuild. Upgrade both together:
+> ```bash
+> npm install klaviyo-react-native-sdk@^2.5.0
+> ```
+
+**Once you are on 2.5.0+, most apps only need to delete the old property.** Both it and its
+replacement default to `true`, so open tracking keeps working exactly as before. Leaving
+`openTracking` in place fails the build with a message pointing at this guide.
+
+**Before (v0.x):**
+
+```js
+["klaviyo-expo-plugin", {
+  "android": { "openTracking": true }
+}]
+```
+
+**After (v1.0.0+):**
+
+```js
+["klaviyo-expo-plugin", {
+  "android": {}
+}]
+```
+
+**If you previously set `openTracking: false`**, you now have to opt out explicitly. Omitting the
+new property enables tracking rather than disabling it:
+
+```js
+["klaviyo-expo-plugin", {
+  "android": { "automaticPushOpenTracking": false }
+}]
+```
+
+> **Note:** If your `MainActivity` still contains `// @generated begin klaviyo-` blocks from a
+> previous prebuild, run `expo prebuild --clean` once to regenerate clean native files.
+
+### iOS: nothing to migrate
+
+iOS push opens are already tracked automatically and always have been, so there is no
+`ios.automaticPushOpenTracking` prop and nothing changes on iOS in v1.0.0.
+
+Avoid setting the native `klaviyo_automatic_push_open_tracking` Info.plist key by hand. It adds no
+tracking you do not already have, and it can override the foreground presentation options your app
+returns from `setNotificationHandler` in `expo-notifications`. We may expose it as a prop in a
+future release.
+
 ## Migrating to v0.3.0
 
 ### Version and build number (iOS)
