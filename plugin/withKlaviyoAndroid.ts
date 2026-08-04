@@ -62,14 +62,15 @@ const mutateAndroidManifest = (config: ExportedConfigWithProps<AndroidManifest>,
   }
 
   // Manage automatic_push_open_tracking flag.
-  // The flag is only written when explicitly set to true (opt-in; native default is OFF).
-  // When omitted the key is removed so the native default applies.
+  // Written when true, which is the plugin default (see ANDROID_DEFAULTS) because the native
+  // default is OFF and open tracking needs to survive the v1.0.0 upgrade. Set the prop to false
+  // to opt out, which removes the key and lets the native default apply.
   const OPEN_TRACKING_KEY = 'com.klaviyo.push.automatic_push_open_tracking';
   application['meta-data'] = (application['meta-data'] || []).filter(
     (item: ManifestMetaData) => item.$['android:name'] !== OPEN_TRACKING_KEY
   );
   if (props.automaticPushOpenTracking === true) {
-    KlaviyoLog.log('Injecting automatic_push_open_tracking=true (opt-in)');
+    KlaviyoLog.log('Injecting automatic_push_open_tracking=true');
     application['meta-data'].push({
       $: { 'android:name': OPEN_TRACKING_KEY, 'android:value': 'true' }
     } as ManifestMetaData);

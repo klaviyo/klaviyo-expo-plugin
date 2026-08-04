@@ -19,12 +19,15 @@ export const validateAndroidConfig = (config: KlaviyoPluginProps['android'], pro
     }
   }
 
-  // Reject removed openTracking prop — was removed as a breaking change in v1.0.0
+  // Reject removed openTracking prop — was removed as a breaking change in v1.0.0.
+  // Keyed on presence, not value, so `openTracking: undefined` still gets the migration message
+  // rather than being silently ignored.
   const androidConfigWithExtras = config as unknown as Record<string, unknown>;
-  if (androidConfigWithExtras.openTracking !== undefined) {
+  if (Object.prototype.hasOwnProperty.call(androidConfigWithExtras, 'openTracking')) {
     throw new KlaviyoConfigError(
       'Android openTracking was removed in v1.0.0. ' +
-      'Use automaticPushOpenTracking instead. ' +
+      'For openTracking: true, just remove it — automaticPushOpenTracking defaults to true. ' +
+      'For openTracking: false, replace it with automaticPushOpenTracking: false. ' +
       'See MIGRATION_GUIDE.md for details.'
     );
   }
@@ -111,11 +114,6 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
   // Validate formsEnabled
   if (config.formsEnabled !== undefined && typeof config.formsEnabled !== 'boolean') {
     throw new KlaviyoConfigError('iOS formsEnabled must be a boolean');
-  }
-
-  // Validate automaticPushOpenTracking
-  if (config.automaticPushOpenTracking !== undefined && typeof config.automaticPushOpenTracking !== 'boolean') {
-    throw new KlaviyoConfigError('iOS automaticPushOpenTracking must be a boolean');
   }
 
   // Validate automaticPushTokenForwarding

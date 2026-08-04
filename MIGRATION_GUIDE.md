@@ -6,12 +6,13 @@ This guide outlines how to migrate when upgrading to newer versions of the Klavi
 
 ### `android.openTracking` removed
 
-The `openTracking` plugin prop has been removed. It previously injected `Klaviyo.handlePush` calls
-into your `MainActivity` via a dangerous mod — directly modifying generated Activity source code at
-prebuild time.
+The `openTracking` prop has been removed. It generated push-handling code into your `MainActivity`;
+the native Klaviyo SDK now tracks notification opens itself, so no Activity code is needed. Its
+replacement is `android.automaticPushOpenTracking`.
 
-**Replace it with the manifest-flag approach**, which lets the native Android SDK own push open
-tracking entirely (no MainActivity modification):
+**Most apps only need to delete the old property.** Both it and its replacement default to `true`,
+so open tracking keeps working exactly as before. Leaving `openTracking` in place fails the build
+with a message pointing at this guide.
 
 **Before (v0.x):**
 
@@ -25,23 +26,31 @@ tracking entirely (no MainActivity modification):
 
 ```js
 ["klaviyo-expo-plugin", {
-  "android": { "automaticPushOpenTracking": true }
+  "android": {}
 }]
 ```
 
-Setting `automaticPushOpenTracking: true` writes the
-`com.klaviyo.push.automatic_push_open_tracking="true"` meta-data entry to your
-`AndroidManifest.xml`. The native Klaviyo SDK reads this flag at notification-build time and
-routes notification taps through its own `KlaviyoTrampolineActivity`, which calls
-`Klaviyo.handlePush` automatically — no manual Activity code needed.
+**If you previously set `openTracking: false`**, you now have to opt out explicitly. Omitting the
+new property enables tracking rather than disabling it:
 
-If you had previously set `openTracking: false` to suppress the MainActivity injection, simply
-omit `automaticPushOpenTracking` (or don't set it). The native default is OFF, so no key is
-written and no automatic tracking occurs.
+```js
+["klaviyo-expo-plugin", {
+  "android": { "automaticPushOpenTracking": false }
+}]
+```
 
 > **Note:** If your `MainActivity` still contains `// @generated begin klaviyo-` blocks from a
-> previous prebuild with `openTracking: true`, run `expo prebuild --clean` once to regenerate
-> clean native files.
+> previous prebuild, run `expo prebuild --clean` once to regenerate clean native files.
+
+### iOS: nothing to migrate
+
+iOS push opens are already tracked automatically and always have been, so there is no
+`ios.automaticPushOpenTracking` prop and nothing changes on iOS in v1.0.0.
+
+Avoid setting the native `klaviyo_automatic_push_open_tracking` Info.plist key by hand. It adds no
+tracking you do not already have, and it can override the foreground presentation options your app
+returns from `setNotificationHandler` in `expo-notifications`. We may expose it as a prop in a
+future release.
 
 ## Migrating to v0.3.0
 
