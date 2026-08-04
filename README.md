@@ -124,8 +124,8 @@ npx expo prebuild
 |`ios.includeNotificationServiceExtension`| boolean | optional | Controls whether the Notification Service Extension (NSE) target is automatically set up. Set to `false` if you already have an NSE (e.g., from another SDK) to prevent conflicts — iOS only executes one NSE per app. Default: `true`|
 |`ios.automaticPushTokenForwarding`| boolean | optional | Forwards the APNs push token to Klaviyo automatically. Opt-in, because on iOS this relies on app-delegate swizzling. When `false`, call `Klaviyo.setPushToken(...)` yourself. Default: `false` |
 
-> **Note:** iOS push opens are tracked automatically and need no configuration, which is why there
-> is no `ios.automaticPushOpenTracking` prop.
+iOS push opens are tracked automatically and need no configuration, which is why there is no
+`ios.automaticPushOpenTracking` prop.
 
 Note: If you do not need to specify any of these for your project, it will use the defaults defined here. If you do not specify any of these props, you can add the plugin without additional arguments:
 ```
