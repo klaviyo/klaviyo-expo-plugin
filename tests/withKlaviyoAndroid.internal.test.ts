@@ -784,7 +784,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           });
           mutateAndroidManifest(config, mergeAndroidProps({}));
           const metaData = config.modResults.manifest.application[0]['meta-data'];
-          const entry = metaData.find(m => m.$['android:name'] === OPEN_TRACKING_KEY);
+          const entry = metaData.find((m: { $: Record<string, string> }) => m.$['android:name'] === OPEN_TRACKING_KEY);
           expect(entry).toBeDefined();
           expect(entry.$['android:value']).toBe('true');
         });
@@ -795,7 +795,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           });
           mutateAndroidManifest(config, mergeAndroidProps({ automaticPushOpenTracking: false }));
           const metaData = config.modResults.manifest.application[0]['meta-data'];
-          expect(metaData.some(m => m.$['android:name'] === OPEN_TRACKING_KEY)).toBe(false);
+          expect(metaData.some((m: { $: Record<string, string> }) => m.$['android:name'] === OPEN_TRACKING_KEY)).toBe(false);
         });
       });
 
