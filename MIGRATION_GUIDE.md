@@ -10,9 +10,17 @@ The `openTracking` prop has been removed. It generated push-handling code into y
 the native Klaviyo SDK now tracks notification opens itself, so no Activity code is needed. Its
 replacement is `android.automaticPushOpenTracking`.
 
-**Most apps only need to delete the old property.** Both it and its replacement default to `true`,
-so open tracking keeps working exactly as before. Leaving `openTracking` in place fails the build
-with a message pointing at this guide.
+> **⚠️ Important:** This requires `klaviyo-react-native-sdk` version **2.5.0 or higher**. Open
+> tracking is now driven by a manifest flag that only the native Android SDK bundled with 2.5.0+
+> reads. On older versions that flag is ignored, and because the `MainActivity` code generation is
+> gone, Android open tracking stops silently after a clean prebuild. Upgrade both together:
+> ```bash
+> npm install klaviyo-react-native-sdk@^2.5.0
+> ```
+
+**Once you are on 2.5.0+, most apps only need to delete the old property.** Both it and its
+replacement default to `true`, so open tracking keeps working exactly as before. Leaving
+`openTracking` in place fails the build with a message pointing at this guide.
 
 **Before (v0.x):**
 
