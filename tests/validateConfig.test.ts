@@ -109,7 +109,7 @@ describe('validateConfig', () => {
       });
 
       it('rejects openTracking regardless of value type', () => {
-        expect(() => validateAndroidConfig({ openTracking: false } as unknown as Record<string, unknown>)).toThrow('remove openTracking and leave automaticPushOpenTracking unset');
+        expect(() => validateAndroidConfig({ openTracking: false } as unknown as Record<string, unknown>)).toThrow('replace it with automaticPushOpenTracking: false');
       });
 
       it('rejects invalid notificationColor', () => {
@@ -156,24 +156,6 @@ describe('validateConfig', () => {
 
       it('rejects number values', () => {
         expect(() => validateIosConfig({ badgeAutoclearing: true, codeSigningStyle: 'Automatic', projectVersion: '1', marketingVersion: '1.0', formsEnabled: 0 as any })).toThrow('iOS formsEnabled must be a boolean');
-      });
-    });
-
-    describe('automaticPushOpenTracking', () => {
-      it('accepts true', () => {
-        expect(() => validateIosConfig({ automaticPushOpenTracking: true })).not.toThrow();
-      });
-
-      it('accepts false', () => {
-        expect(() => validateIosConfig({ automaticPushOpenTracking: false })).not.toThrow();
-      });
-
-      it('accepts undefined (optional)', () => {
-        expect(() => validateIosConfig({ automaticPushOpenTracking: undefined })).not.toThrow();
-      });
-
-      it('rejects non-boolean values', () => {
-        expect(() => validateIosConfig({ automaticPushOpenTracking: 'true' as unknown as boolean })).toThrow('iOS automaticPushOpenTracking must be a boolean');
       });
     });
 

@@ -16,7 +16,6 @@ export interface KlaviyoPluginIosBaseProps  {
   formsEnabled?: boolean;
   includeNotificationServiceExtension?: boolean;
   automaticPushTokenForwarding?: boolean;
-  automaticPushOpenTracking?: boolean;
 }
 
 export interface KlaviyoPluginProps {
@@ -30,6 +29,7 @@ export interface KlaviyoPluginAndroidProps extends KlaviyoPluginAndroidBaseProps
   notificationColor: string | undefined;
   geofencingEnabled: boolean;
   formsEnabled: boolean;
+  automaticPushOpenTracking: boolean;
 }
 
 export interface KlaviyoPluginIosProps extends KlaviyoPluginIosBaseProps {
@@ -51,7 +51,11 @@ const ANDROID_DEFAULTS: KlaviyoPluginAndroidProps = {
   notificationIconFilePath: undefined,
   notificationColor: undefined,
   geofencingEnabled: false,
-  formsEnabled: true
+  formsEnabled: true,
+  // On by default so upgrades keep tracking opens. Before v1.0.0 the removed openTracking prop
+  // defaulted to true and injected handlePush into MainActivity; the native trampoline replaces
+  // that, but only when this flag is written to the manifest.
+  automaticPushOpenTracking: true
 };
 
 const IOS_DEFAULTS: KlaviyoPluginIosProps = {

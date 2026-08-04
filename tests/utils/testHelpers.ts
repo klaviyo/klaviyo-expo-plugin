@@ -230,7 +230,6 @@ export interface MockIosPropsOptions {
   formsEnabled?: boolean;
   includeNotificationServiceExtension?: boolean;
   automaticPushTokenForwarding?: boolean;
-  automaticPushOpenTracking?: boolean;
 }
 
 export const createMockIosConfig = (options: MockIosConfigOptions = {}): any => {

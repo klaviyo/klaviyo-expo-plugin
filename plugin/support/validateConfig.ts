@@ -24,8 +24,8 @@ export const validateAndroidConfig = (config: KlaviyoPluginProps['android'], pro
   if (androidConfigWithExtras.openTracking !== undefined) {
     throw new KlaviyoConfigError(
       'Android openTracking was removed in v1.0.0. ' +
-      'For openTracking: true, set automaticPushOpenTracking: true. ' +
-      'For openTracking: false, remove openTracking and leave automaticPushOpenTracking unset. ' +
+      'For openTracking: true, just remove it — automaticPushOpenTracking defaults to true. ' +
+      'For openTracking: false, replace it with automaticPushOpenTracking: false. ' +
       'See MIGRATION_GUIDE.md for details.'
     );
   }
@@ -112,11 +112,6 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
   // Validate formsEnabled
   if (config.formsEnabled !== undefined && typeof config.formsEnabled !== 'boolean') {
     throw new KlaviyoConfigError('iOS formsEnabled must be a boolean');
-  }
-
-  // Validate automaticPushOpenTracking
-  if (config.automaticPushOpenTracking !== undefined && typeof config.automaticPushOpenTracking !== 'boolean') {
-    throw new KlaviyoConfigError('iOS automaticPushOpenTracking must be a boolean');
   }
 
   // Validate automaticPushTokenForwarding

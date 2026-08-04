@@ -165,14 +165,9 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
       delete infoPlist.klaviyo_automatic_push_token_forwarding;
     }
 
-    // Manage klaviyo_automatic_push_open_tracking flag (opt-in; native iOS defaults to OFF).
-    // Write only when true; remove the key when omitted so the native default applies.
-    if (props.automaticPushOpenTracking) {
-      KlaviyoLog.log('Injecting klaviyo_automatic_push_open_tracking=true into Info.plist (opt-in)');
-      infoPlist.klaviyo_automatic_push_open_tracking = true;
-    } else {
-      delete infoPlist.klaviyo_automatic_push_open_tracking;
-    }
+    // No klaviyo_automatic_push_open_tracking prop on iOS: KlaviyoAppDelegate already tracks opens,
+    // and the native SDK's proxy resolves willPresent before expo-notifications answers from JS,
+    // which would override the app's setNotificationHandler options.
 
     return config;
   });

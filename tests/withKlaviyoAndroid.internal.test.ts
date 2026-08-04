@@ -763,7 +763,43 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     describe('automaticPushOpenTracking flag', () => {
       const OPEN_TRACKING_KEY = 'com.klaviyo.push.automatic_push_open_tracking';
 
-      it('does not inject the flag when automaticPushOpenTracking is omitted', () => {
+      // The tests below drive mutateAndroidManifest directly, so they see whatever value is
+      // passed. These two cover what a real app config resolves to via mergeAndroidProps, which
+      // is what determines the flag's actual default.
+      describe('resolved plugin defaults', () => {
+        const { mergeAndroidProps } = require('../plugin/types');
+
+        it('defaults automaticPushOpenTracking to true so upgrades keep tracking opens', () => {
+          expect(mergeAndroidProps({}).automaticPushOpenTracking).toBe(true);
+          expect(mergeAndroidProps(undefined).automaticPushOpenTracking).toBe(true);
+        });
+
+        it('lets an app opt out with false', () => {
+          expect(mergeAndroidProps({ automaticPushOpenTracking: false }).automaticPushOpenTracking).toBe(false);
+        });
+
+        it('injects the flag for a config that does not mention it', () => {
+          const config = createMockConfig({
+            modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+          });
+          mutateAndroidManifest(config, mergeAndroidProps({}));
+          const metaData = config.modResults.manifest.application[0]['meta-data'];
+          const entry = metaData.find(m => m.$['android:name'] === OPEN_TRACKING_KEY);
+          expect(entry).toBeDefined();
+          expect(entry.$['android:value']).toBe('true');
+        });
+
+        it('omits the flag for a config that opts out', () => {
+          const config = createMockConfig({
+            modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+          });
+          mutateAndroidManifest(config, mergeAndroidProps({ automaticPushOpenTracking: false }));
+          const metaData = config.modResults.manifest.application[0]['meta-data'];
+          expect(metaData.some(m => m.$['android:name'] === OPEN_TRACKING_KEY)).toBe(false);
+        });
+      });
+
+      it('does not inject the flag when automaticPushOpenTracking is undefined', () => {
         const config = createMockConfig({
           modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
         });
@@ -793,7 +829,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         const entry = metaData.find(m => m.$['android:name'] === OPEN_TRACKING_KEY);
         expect(entry).toBeDefined();
         expect(entry.$['android:value']).toBe('true');
-        expect(logger.log).toHaveBeenCalledWith('Injecting automatic_push_open_tracking=true (opt-in)');
+        expect(logger.log).toHaveBeenCalledWith('Injecting automatic_push_open_tracking=true');
       });
 
       it('removes an existing open tracking entry when prop is omitted (idempotency)', () => {
