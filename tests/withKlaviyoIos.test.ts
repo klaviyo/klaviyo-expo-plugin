@@ -105,7 +105,12 @@ describe('withKlaviyoIos', () => {
 
     describe('automaticPushOpenTracking (deliberately not an iOS prop)', () => {
       it('should not write klaviyo_automatic_push_open_tracking even when the prop is passed', () => {
-        const props = { ...mockProps, automaticPushOpenTracking: true } as any;
+        // Typed as an extension rather than `any` to show the prop is deliberately outside
+        // KlaviyoPluginIosProps — passing it should be a no-op.
+        const props: KlaviyoPluginIosProps & { automaticPushOpenTracking: boolean } = {
+          ...mockProps,
+          automaticPushOpenTracking: true,
+        };
         const modifiedConfig = withKlaviyoIos(mockConfig, props) as any;
         expect(modifiedConfig.modResults.klaviyo_automatic_push_open_tracking).toBeUndefined();
       });

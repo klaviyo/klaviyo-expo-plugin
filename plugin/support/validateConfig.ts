@@ -19,9 +19,11 @@ export const validateAndroidConfig = (config: KlaviyoPluginProps['android'], pro
     }
   }
 
-  // Reject removed openTracking prop — was removed as a breaking change in v1.0.0
+  // Reject removed openTracking prop — was removed as a breaking change in v1.0.0.
+  // Keyed on presence, not value, so `openTracking: undefined` still gets the migration message
+  // rather than being silently ignored.
   const androidConfigWithExtras = config as unknown as Record<string, unknown>;
-  if (androidConfigWithExtras.openTracking !== undefined) {
+  if (Object.prototype.hasOwnProperty.call(androidConfigWithExtras, 'openTracking')) {
     throw new KlaviyoConfigError(
       'Android openTracking was removed in v1.0.0. ' +
       'For openTracking: true, just remove it — automaticPushOpenTracking defaults to true. ' +

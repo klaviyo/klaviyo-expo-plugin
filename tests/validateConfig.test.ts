@@ -112,6 +112,10 @@ describe('validateConfig', () => {
         expect(() => validateAndroidConfig({ openTracking: false } as unknown as Record<string, unknown>)).toThrow('replace it with automaticPushOpenTracking: false');
       });
 
+      it('rejects an explicitly undefined openTracking rather than ignoring it', () => {
+        expect(() => validateAndroidConfig({ openTracking: undefined } as unknown as Record<string, unknown>)).toThrow('Android openTracking was removed in v1.0.0');
+      });
+
       it('rejects invalid notificationColor', () => {
         expect(() => validateAndroidConfig({ notificationColor: 'red' })).toThrow('Android notificationColor must be a valid hex color code');
       });
