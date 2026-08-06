@@ -87,7 +87,7 @@ export default function PushScreen() {
       setPushToken(token);      
       console.log('Setting token in Klaviyo...');
       try {
-        Klaviyo.setPushToken(token);
+        // Klaviyo.setPushToken(token);
         console.log('Token set in Klaviyo successfully');
       } catch (klaviyoError) {
         console.error('Error setting token in Klaviyo:', klaviyoError);

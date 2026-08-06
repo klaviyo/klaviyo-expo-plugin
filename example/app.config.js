@@ -10,7 +10,7 @@ module.exports = () => {
     newArchEnabled: false,
     ios: {
       // Make sure to increment this and the version as needed when making builds
-      buildNumber: '1',
+      buildNumber: '4',
       bundleIdentifier: 'com.klaviyo.expoexample',
       infoPlist: {
         UIBackgroundModes: ['remote-notification'],
@@ -47,10 +47,11 @@ module.exports = () => {
           ios: {
             badgeAutoclearing: true,
             codeSigningStyle: 'Automatic',
-            devTeam: 'XXXXXXXXXX',
+            devTeam: 'G3793W2RJ2',
             geofencingEnabled: true,
             formsEnabled: true,
             includeNotificationServiceExtension: true,
+            automaticPushTokenForwarding: true,
           },
         },
       ],
@@ -62,7 +63,7 @@ module.exports = () => {
     extra: {
       router: {},
       eas: {
-        projectId: 'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX',
+        projectId: '1c04d6a2-82fa-477d-8ade-a79321cbd0b1',
         build: {
           experimental: {
             ios: {

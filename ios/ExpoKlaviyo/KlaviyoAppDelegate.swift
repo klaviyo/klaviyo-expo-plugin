@@ -21,6 +21,31 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
         return true
     }
 
+    /// Forwards the APNs device token to Klaviyo when automatic push token forwarding is enabled.
+    ///
+    /// Expo delivers `didRegisterForRemoteNotificationsWithDeviceToken` to every registered
+    /// `ExpoAppDelegateSubscriber`, so handling it here gives deterministic token forwarding that
+    /// coexists with expo-notifications' own subscriber.
+    ///
+    /// This is used in place of KlaviyoSwift's app-delegate swizzling
+    /// (`klaviyo_automatic_push_token_forwarding`): in a config-plugin setup the swizzle is only
+    /// installed from `KlaviyoSDK.initialize(with:)`, which runs from JS after launch, so the
+    /// APNs callback can fire before the swizzle exists and the token is missed. The subscriber
+    /// is registered at build time and is therefore always in the delivery path.
+    ///
+    /// Gated on the same `klaviyo_automatic_push_token_forwarding` Info.plist key the plugin
+    /// injects from the `automaticPushTokenForwarding` prop, so the opt-in stays authoritative.
+    public func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        let forwardingEnabled = Bundle.main.object(
+            forInfoDictionaryKey: "klaviyo_automatic_push_token_forwarding"
+        ) as? Bool ?? false
+        guard forwardingEnabled else { return }
+        KlaviyoSDK().set(pushToken: deviceToken)
+    }
+
     public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
