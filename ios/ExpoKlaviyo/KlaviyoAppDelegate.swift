@@ -21,6 +21,29 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
         return true
     }
 
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void) {
+        _ = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: completionHandler)
+        if let originalDelegate {
+            originalDelegate.userNotificationCenter?(center, didReceive: response, withCompletionHandler: completionHandler)
+        }
+    }
+
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        // Forward to the original delegate (for expo-notifications)
+        if let originalDelegate {
+            originalDelegate.userNotificationCenter?(center, willPresent: notification, withCompletionHandler: completionHandler)
+        } else {
+            completionHandler([.list, .banner, .badge, .sound])
+        }
+    }
+    
     /// Forwards the APNs device token to Klaviyo when automatic push token forwarding is enabled.
     ///
     /// Expo delivers `didRegisterForRemoteNotificationsWithDeviceToken` to every registered
@@ -44,39 +67,5 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
         ) as? Bool ?? false
         guard forwardingEnabled else { return }
         KlaviyoSDK().set(pushToken: deviceToken)
-    }
-
-    public func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse,
-        withCompletionHandler completionHandler: @escaping () -> Void
-    ) {
-        let handled = KlaviyoSDK().handle(notificationResponse: response, withCompletionHandler: completionHandler)
-
-        let didReceiveSelector = #selector(UNUserNotificationCenterDelegate.userNotificationCenter(_:didReceive:withCompletionHandler:))
-        if let originalDelegate, originalDelegate.responds(to: didReceiveSelector) {
-            // If handle() already consumed the completionHandler, forward with a no-op so
-            // expo-notifications can still observe the response (firing any JS listeners)
-            // without invoking the real handler a second time.
-            let downstream: () -> Void = handled ? {} : completionHandler
-            originalDelegate.userNotificationCenter?(center, didReceive: response, withCompletionHandler: downstream)
-        } else if !handled {
-            // No downstream handler and the completionHandler hasn't been consumed yet.
-            completionHandler()
-        }
-    }
-
-    public func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        // Forward to the original delegate (for expo-notifications)
-        let willPresentSelector = #selector(UNUserNotificationCenterDelegate.userNotificationCenter(_:willPresent:withCompletionHandler:))
-        if let originalDelegate, originalDelegate.responds(to: willPresentSelector) {
-            originalDelegate.userNotificationCenter?(center, willPresent: notification, withCompletionHandler: completionHandler)
-        } else {
-            completionHandler([.list, .banner, .badge, .sound])
-        }
     }
 }

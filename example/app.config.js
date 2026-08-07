@@ -33,6 +33,7 @@ module.exports = () => {
     },
     plugins: [
       'expo-router',
+      './plugins/withFmtConstevalFix',
       [
         'klaviyo-expo-plugin',
         {
