@@ -54,4 +54,19 @@ public final class KlaviyoAppDelegate: ExpoAppDelegateSubscriber, UNUserNotifica
             completionHandler([.list, .banner, .badge, .sound])
         }
     }
+
+    /// Forwards the APNs device token to Klaviyo, in place of KlaviyoSwift's app-delegate
+    /// swizzling which races with JS-driven SDK init in a config-plugin setup. Gated on the
+    /// `klaviyo_automatic_push_token_forwarding` Info.plist key the plugin injects from the
+    /// `automaticPushTokenForwarding` prop.
+    public func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        let forwardingEnabled = Bundle.main.object(
+            forInfoDictionaryKey: "klaviyo_automatic_push_token_forwarding"
+        ) as? Bool ?? false
+        guard forwardingEnabled else { return }
+        KlaviyoSDK().set(pushToken: deviceToken)
+    }
 }

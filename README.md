@@ -122,7 +122,7 @@ npx expo prebuild
 |`ios.geofencingEnabled`| boolean | optional | Enables geofencing/location tracking support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. When `false`, sets the `KLAVIYO_INCLUDE_LOCATION` Podfile ENV var to exclude the KlaviyoLocation pod. See [Geofencing](#geofencing) below. Default: `false` (geofencing disabled)|
 |`ios.formsEnabled`| boolean | optional | Controls whether the full forms module (in-app forms rendering with WebView) is included on iOS. When `false`, sets the `KLAVIYO_INCLUDE_FORMS` Podfile ENV var to exclude the module. Default: `true`|
 |`ios.includeNotificationServiceExtension`| boolean | optional | Controls whether the Notification Service Extension (NSE) target is automatically set up. Set to `false` if you already have an NSE (e.g., from another SDK) to prevent conflicts — iOS only executes one NSE per app. Default: `true`|
-|`ios.automaticPushTokenForwarding`| boolean | optional | Forwards the APNs push token to Klaviyo automatically. Opt-in, because on iOS this relies on app-delegate swizzling. When `false`, call `Klaviyo.setPushToken(...)` yourself. Default: `false` |
+|`ios.automaticPushTokenForwarding`| boolean | optional | Forwards the APNs push token to Klaviyo automatically via the plugin's app-delegate integration. Opt-in on iOS to match the native SDK's default. When `false`, call `Klaviyo.setPushToken(...)` yourself. Default: `false` |
 
 > **⚠️ Important:** The two `android.automaticPush*` props require `klaviyo-react-native-sdk` version
 > **2.5.0 or higher**, which bundles the native Android SDK that reads them. On older versions the
