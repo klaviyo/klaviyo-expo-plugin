@@ -115,7 +115,7 @@ npx expo prebuild
 | `android.geofencingEnabled` | boolean | optional | Controls whether the full location module (with geofencing and permissions) is included. When `false`, only the lightweight location-core module is included (no location permissions). Sets the `klaviyoIncludeLocation` gradle property. Default: `false` |
 | `android.formsEnabled` | boolean | optional | Controls whether the full forms module (in-app forms rendering with WebView) is included. When `false`, only the lightweight forms-core module is included. Sets the `klaviyoIncludeForms` gradle property. Default: `true` |
 | `android.automaticPushOpenTracking` | boolean | optional | Tracks notification opens automatically. Set to `false` to opt out and call `Klaviyo.handlePush(intent)` yourself. Default: `true` |
-| `android.automaticPushTokenForwarding` | boolean | optional | Forwards the FCM push token to Klaviyo automatically. Set to `false` to opt out and call `Klaviyo.setPushToken(...)` yourself. Default: `true` |
+| `android.automaticPushTokenForwarding` | boolean | optional | Forwards the FCM push token to Klaviyo. Leaving this unset keeps the native SDK's default (forwards a token only when FCM delivers one); set to `true` to additionally fetch the token at init/foreground, or `false` to disable forwarding entirely. Default: unset |
 | `ios.badgeAutoclearing` | boolean | optional | Enables automatic badge count clearing when app is opened. Default: `true` |
 |`ios.codeSigningStyle`| string | optional | Declares management style for Code Signing Identity, Entitlements, and Provisioning Profile handled through XCode. Must be either "Manual" or "Automatic". Default: `"Automatic"`. Note: We highly recommend using the automatic signing style. If you select manual, you may need to go into your [developer.apple.com](https://developer.apple.com/) console and import the appropriate files and enable capabilities yourself.|
 |`ios.devTeam`| string | optional| The 10-digit alphanumeric Apple Development Team ID associated with the necessary signing capabilities, provisioning profile, etc. Format: "XXXXXXXXXX" Default: `undefined`|
@@ -132,6 +132,11 @@ npx expo prebuild
 > ```bash
 > npm install klaviyo-react-native-sdk@^2.5.0
 > ```
+
+**Note:** unlike `automaticPushOpenTracking`, this plugin does not inject a default value for
+`automaticPushTokenForwarding` — omitting it leaves the manifest flag unset, which forwards a token
+reactively (whenever FCM delivers one) but does not fetch proactively at startup. Set this prop to
+`true` if you want the SDK to also fetch the token at initialize/foreground.
 
 iOS push opens are tracked automatically and need no configuration, which is why there is no
 `ios.automaticPushOpenTracking` prop.
