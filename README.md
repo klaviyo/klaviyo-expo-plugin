@@ -37,6 +37,9 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 - Icon / color notification configuration (Android)
 - Universal links / App links support
 
+> **Upgrading from an earlier version?** See the [Migration Guide](./MIGRATION_GUIDE.md) for breaking
+> changes and the steps to move between versions.
+
 ## Requirements
 
 ### Expo
@@ -76,7 +79,7 @@ npx expo install klaviyo-expo-plugin
         {
           "android": {
             "logLevel": 1,
-            "openTracking": true,
+            "automaticPushOpenTracking": true,
             "notificationIconFilePath": "./your/notification/icon/path.png",
             "notificationColor": "#00FF00"
           },
@@ -107,17 +110,36 @@ npx expo prebuild
 | Plugin prop | Type | Required | Description |
 |-------------|------|----|-------------|
 | `android.logLevel` | int | optional | Sets the logging level for the Klaviyo Android SDK. Default: `1` (DEBUG). Values: `0` (NONE), `1` (VERBOSE), `2` (DEBUG), `3` (INFO), `4` (WARNING), `5` (ERROR), `6` (ASSERT) |
-| `android.openTracking` | boolean | optional | Enables tracking when notifications are opened. Default: `true`. Note that this is considered to be a **dangerous** mod, as it directly modifies your MainActivity code. |
 | `android.notificationIconFilePath` | string | optional | Path to the notification icon file. Should be a white, transparent PNG. Default: none specified. Note that you should set this instead of `expo-notifications`, as they can conflict with each other. |
 | `android.notificationColor` | string | optional | Hex color for notification accent. Must be a valid hex value, e.g., `"#FF0000"` Default: `undefined` |
 | `android.geofencingEnabled` | boolean | optional | Controls whether the full location module (with geofencing and permissions) is included. When `false`, only the lightweight location-core module is included (no location permissions). Sets the `klaviyoIncludeLocation` gradle property. Default: `false` |
 | `android.formsEnabled` | boolean | optional | Controls whether the full forms module (in-app forms rendering with WebView) is included. When `false`, only the lightweight forms-core module is included. Sets the `klaviyoIncludeForms` gradle property. Default: `true` |
+| `android.automaticPushOpenTracking` | boolean | optional | Tracks notification opens automatically. Set to `false` to opt out and call `Klaviyo.handlePush(intent)` yourself. Default: `true` |
+| `android.automaticPushTokenForwarding` | boolean | optional | Forwards the FCM push token to Klaviyo. Leaving this unset keeps the native SDK's default (forwards a token only when FCM delivers one); set to `true` to additionally fetch the token at init/foreground, or `false` to disable forwarding entirely. Default: unset |
 | `ios.badgeAutoclearing` | boolean | optional | Enables automatic badge count clearing when app is opened. Default: `true` |
 |`ios.codeSigningStyle`| string | optional | Declares management style for Code Signing Identity, Entitlements, and Provisioning Profile handled through XCode. Must be either "Manual" or "Automatic". Default: `"Automatic"`. Note: We highly recommend using the automatic signing style. If you select manual, you may need to go into your [developer.apple.com](https://developer.apple.com/) console and import the appropriate files and enable capabilities yourself.|
-|`ios.devTeam`| string | optional| The 10-digit alphanumeric Apple Development Team ID associated with the necessary signing capabilites, provisioning profile, etc. Format: "XXXXXXXXXX" Default: `undefined`|
+|`ios.devTeam`| string | optional| The 10-digit alphanumeric Apple Development Team ID associated with the necessary signing capabilities, provisioning profile, etc. Format: "XXXXXXXXXX" Default: `undefined`|
 |`ios.geofencingEnabled`| boolean | optional | Enables geofencing/location tracking support. When `true`, injects the necessary dependencies to set up registering for geofencing on app launch. When `false`, sets the `KLAVIYO_INCLUDE_LOCATION` Podfile ENV var to exclude the KlaviyoLocation pod. See [Geofencing](#geofencing) below. Default: `false` (geofencing disabled)|
 |`ios.formsEnabled`| boolean | optional | Controls whether the full forms module (in-app forms rendering with WebView) is included on iOS. When `false`, sets the `KLAVIYO_INCLUDE_FORMS` Podfile ENV var to exclude the module. Default: `true`|
 |`ios.includeNotificationServiceExtension`| boolean | optional | Controls whether the Notification Service Extension (NSE) target is automatically set up. Set to `false` if you already have an NSE (e.g., from another SDK) to prevent conflicts — iOS only executes one NSE per app. Default: `true`|
+|`ios.automaticPushTokenForwarding`| boolean | optional | Forwards the APNs push token to Klaviyo automatically. Opt-in, because on iOS this relies on app-delegate swizzling. When `false`, call `Klaviyo.setPushToken(...)` yourself. Default: `false` |
+
+> **⚠️ Important:** The two `android.automaticPush*` props require `klaviyo-react-native-sdk` version
+> **2.5.0 or higher**, which bundles the native Android SDK that reads them. On older versions the
+> generated manifest flags are ignored: opens are not tracked (the `MainActivity` code generation that
+> used to do this was removed in v1.0.0), and setting either prop to `false` does not opt you out.
+> Make sure you have the correct version installed:
+> ```bash
+> npm install klaviyo-react-native-sdk@^2.5.0
+> ```
+
+**Note:** unlike `automaticPushOpenTracking`, this plugin does not inject a default value for
+`automaticPushTokenForwarding` — omitting it leaves the manifest flag unset, which forwards a token
+reactively (whenever FCM delivers one) but does not fetch proactively at startup. Set this prop to
+`true` if you want the SDK to also fetch the token at initialize/foreground.
+
+iOS push opens are tracked automatically and need no configuration, which is why there is no
+`ios.automaticPushOpenTracking` prop.
 
 Note: If you do not need to specify any of these for your project, it will use the defaults defined here. If you do not specify any of these props, you can add the plugin without additional arguments:
 ```

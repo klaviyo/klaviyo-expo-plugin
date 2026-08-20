@@ -56,7 +56,7 @@ describe('Gradle Properties Plugins', () => {
 
     it('defaults to false when geofencingEnabled is undefined', () => {
       const config: any = { modResults: [] };
-      const props = { logLevel: 1, openTracking: true, notificationIconFilePath: undefined, notificationColor: undefined, formsEnabled: true } as KlaviyoPluginAndroidProps;
+      const props = { logLevel: 1, notificationIconFilePath: undefined, notificationColor: undefined, formsEnabled: true } as KlaviyoPluginAndroidProps;
 
       const result = withLocationGradleProperties(config, props);
 
@@ -144,7 +144,7 @@ describe('Gradle Properties Plugins', () => {
 
     it('defaults to true when formsEnabled is undefined', () => {
       const config: any = { modResults: [] };
-      const props = { logLevel: 1, openTracking: true, notificationIconFilePath: undefined, notificationColor: undefined, geofencingEnabled: false } as KlaviyoPluginAndroidProps;
+      const props = { logLevel: 1, notificationIconFilePath: undefined, notificationColor: undefined, geofencingEnabled: false } as KlaviyoPluginAndroidProps;
 
       const result = withFormsGradleProperties(config, props);
 

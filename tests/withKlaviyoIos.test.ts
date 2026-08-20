@@ -75,6 +75,54 @@ describe('withKlaviyoIos', () => {
       expect(modifiedConfig.modResults.klaviyo_app_group).toBe('group.com.test.app.KlaviyoNotificationServiceExtension.shared');
       expect(modifiedConfig.modResults.klaviyo_badge_autoclearing).toBe(true);
     });
+
+    describe('automaticPushTokenForwarding', () => {
+      it('should not write klaviyo_automatic_push_token_forwarding when prop is omitted', () => {
+        const modifiedConfig = withKlaviyoIos(mockConfig, mockProps) as any;
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_token_forwarding).toBeUndefined();
+      });
+
+      it('should not write klaviyo_automatic_push_token_forwarding when prop is false', () => {
+        const props = createMockIosProps({ automaticPushTokenForwarding: false });
+        const modifiedConfig = withKlaviyoIos(mockConfig, props) as any;
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_token_forwarding).toBeUndefined();
+      });
+
+      it('should write klaviyo_automatic_push_token_forwarding=true when prop is true (opt-in)', () => {
+        const props = createMockIosProps({ automaticPushTokenForwarding: true });
+        const modifiedConfig = withKlaviyoIos(mockConfig, props) as any;
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_token_forwarding).toBe(true);
+      });
+
+      it('should remove klaviyo_automatic_push_token_forwarding from plist when prop becomes omitted (idempotency)', () => {
+        const configWithExistingFlag = createMockIosConfig({
+          modResults: { ...mockConfig.modResults, klaviyo_automatic_push_token_forwarding: true },
+        });
+        const modifiedConfig = withKlaviyoIos(configWithExistingFlag, mockProps) as any;
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_token_forwarding).toBeUndefined();
+      });
+    });
+
+    describe('automaticPushOpenTracking (deliberately not an iOS prop)', () => {
+      it('should not write klaviyo_automatic_push_open_tracking even when the prop is passed', () => {
+        // Typed as an extension rather than `any` to show the prop is deliberately outside
+        // KlaviyoPluginIosProps — passing it should be a no-op.
+        const props: KlaviyoPluginIosProps & { automaticPushOpenTracking: boolean } = {
+          ...mockProps,
+          automaticPushOpenTracking: true,
+        };
+        const modifiedConfig = withKlaviyoIos(mockConfig, props) as any;
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_open_tracking).toBeUndefined();
+      });
+
+      it('should leave a klaviyo_automatic_push_open_tracking key the app set itself untouched', () => {
+        const configWithExistingFlag = createMockIosConfig({
+          modResults: { ...mockConfig.modResults, klaviyo_automatic_push_open_tracking: true },
+        });
+        const modifiedConfig = withKlaviyoIos(configWithExistingFlag, mockProps) as any;
+        expect(modifiedConfig.modResults.klaviyo_automatic_push_open_tracking).toBe(true);
+      });
+    });
   });
 
   describe('withKlaviyoAppGroup', () => {

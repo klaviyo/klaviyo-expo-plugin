@@ -1,4 +1,4 @@
-import { withNotificationIcon, withKlaviyoPluginNameVersion, modifyMainActivity, withNotificationResources } from '../plugin/withKlaviyoAndroid';
+import { withNotificationIcon, withKlaviyoPluginNameVersion, withNotificationResources } from '../plugin/withKlaviyoAndroid';
 import { createMockConfig, createMockProps, testPluginFunction } from './utils/testHelpers';
 
 // Mock file system operations
@@ -459,450 +459,6 @@ describe('withKlaviyoAndroid Internal Functions', () => {
     });
   });
 
-  describe('modifyMainActivity error handling', () => {
-    const baseProps = createMockProps({ openTracking: true });
-
-    it('throws if MainActivity has no package declaration', () => {
-      const content = `public class MainActivity extends ReactActivity {}`;
-      expect(() => modifyMainActivity('java', baseProps, content)).toThrow('Could not find package declaration in MainActivity');
-    });
-
-    it('throws if MainActivity has no class declaration', () => {
-      const content = `package com.example.test;\n// no class here`;
-      expect(() => modifyMainActivity('java', baseProps, content)).toThrow('Could not find MainActivity class declaration');
-    });
-  });
-
-  describe('onCreate tracking functionality', () => {
-    const baseProps = createMockProps({ openTracking: true });
-
-    describe('Java MainActivity', () => {
-      it('adds onCreate when it does not exist in Java MainActivity', () => {
-        const javaMainActivity = `package com.example.test;
-
-import com.facebook.react.ReactActivity;
-
-public class MainActivity extends ReactActivity {
-  @Override
-  protected String getMainComponentName() {
-    return "main";
-  }
-}`;
-
-        const result = modifyMainActivity('java', baseProps, javaMainActivity);
-
-        // Check that onCreate was added
-        expect(result).toContain('protected void onCreate');
-        expect(result).toContain('super.onCreate(savedInstanceState);');
-        expect(result).toContain('Klaviyo.handlePush(getIntent());');
-        expect(result).toContain('// Tracks when a system tray notification is opened while app is killed');
-      });
-
-      it('injects into existing onCreate in Java MainActivity', () => {
-        const javaMainActivityWithOnCreate = `package com.example.test;
-
-import com.facebook.react.ReactActivity;
-
-public class MainActivity extends ReactActivity {
-  @Override
-  protected void onCreate(android.os.Bundle savedInstanceState) {
-    setTheme(R.style.AppTheme);
-    super.onCreate(savedInstanceState);
-  }
-
-  @Override
-  protected String getMainComponentName() {
-    return "main";
-  }
-}`;
-
-        const result = modifyMainActivity('java', baseProps, javaMainActivityWithOnCreate);
-
-        // Check that Klaviyo.handlePush was injected after super.onCreate
-        expect(result).toContain('super.onCreate(savedInstanceState);');
-        expect(result).toContain('Klaviyo.handlePush(getIntent());');
-        expect(result).toContain('// @generated begin klaviyo-onCreate');
-        expect(result).toContain('// @generated end klaviyo-onCreate');
-
-        // Verify order: super.onCreate should come before Klaviyo.handlePush
-        const superIndex = result.indexOf('super.onCreate(savedInstanceState);');
-        const handlePushIndex = result.indexOf('Klaviyo.handlePush(getIntent());');
-        expect(superIndex).toBeLessThan(handlePushIndex);
-      });
-
-      it('adds onNewIntent method in Java MainActivity', () => {
-        const javaMainActivity = `package com.example.test;
-
-import com.facebook.react.ReactActivity;
-
-public class MainActivity extends ReactActivity {
-  @Override
-  protected String getMainComponentName() {
-    return "main";
-  }
-}`;
-
-        const result = modifyMainActivity('java', baseProps, javaMainActivity);
-
-        // Check that onNewIntent was added
-        expect(result).toContain('@Override');
-        expect(result).toContain('public void onNewIntent(Intent intent)');
-        expect(result).toContain('super.onNewIntent(intent);');
-        expect(result).toContain('Klaviyo.handlePush(intent);');
-        expect(result).toContain('// Tracks when a system tray notification is opened');
-      });
-
-      it('adds required imports in Java MainActivity', () => {
-        const javaMainActivity = `package com.example.test;
-
-import com.facebook.react.ReactActivity;
-
-public class MainActivity extends ReactActivity {
-  @Override
-  protected String getMainComponentName() {
-    return "main";
-  }
-}`;
-
-        const result = modifyMainActivity('java', baseProps, javaMainActivity);
-
-        // Check that imports were added
-        expect(result).toContain('import android.content.Intent;');
-        expect(result).toContain('import com.klaviyo.analytics.Klaviyo;');
-      });
-    });
-
-    describe('Kotlin MainActivity', () => {
-      it('adds onCreate when it does not exist in Kotlin MainActivity', () => {
-        const kotlinMainActivity = `package com.example.test
-
-import com.facebook.react.ReactActivity
-
-class MainActivity : ReactActivity() {
-    override fun getMainComponentName(): String {
-        return "main"
-    }
-}`;
-
-        const result = modifyMainActivity('kt', baseProps, kotlinMainActivity);
-
-        // Check that onCreate was added
-        expect(result).toContain('override fun onCreate');
-        expect(result).toContain('super.onCreate(savedInstanceState)');
-        expect(result).toContain('Klaviyo.handlePush(intent)');
-        expect(result).toContain('// Tracks when a system tray notification is opened while app is killed');
-      });
-
-      it('injects into existing onCreate in Kotlin MainActivity', () => {
-        const kotlinMainActivityWithOnCreate = `package com.example.test
-
-import com.facebook.react.ReactActivity
-import android.os.Bundle
-
-class MainActivity : ReactActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        setTheme(R.style.AppTheme);
-        super.onCreate(savedInstanceState)
-    }
-
-    override fun getMainComponentName(): String {
-        return "main"
-    }
-}`;
-
-        const result = modifyMainActivity('kt', baseProps, kotlinMainActivityWithOnCreate);
-
-        // Check that Klaviyo.handlePush was injected after super.onCreate
-        expect(result).toContain('super.onCreate(savedInstanceState)');
-        expect(result).toContain('// @generated begin klaviyo-onCreate');
-        expect(result).toContain('// @generated end klaviyo-onCreate');
-
-        // Verify order: super.onCreate should come before the onCreate injection block
-        const superIndex = result.indexOf('super.onCreate(savedInstanceState)');
-        const onCreateBlockIndex = result.indexOf('// @generated begin klaviyo-onCreate');
-        expect(superIndex).toBeLessThan(onCreateBlockIndex);
-
-        // Verify the injected call is in the onCreate block (not just in onNewIntent method signature)
-        const onCreateBlock = result.substring(
-          result.indexOf('// @generated begin klaviyo-onCreate'),
-          result.indexOf('// @generated end klaviyo-onCreate')
-        );
-        expect(onCreateBlock).toContain('Klaviyo.handlePush(intent)');
-      });
-
-      it('adds onNewIntent method in Kotlin MainActivity', () => {
-        const kotlinMainActivity = `package com.example.test
-
-import com.facebook.react.ReactActivity
-
-class MainActivity : ReactActivity() {
-    override fun getMainComponentName(): String {
-        return "main"
-    }
-}`;
-
-        const result = modifyMainActivity('kt', baseProps, kotlinMainActivity);
-
-        // Check that onNewIntent was added
-        expect(result).toContain('override fun onNewIntent(intent: Intent)');
-        expect(result).toContain('super.onNewIntent(intent)');
-        expect(result).toContain('Klaviyo.handlePush(intent)');
-        expect(result).toContain('// Tracks when a system tray notification is opened');
-      });
-
-      it('adds required imports in Kotlin MainActivity', () => {
-        const kotlinMainActivity = `package com.example.test
-
-import com.facebook.react.ReactActivity
-
-class MainActivity : ReactActivity() {
-    override fun getMainComponentName(): String {
-        return "main"
-    }
-}`;
-
-        const result = modifyMainActivity('kt', baseProps, kotlinMainActivity);
-
-        // Check that imports were added (Kotlin doesn't use semicolons)
-        expect(result).toContain('import android.content.Intent');
-        expect(result).toContain('import com.klaviyo.analytics.Klaviyo');
-      });
-    });
-
-    describe('openTracking disabled', () => {
-      it('removes onCreate injection when openTracking is disabled', () => {
-        const javaMainActivityWithTracking = `package com.example.test;
-
-import android.content.Intent;
-import com.klaviyo.analytics.Klaviyo;
-import com.facebook.react.ReactActivity;
-
-public class MainActivity extends ReactActivity {
-  // @generated begin klaviyo-imports - expo prebuild (DO NOT MODIFY) sync-hash
-  // @generated end klaviyo-imports
-
-  // @generated begin klaviyo-onNewIntent - expo prebuild (DO NOT MODIFY) sync-hash
-  @Override
-  public void onNewIntent(Intent intent) {
-    super.onNewIntent(intent);
-    Klaviyo.handlePush(intent);
-  }
-  // @generated end klaviyo-onNewIntent
-
-  @Override
-  protected void onCreate(android.os.Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
-    // @generated begin klaviyo-onCreate - expo prebuild (DO NOT MODIFY) sync-klaviyo-oncreate
-    Klaviyo.handlePush(getIntent());
-    // @generated end klaviyo-onCreate
-  }
-}`;
-
-        const disabledProps = createMockProps({ openTracking: false });
-        const result = modifyMainActivity('java', disabledProps, javaMainActivityWithTracking);
-
-        // Check that Klaviyo code was removed
-        expect(result).not.toContain('import android.content.Intent');
-        expect(result).not.toContain('import com.klaviyo.analytics.Klaviyo');
-        expect(result).not.toContain('Klaviyo.handlePush');
-        expect(result).not.toContain('// @generated begin klaviyo-');
-      });
-    });
-
-    describe('idempotency', () => {
-      it('does not duplicate onCreate injection on multiple runs', () => {
-        const javaMainActivityWithOnCreate = `package com.example.test;
-
-import com.facebook.react.ReactActivity;
-
-public class MainActivity extends ReactActivity {
-  @Override
-  protected void onCreate(android.os.Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
-  }
-}`;
-
-        // Run twice
-        const firstRunContent = modifyMainActivity('java', baseProps, javaMainActivityWithOnCreate);
-        const secondRunContent = modifyMainActivity('java', baseProps, firstRunContent);
-
-        // Count occurrences of the injection
-        const handlePushMatches = (secondRunContent.match(/Klaviyo\.handlePush\(getIntent\(\)\);/g) || []).length;
-        expect(handlePushMatches).toBe(1); // Should only appear once
-      });
-    });
-  });
-
-  describe('mutateNotificationManifest', () => {
-    const { mutateNotificationManifest } = require('../plugin/withKlaviyoAndroid');
-    const logger = require('../plugin/support/logger').KlaviyoLog;
-
-    beforeEach(() => {
-      jest.clearAllMocks();
-    });
-
-    it('adds notification icon meta-data when icon path is provided', () => {
-      const config = createMockConfig({
-        modResults: {
-          manifest: {
-            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
-          }
-        }
-      });
-      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: undefined });
-      mutateNotificationManifest(config, props);
-      const metaData = config.modResults.manifest.application[0]['meta-data'];
-      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(true);
-      expect(logger.log).toHaveBeenCalledWith('Adding notification icon meta-data: ./icon.png');
-    });
-
-    it('removes notification icon meta-data when icon path is not provided', () => {
-      const config = createMockConfig({
-        modResults: {
-          manifest: {
-            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_icon' } }] }]
-          }
-        }
-      });
-      const props = createMockProps({ notificationIconFilePath: undefined, notificationColor: undefined });
-      mutateNotificationManifest(config, props);
-      const metaData = config.modResults.manifest.application[0]['meta-data'];
-      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(false);
-      expect(logger.log).toHaveBeenCalledWith('Removing notification icon meta-data');
-    });
-
-    it('does not duplicate icon meta-data if already present', () => {
-      const config = createMockConfig({
-        modResults: {
-          manifest: {
-            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_icon' } }] }]
-          }
-        }
-      });
-      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: undefined });
-      mutateNotificationManifest(config, props);
-      const metaData = config.modResults.manifest.application[0]['meta-data'];
-      expect(metaData.filter(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon').length).toBe(1);
-      expect(logger.log).toHaveBeenCalledWith('Icon meta-data already exists, skipping');
-    });
-
-    it('adds notification color meta-data when color is provided', () => {
-      const config = createMockConfig({
-        modResults: {
-          manifest: {
-            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
-          }
-        }
-      });
-      const props = createMockProps({ notificationIconFilePath: undefined, notificationColor: '#FF0000' });
-      mutateNotificationManifest(config, props);
-      const metaData = config.modResults.manifest.application[0]['meta-data'];
-      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(true);
-      expect(logger.log).toHaveBeenCalledWith('Adding notification color meta-data: #FF0000');
-    });
-
-    it('removes notification color meta-data when color is not provided', () => {
-      const config = createMockConfig({
-        modResults: {
-          manifest: {
-            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_color' } }] }]
-          }
-        }
-      });
-      const props = createMockProps({ notificationIconFilePath: undefined, notificationColor: undefined });
-      mutateNotificationManifest(config, props);
-      const metaData = config.modResults.manifest.application[0]['meta-data'];
-      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(false);
-      expect(logger.log).toHaveBeenCalledWith('Removing notification color meta-data');
-    });
-
-    it('does not duplicate color meta-data if already present', () => {
-      const config = createMockConfig({
-        modResults: {
-          manifest: {
-            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_color' } }] }]
-          }
-        }
-      });
-      const props = createMockProps({ notificationIconFilePath: undefined, notificationColor: '#FF0000' });
-      mutateNotificationManifest(config, props);
-      const metaData = config.modResults.manifest.application[0]['meta-data'];
-      expect(metaData.filter(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color').length).toBe(1);
-      expect(logger.log).toHaveBeenCalledWith('Color meta-data already exists, skipping');
-    });
-
-    it('creates application and meta-data if missing', () => {
-      const config = createMockConfig({
-        modResults: {
-          manifest: {}
-        }
-      });
-      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
-      mutateNotificationManifest(config, props);
-      expect(config.modResults.manifest.application).toBeDefined();
-      expect(config.modResults.manifest.application[0]['meta-data']).toBeDefined();
-      expect(logger.log).toHaveBeenCalledWith('No application tag found, creating one...');
-    });
-
-    it('handles both icon and color meta-data together', () => {
-      const config = createMockConfig({
-        modResults: {
-          manifest: {
-            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
-          }
-        }
-      });
-      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
-      mutateNotificationManifest(config, props);
-      const metaData = config.modResults.manifest.application[0]['meta-data'];
-      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(true);
-      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(true);
-      expect(metaData.length).toBe(2);
-    });
-
-    it('preserves existing meta-data when adding new ones', () => {
-      const config = createMockConfig({
-        modResults: {
-          manifest: {
-            application: [{ 
-              $: { 'android:name': '.MainApplication' }, 
-              'meta-data': [{ $: { 'android:name': 'existing_meta' } }] 
-            }]
-          }
-        }
-      });
-      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
-      mutateNotificationManifest(config, props);
-      const metaData = config.modResults.manifest.application[0]['meta-data'];
-      expect(metaData.some(m => m.$['android:name'] === 'existing_meta')).toBe(true);
-      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(true);
-      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(true);
-      expect(metaData.length).toBe(3);
-    });
-
-    it('handles empty string values for icon path and color', () => {
-      const config = createMockConfig({
-        modResults: {
-          manifest: {
-            application: [{ 
-              $: { 'android:name': '.MainApplication' }, 
-              'meta-data': [
-                { $: { 'android:name': 'com.klaviyo.push.default_notification_icon' } },
-                { $: { 'android:name': 'com.klaviyo.push.default_notification_color' } }
-              ] 
-            }]
-          }
-        }
-      });
-      const props = createMockProps({ notificationIconFilePath: '', notificationColor: '' });
-      mutateNotificationManifest(config, props);
-      const metaData = config.modResults.manifest.application[0]['meta-data'];
-      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(false);
-      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(false);
-      expect(metaData.length).toBe(0);
-    });
-  });
-
   describe('mutateAndroidManifest', () => {
     const { mutateAndroidManifest } = require('../plugin/withKlaviyoAndroid');
     const logger = require('../plugin/support/logger').KlaviyoLog;
@@ -1131,6 +687,367 @@ public class MainActivity extends ReactActivity {
       const metaData = config.modResults.manifest.application[0]['meta-data'];
       expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.core.log_level' && m.$['android:value'] === '1')).toBe(true);
       expect(logger.log).toHaveBeenCalledWith('Setting Klaviyo log level to 1');
+    });
+
+    describe('automaticPushTokenForwarding flag', () => {
+      const TOKEN_FORWARDING_KEY = 'com.klaviyo.push.automatic_push_token_forwarding';
+
+      it('does not inject the flag when automaticPushTokenForwarding is omitted', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps();
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.some(m => m.$['android:name'] === TOKEN_FORWARDING_KEY)).toBe(false);
+      });
+
+      it('does not inject the flag when automaticPushTokenForwarding is true', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps({ automaticPushTokenForwarding: true });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.some(m => m.$['android:name'] === TOKEN_FORWARDING_KEY)).toBe(false);
+      });
+
+      it('injects automatic_push_token_forwarding="false" when set to false (opt-out)', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps({ automaticPushTokenForwarding: false });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        const entry = metaData.find(m => m.$['android:name'] === TOKEN_FORWARDING_KEY);
+        expect(entry).toBeDefined();
+        expect(entry.$['android:value']).toBe('false');
+        expect(logger.log).toHaveBeenCalledWith('Injecting automatic_push_token_forwarding=false (opt-out)');
+      });
+
+      it('removes an existing token forwarding entry when prop is omitted (idempotency)', () => {
+        const config = createMockConfig({
+          modResults: {
+            manifest: {
+              application: [{
+                $: { 'android:name': '.MainApplication' },
+                'meta-data': [{ $: { 'android:name': TOKEN_FORWARDING_KEY, 'android:value': 'false' } }]
+              }]
+            }
+          }
+        });
+        const props = createMockProps();
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.some(m => m.$['android:name'] === TOKEN_FORWARDING_KEY)).toBe(false);
+      });
+
+      it('produces exactly one token forwarding entry on repeated runs (idempotency)', () => {
+        const config = createMockConfig({
+          modResults: {
+            manifest: {
+              application: [{
+                $: { 'android:name': '.MainApplication' },
+                'meta-data': [{ $: { 'android:name': TOKEN_FORWARDING_KEY, 'android:value': 'false' } }]
+              }]
+            }
+          }
+        });
+        const props = createMockProps({ automaticPushTokenForwarding: false });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.filter(m => m.$['android:name'] === TOKEN_FORWARDING_KEY)).toHaveLength(1);
+      });
+    });
+
+    describe('automaticPushOpenTracking flag', () => {
+      const OPEN_TRACKING_KEY = 'com.klaviyo.push.automatic_push_open_tracking';
+
+      // The tests below drive mutateAndroidManifest directly, so they see whatever value is
+      // passed. These two cover what a real app config resolves to via mergeAndroidProps, which
+      // is what determines the flag's actual default.
+      describe('resolved plugin defaults', () => {
+        const { mergeAndroidProps } = require('../plugin/types');
+
+        it('defaults automaticPushOpenTracking to true so upgrades keep tracking opens', () => {
+          expect(mergeAndroidProps({}).automaticPushOpenTracking).toBe(true);
+          expect(mergeAndroidProps(undefined).automaticPushOpenTracking).toBe(true);
+        });
+
+        it('lets an app opt out with false', () => {
+          expect(mergeAndroidProps({ automaticPushOpenTracking: false }).automaticPushOpenTracking).toBe(false);
+        });
+
+        it('injects the flag for a config that does not mention it', () => {
+          const config = createMockConfig({
+            modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+          });
+          mutateAndroidManifest(config, mergeAndroidProps({}));
+          const metaData = config.modResults.manifest.application[0]['meta-data'];
+          const entry = metaData.find((m: { $: Record<string, string> }) => m.$['android:name'] === OPEN_TRACKING_KEY);
+          expect(entry).toBeDefined();
+          expect(entry.$['android:value']).toBe('true');
+        });
+
+        it('omits the flag for a config that opts out', () => {
+          const config = createMockConfig({
+            modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+          });
+          mutateAndroidManifest(config, mergeAndroidProps({ automaticPushOpenTracking: false }));
+          const metaData = config.modResults.manifest.application[0]['meta-data'];
+          expect(metaData.some((m: { $: Record<string, string> }) => m.$['android:name'] === OPEN_TRACKING_KEY)).toBe(false);
+        });
+      });
+
+      it('does not inject the flag when automaticPushOpenTracking is undefined', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps();
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.some(m => m.$['android:name'] === OPEN_TRACKING_KEY)).toBe(false);
+      });
+
+      it('does not inject the flag when automaticPushOpenTracking is false', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps({ automaticPushOpenTracking: false });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.some(m => m.$['android:name'] === OPEN_TRACKING_KEY)).toBe(false);
+      });
+
+      it('injects automatic_push_open_tracking="true" when set to true (opt-in)', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps({ automaticPushOpenTracking: true });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        const entry = metaData.find(m => m.$['android:name'] === OPEN_TRACKING_KEY);
+        expect(entry).toBeDefined();
+        expect(entry.$['android:value']).toBe('true');
+        expect(logger.log).toHaveBeenCalledWith('Injecting automatic_push_open_tracking=true');
+      });
+
+      it('removes an existing open tracking entry when prop is omitted (idempotency)', () => {
+        const config = createMockConfig({
+          modResults: {
+            manifest: {
+              application: [{
+                $: { 'android:name': '.MainApplication' },
+                'meta-data': [{ $: { 'android:name': OPEN_TRACKING_KEY, 'android:value': 'true' } }]
+              }]
+            }
+          }
+        });
+        const props = createMockProps();
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.some(m => m.$['android:name'] === OPEN_TRACKING_KEY)).toBe(false);
+      });
+
+      it('produces exactly one open tracking entry on repeated runs (idempotency)', () => {
+        const config = createMockConfig({
+          modResults: {
+            manifest: {
+              application: [{
+                $: { 'android:name': '.MainApplication' },
+                'meta-data': [{ $: { 'android:name': OPEN_TRACKING_KEY, 'android:value': 'true' } }]
+              }]
+            }
+          }
+        });
+        const props = createMockProps({ automaticPushOpenTracking: true });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.filter(m => m.$['android:name'] === OPEN_TRACKING_KEY)).toHaveLength(1);
+      });
+
+      it('injects both flags independently when both are set', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps({ automaticPushTokenForwarding: false, automaticPushOpenTracking: true });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        const tokenEntry = metaData.find(m => m.$['android:name'] === 'com.klaviyo.push.automatic_push_token_forwarding');
+        const openEntry = metaData.find(m => m.$['android:name'] === OPEN_TRACKING_KEY);
+        expect(tokenEntry?.$['android:value']).toBe('false');
+        expect(openEntry?.$['android:value']).toBe('true');
+      });
+    });
+  });
+
+  describe('mutateNotificationManifest', () => {
+    const { mutateNotificationManifest } = require('../plugin/withKlaviyoAndroid');
+    const logger = require('../plugin/support/logger').KlaviyoLog;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('adds notification icon meta-data when icon path is provided', () => {
+      const config = createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
+          }
+        }
+      });
+      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: undefined });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(true);
+      expect(logger.log).toHaveBeenCalledWith('Adding notification icon meta-data: ./icon.png');
+    });
+
+    it('removes notification icon meta-data when icon path is not provided', () => {
+      const config = createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_icon' } }] }]
+          }
+        }
+      });
+      const props = createMockProps({ notificationIconFilePath: undefined, notificationColor: undefined });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(false);
+      expect(logger.log).toHaveBeenCalledWith('Removing notification icon meta-data');
+    });
+
+    it('does not duplicate icon meta-data if already present', () => {
+      const config = createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_icon' } }] }]
+          }
+        }
+      });
+      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: undefined });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.filter(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon').length).toBe(1);
+      expect(logger.log).toHaveBeenCalledWith('Icon meta-data already exists, skipping');
+    });
+
+    it('adds notification color meta-data when color is provided', () => {
+      const config = createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
+          }
+        }
+      });
+      const props = createMockProps({ notificationIconFilePath: undefined, notificationColor: '#FF0000' });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(true);
+      expect(logger.log).toHaveBeenCalledWith('Adding notification color meta-data: #FF0000');
+    });
+
+    it('removes notification color meta-data when color is not provided', () => {
+      const config = createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_color' } }] }]
+          }
+        }
+      });
+      const props = createMockProps({ notificationIconFilePath: undefined, notificationColor: undefined });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(false);
+      expect(logger.log).toHaveBeenCalledWith('Removing notification color meta-data');
+    });
+
+    it('does not duplicate color meta-data if already present', () => {
+      const config = createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [{ $: { 'android:name': 'com.klaviyo.push.default_notification_color' } }] }]
+          }
+        }
+      });
+      const props = createMockProps({ notificationIconFilePath: undefined, notificationColor: '#FF0000' });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.filter(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color').length).toBe(1);
+      expect(logger.log).toHaveBeenCalledWith('Color meta-data already exists, skipping');
+    });
+
+    it('creates application and meta-data if missing', () => {
+      const config = createMockConfig({
+        modResults: {
+          manifest: {}
+        }
+      });
+      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
+      mutateNotificationManifest(config, props);
+      expect(config.modResults.manifest.application).toBeDefined();
+      expect(config.modResults.manifest.application[0]['meta-data']).toBeDefined();
+      expect(logger.log).toHaveBeenCalledWith('No application tag found, creating one...');
+    });
+
+    it('handles both icon and color meta-data together', () => {
+      const config = createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }]
+          }
+        }
+      });
+      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(true);
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(true);
+      expect(metaData.length).toBe(2);
+    });
+
+    it('preserves existing meta-data when adding new ones', () => {
+      const config = createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ 
+              $: { 'android:name': '.MainApplication' }, 
+              'meta-data': [{ $: { 'android:name': 'existing_meta' } }] 
+            }]
+          }
+        }
+      });
+      const props = createMockProps({ notificationIconFilePath: './icon.png', notificationColor: '#FF0000' });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'existing_meta')).toBe(true);
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(true);
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(true);
+      expect(metaData.length).toBe(3);
+    });
+
+    it('handles empty string values for icon path and color', () => {
+      const config = createMockConfig({
+        modResults: {
+          manifest: {
+            application: [{ 
+              $: { 'android:name': '.MainApplication' }, 
+              'meta-data': [
+                { $: { 'android:name': 'com.klaviyo.push.default_notification_icon' } },
+                { $: { 'android:name': 'com.klaviyo.push.default_notification_color' } }
+              ] 
+            }]
+          }
+        }
+      });
+      const props = createMockProps({ notificationIconFilePath: '', notificationColor: '' });
+      mutateNotificationManifest(config, props);
+      const metaData = config.modResults.manifest.application[0]['meta-data'];
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_icon')).toBe(false);
+      expect(metaData.some(m => m.$['android:name'] === 'com.klaviyo.push.default_notification_color')).toBe(false);
+      expect(metaData.length).toBe(0);
     });
   });
 
