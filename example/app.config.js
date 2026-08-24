@@ -2,7 +2,7 @@ module.exports = () => {
   return {
     name: 'klaviyo plugin example',
     slug: 'klaviyo-plugin-example',
-    version: '0.4.0',
+    version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'expoexample',
@@ -38,7 +38,7 @@ module.exports = () => {
         {
           android: {
             logLevel: 1,
-            openTracking: true,
+            automaticPushOpenTracking: true,
             notificationIconFilePath: './assets/images/ic_notification.png',
             notificationColor: '#FF0000',
             geofencingEnabled: true,
