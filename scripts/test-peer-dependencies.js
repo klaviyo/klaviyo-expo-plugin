@@ -4,16 +4,18 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// Test matrix - same as CI
+// Test matrix - same as CI.
+// Each row is a real Expo SDK pairing from https://api.expo.dev/v2/versions/latest
+// (facebookReactNativeVersion / facebookReactVersion). Do not hand-edit these to
+// arbitrary versions: a combination Expo never shipped tests nothing a customer can hit.
+// The supported range is documented in README.md; this matrix is a subset of it.
 const testMatrix = [
-  // React 18.x with various React Native versions
-  { react: "18.1.0", reactNative: "0.70.0", expo: "~48.0.0" },
-  { react: "18.2.0", reactNative: "0.71.0", expo: "~49.0.0" },
-  { react: "18.2.0", reactNative: "0.72.0", expo: "~50.0.0" },
-  { react: "18.2.0", reactNative: "0.73.0", expo: "~51.0.0" },
-  // React 19.x with various React Native versions
-  { react: "19.0.0", reactNative: "0.79.0", expo: "~52.0.0" },
-  { react: "19.1.0", reactNative: "0.80.0", expo: "~53.0.0" },
+  { react: "18.3.1", reactNative: "0.76.9",  expo: "~52.0.0" },
+  { react: "19.0.0", reactNative: "0.79.6",  expo: "~53.0.0" },
+  { react: "19.1.0", reactNative: "0.81.5",  expo: "~54.0.0" },
+  { react: "19.2.0", reactNative: "0.83.10", expo: "~55.0.0" },
+  { react: "19.2.3", reactNative: "0.85.3",  expo: "~56.0.0" },
+  { react: "19.2.3", reactNative: "0.86.3",  expo: "~57.0.0" },
 ];
 
 function runCommand(command, description) {

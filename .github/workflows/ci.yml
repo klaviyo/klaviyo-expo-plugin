@@ -64,31 +64,35 @@ jobs:
     
     strategy:
       matrix:
+        # Real Expo SDK pairings from https://api.expo.dev/v2/versions/latest
+        # (facebookReactNativeVersion / facebookReactVersion). Do not substitute
+        # arbitrary versions: a combination Expo never shipped tests nothing a
+        # customer can hit. The supported range is documented in README.md.
         include:
-          # Test React 18.x with React Native 0.70.x
-          - react-version: "18.1.0"
-            react-native-version: "0.70.0"
-            expo-version: "~48.0.0"
-          # Test React 18.x with React Native 0.71.x
-          - react-version: "18.2.0"
-            react-native-version: "0.71.0"
-            expo-version: "~49.0.0"
-          # Test React 18.x with React Native 0.72.x
-          - react-version: "18.2.0"
-            react-native-version: "0.72.0"
-            expo-version: "~50.0.0"
-          # Test React 18.x with React Native 0.73.x
-          - react-version: "18.2.0"
-            react-native-version: "0.73.0"
-            expo-version: "~51.0.0"
-          # Test React 19.x with React Native 0.79.x
-          - react-version: "19.0.0"
-            react-native-version: "0.79.0"
+          # Expo SDK 52
+          - react-version: "18.3.1"
+            react-native-version: "0.76.9"
             expo-version: "~52.0.0"
-          # Test React 19.x with React Native 0.80.x
-          - react-version: "19.1.0"
-            react-native-version: "0.80.0"
+          # Expo SDK 53
+          - react-version: "19.0.0"
+            react-native-version: "0.79.6"
             expo-version: "~53.0.0"
+          # Expo SDK 54
+          - react-version: "19.1.0"
+            react-native-version: "0.81.5"
+            expo-version: "~54.0.0"
+          # Expo SDK 55
+          - react-version: "19.2.0"
+            react-native-version: "0.83.10"
+            expo-version: "~55.0.0"
+          # Expo SDK 56
+          - react-version: "19.2.3"
+            react-native-version: "0.85.3"
+            expo-version: "~56.0.0"
+          # Expo SDK 57
+          - react-version: "19.2.3"
+            react-native-version: "0.86.3"
+            expo-version: "~57.0.0"
     
     steps:
     - name: Checkout code
