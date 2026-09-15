@@ -1,4 +1,4 @@
-import { ConfigPlugin, withPlugins, withDangerousMod, withEntitlementsPlist, withInfoPlist, withXcodeProject } from '@expo/config-plugins';
+import { ConfigPlugin, IOSConfig, withPlugins, withDangerousMod, withEntitlementsPlist, withInfoPlist, withXcodeProject } from '@expo/config-plugins';
 import { KlaviyoPluginIosProps } from './types';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -6,15 +6,14 @@ import { FileManager } from './support/fileManager';
 import { KlaviyoLog } from './support/logger';
 import { getPluginRoot } from './support/pluginResolver';
 
-/** Get marketing version (CFBundleShortVersionString / MARKETING_VERSION) from Expo config. */
-function getMarketingVersion(config: { version?: string }): string {
-  return config.version ?? '1.0';
-}
-
-/** Get build number (CFBundleVersion / CURRENT_PROJECT_VERSION) from Expo config. */
-function getBuildNumber(config: { ios?: { buildNumber?: string } }): string {
-  return config.ios?.buildNumber ?? '1';
-}
+/**
+ * Version helpers come straight from @expo/config-plugins rather than being reimplemented here.
+ * The notification service extension must report the same CFBundleShortVersionString as the host
+ * app — App Store validation rejects a mismatch — and the host app's value is written by Expo's
+ * own withVersion/withBuildNumber using exactly these functions.
+ */
+const getMarketingVersion = IOSConfig.Version.getVersion;
+const getBuildNumber = IOSConfig.Version.getBuildNumber;
 
 const withKlaviyoIos: ConfigPlugin<KlaviyoPluginIosProps> = (config, props) => {
   KlaviyoLog.log('Starting iOS plugin configuration...');
@@ -64,62 +63,35 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
       fs.copyFileSync(srcPlistPath, destPlistPath);
       KlaviyoLog.log(`Copied klaviyo-plugin-configuration.plist to ${destPlistPath}`);
 
-      // Get the main group
       const mainGroupId = xcodeProject.findPBXGroupKey({ name: projectName });
-      
       if (!mainGroupId) {
-        KlaviyoLog.log(`Could not find main group for project ${projectName}, skipping Xcode project modification`);
+        KlaviyoLog.warn(
+          `Could not find the Xcode group for ${projectName}. klaviyo-plugin-configuration.plist ` +
+            'was not added to the app bundle, so the Klaviyo SDK cannot report the plugin version.'
+        );
         return config;
       }
 
-      // Add the file to the Xcode project
-      const fileRef = xcodeProject.addFile(
-        destPlistPath,
-        mainGroupId,
-        { target: xcodeProject.getFirstTarget().uuid }
-      );
+      const fileRef = xcodeProject.addFile(destPlistPath, mainGroupId, {
+        target: xcodeProject.getFirstTarget().uuid,
+      });
 
       if (!fileRef) {
-        KlaviyoLog.log('Failed to add file to Xcode project');
-        return config;
-      }
-
-      // Add the file to the "Copy Bundle Resources" build phase
-      const target = xcodeProject.getFirstTarget();
-      if (!target) {
-        KlaviyoLog.log('Could not find target, skipping build phase modification');
-        return config;
-      }
-
-      // Find or create the Copy Bundle Resources build phase
-      let buildPhase = xcodeProject.buildPhaseObject(
-        target.uuid,
-        'PBXResourcesBuildPhase'
-      );
-
-      if (buildPhase) {
-        // Add the file as a resource
-        xcodeProject.addResourceFile(destPlistPath, { target: target.uuid });
-        KlaviyoLog.log('Added klaviyo-plugin-configuration.plist to Xcode project');
-
-        // Ensure the file is included in the build phase
-        const buildPhaseFiles = buildPhase.files || [];
-        const fileRefId = fileRef.fileRef;
-        
-        // Check if the file is already in the build phase
-        const fileAlreadyInBuildPhase = buildPhaseFiles.some(
-          (file: any) => file.fileRef === fileRefId
+        KlaviyoLog.warn(
+          'Could not add klaviyo-plugin-configuration.plist to the Xcode project. ' +
+            'The Klaviyo SDK will not be able to report the Expo plugin version.'
         );
-
-        if (!fileAlreadyInBuildPhase) {
-          // Add the file to the build phase
-          xcodeProject.addToPbxBuildFileSection(fileRef);
-          xcodeProject.addToPbxResourcesBuildPhase(fileRef);
-          KlaviyoLog.log('Added klaviyo-plugin-configuration.plist to Copy Bundle Resources build phase');
-        }
-      } else {
-        KlaviyoLog.log('Failed to create or find Copy Bundle Resources build phase');
+        return config;
       }
+
+      // addFile creates the PBXFileReference but does not put the file in a build phase.
+      // xcode's own addResourceFile cannot be used here: it calls correctForResourcesPath,
+      // which dereferences a group named 'Resources' that Expo-generated projects do not have.
+      // These two calls are what actually place the plist in Copy Bundle Resources, so that
+      // it ships inside the built .app and the SDK can read the plugin version at runtime.
+      xcodeProject.addToPbxBuildFileSection(fileRef);
+      xcodeProject.addToPbxResourcesBuildPhase(fileRef);
+      KlaviyoLog.log('Added klaviyo-plugin-configuration.plist to Copy Bundle Resources');
     } else {
       KlaviyoLog.log(`Source plist not found at ${srcPlistPath}`);
     }
@@ -153,8 +125,10 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
     const actualAppGroupName = `group.${bundleIdentifier}.${NSE_TARGET_NAME}.shared`;
     infoPlist.klaviyo_app_group = actualAppGroupName;
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
-    infoPlist.CFBundleShortVersionString = getMarketingVersion(config);
-    infoPlist.CFBundleVersion = getBuildNumber(config);
+    // Deliberately NOT writing CFBundleShortVersionString / CFBundleVersion here. This mod runs
+    // against the host app's Info.plist, and Expo's own withVersion/withBuildNumber already set
+    // both keys with fuller precedence (config.ios.version first). Writing them here overwrote
+    // the app author's `ios.version` with the top-level `version` on every prebuild.
 
     // Manage klaviyo_automatic_push_token_forwarding flag (opt-in; native iOS defaults to OFF).
     // Write only when true; remove the key when omitted so the native default applies.
@@ -277,7 +251,7 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
         const podInsertion = `
   target 'KlaviyoNotificationServiceExtension' do
     ${usesFrameworks ? `use_frameworks!${linkageType ? ` :linkage => ${linkageType}` : ''}` : ''}
-    pod 'KlaviyoSwiftExtension'
+    pod 'KlaviyoSwiftExtension', '~> 5.0'
   end
   `;
         if (!podfile.includes("pod 'KlaviyoSwiftExtension'")) {

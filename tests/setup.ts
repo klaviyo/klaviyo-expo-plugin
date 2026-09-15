@@ -26,6 +26,13 @@ jest.mock('glob', () => ({
 
 // Mock @expo/config-plugins
 jest.mock('@expo/config-plugins', () => ({
+  // Real implementation: withKlaviyoIos delegates version resolution to Expo rather
+  // than reimplementing it, so the tests must exercise Expo's actual functions.
+  IOSConfig: {
+    // Narrow requireActual: the full barrel pulls in modules that need the unmocked fs.
+    // withKlaviyoIos delegates version resolution to Expo, so tests must run the real thing.
+    Version: jest.requireActual('@expo/config-plugins/build/ios/Version'),
+  },
   AndroidConfig: {
     Colors: {
       // Pure function: set or remove a color entry by name
