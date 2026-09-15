@@ -20,7 +20,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22.x'
+        node-version-file: .nvmrc
         cache: 'npm'
         
     - name: Install dependencies
@@ -111,7 +111,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22.x'
+        node-version-file: .nvmrc
 
     - name: Install dependencies with specific peer dependency versions
       # Deliberately NOT `npm ci` first, and deliberately --no-package-lock.
@@ -170,7 +170,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22.x'
+        node-version-file: .nvmrc
         cache: 'npm'
         
     - name: Install dependencies
