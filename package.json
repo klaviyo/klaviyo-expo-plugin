@@ -55,6 +55,9 @@
     "react-native": ">=0.70.0 <1.0.0"
   },
   "peerDependenciesMeta": {
+    "expo": {
+      "optional": true
+    },
     "expo-location": {
       "optional": true
     }

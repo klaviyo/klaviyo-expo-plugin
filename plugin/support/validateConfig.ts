@@ -1,6 +1,7 @@
 import { KlaviyoPluginProps } from '../types';
 import * as fs from 'fs';
 import * as path from 'path';
+import { KlaviyoLog } from './logger';
 
 export class KlaviyoConfigError extends Error {
   constructor(message: string) {
@@ -84,8 +85,8 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
   // Warn if deprecated version props are used (deprecated in 0.3.0; use Expo-level build numbers instead)
   const configWithExtras = config as unknown as Record<string, unknown>;
   if (configWithExtras.projectVersion != null || configWithExtras.marketingVersion != null) {
-    console.warn(
-      '\tWARNING: klaviyo-expo-plugin: projectVersion and marketingVersion are deprecated in 0.3.0 and are ignored. Use Expo-level version and ios.buildNumber the app config instead.'
+    KlaviyoLog.warn(
+      'projectVersion and marketingVersion are deprecated in 0.3.0 and are ignored. Use Expo-level version and ios.buildNumber the app config instead.'
     );
   }
 
