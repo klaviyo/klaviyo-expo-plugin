@@ -105,9 +105,23 @@ jobs:
         cache: 'npm'
         
     - name: Install dependencies with specific peer dependency versions
+      # Deliberately NOT `npm ci` first, and deliberately --no-package-lock.
+      # The committed lock pins the Expo 57 graph. Installing an older pairing on top
+      # of it retains @expo/router-server@57, whose optional peer on
+      # @expo/metro-runtime "^57.0.15" makes npm resolve that package fresh. It in
+      # turn optionally peers react-dom "*", which resolves to latest, and that
+      # react-dom requires a react the pairing does not have:
+      #
+      #   @expo/router-server@57.0.9 -> @expo/metro-runtime@57.0.15
+      #     -> react-dom@19.3.0 -> peer react@^19.3.0   vs   react@18.3.1
+      #
+      # Note @expo/metro-runtime is never itself an entry in the lock; it is pulled in
+      # only to satisfy that peer. Ignoring the lock drops the Expo 57 graph, so
+      # nothing requires it or react-dom - which is what a real consumer on that SDK
+      # gets. Lock integrity is still enforced by the lint-and-type-check, test, and
+      # build jobs, which all use npm ci.
       run: |
-        npm ci
-        npm install --no-save react@${{ matrix.react-version }} react-native@${{ matrix.react-native-version }} expo@${{ matrix.expo-version }}
+        npm install --no-save --no-package-lock react@${{ matrix.react-version }} react-native@${{ matrix.react-native-version }} expo@${{ matrix.expo-version }}
         
     - name: Run tests with specific versions
       run: |

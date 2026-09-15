@@ -35,7 +35,14 @@ function testWithVersions(reactVersion, reactNativeVersion, expoVersion) {
   console.log('='.repeat(80));
   
   // Install specific versions
-  const installCommand = `npm install --no-save react@${reactVersion} react-native@${reactNativeVersion} expo@${expoVersion}`;
+  // --no-package-lock is required: the committed lock pins the Expo 57 graph, and
+  // installing an older pairing on top of it retains @expo/router-server@57, whose
+  // optional peer on @expo/metro-runtime "^57.0.15" makes npm resolve that package
+  // fresh (it is never itself in the lock). That package optionally peers
+  // react-dom "*" -> react-dom@19.3.0 -> peer react@^19.3.0, which conflicts with
+  // the older react in the pairing. Ignoring the lock drops the Expo 57 graph, so
+  // nothing pulls either package in - the way a real consumer on that SDK resolves.
+  const installCommand = `npm install --no-save --no-package-lock react@${reactVersion} react-native@${reactNativeVersion} expo@${expoVersion}`;
   if (!runCommand(installCommand, `Installing React ${reactVersion}, React Native ${reactNativeVersion}, Expo ${expoVersion}`)) {
     return false;
   }
