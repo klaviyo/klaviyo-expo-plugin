@@ -18,11 +18,6 @@ the plugin does not generate**, pass `--no-clean` to get the previous additive b
 npx expo prebuild --no-clean
 ```
 
-> **Note:** On a git working tree with uncommitted changes, `prebuild` asks you to confirm before it
-> continues. Set `EXPO_NO_GIT_STATUS=1` to skip that prompt in CI:
-> ```bash
-> EXPO_NO_GIT_STATUS=1 npx expo prebuild
-> ```
 
 See [Requirements](./README.md#requirements) for the Expo, iOS, and Android versions this release
 supports, and for the Expo SDK versions verified by a full native build.

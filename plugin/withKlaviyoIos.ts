@@ -72,6 +72,14 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
         return config;
       }
 
+      // addFile returns null when the path is already registered, which is the normal
+      // case on a non-clean prebuild. Treat that as a no-op rather than a failure —
+      // warning there would fire on every incremental rebuild.
+      if (xcodeProject.hasFile(destPlistPath)) {
+        KlaviyoLog.log('klaviyo-plugin-configuration.plist is already in the Xcode project');
+        return config;
+      }
+
       const fileRef = xcodeProject.addFile(destPlistPath, mainGroupId, {
         target: xcodeProject.getFirstTarget().uuid,
       });
@@ -99,6 +107,8 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
     return config;
   });
 };
+
+const NSE_POD_DECLARATION = "pod 'KlaviyoSwiftExtension', '~> 5.0'";
 
 const NSE_TARGET_NAME = "KlaviyoNotificationServiceExtension";
 const NSE_EXT_FILES = [
@@ -251,12 +261,24 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
         const podInsertion = `
   target 'KlaviyoNotificationServiceExtension' do
     ${usesFrameworks ? `use_frameworks!${linkageType ? ` :linkage => ${linkageType}` : ''}` : ''}
-    pod 'KlaviyoSwiftExtension', '~> 5.0'
+    ${NSE_POD_DECLARATION}
   end
   `;
-        if (!podfile.includes("pod 'KlaviyoSwiftExtension'")) {
-          const updatedPodfile = `${podfile}\n${podInsertion}`;
-          await FileManager.writeFile(`${iosRoot}/Podfile`, updatedPodfile);
+        // Match the pod name with an optional version argument, so an existing
+        // UNPINNED declaration written by an older plugin version gets upgraded to the
+        // pinned one. A plain substring check would match both forms and silently
+        // leave upgrading consumers on an unconstrained pod.
+        const nsePodDeclaration = /pod\s+'KlaviyoSwiftExtension'(?:\s*,\s*'[^']*')?/;
+        const existing = podfile.match(nsePodDeclaration);
+
+        if (!existing) {
+          await FileManager.writeFile(`${iosRoot}/Podfile`, `${podfile}\n${podInsertion}`);
+        } else if (existing[0] !== NSE_POD_DECLARATION) {
+          KlaviyoLog.log(`Updating Podfile: ${existing[0]} -> ${NSE_POD_DECLARATION}`);
+          await FileManager.writeFile(
+            `${iosRoot}/Podfile`,
+            podfile.replace(nsePodDeclaration, NSE_POD_DECLARATION)
+          );
         }
       } catch (err) {
         KlaviyoLog.log('Could not write Klaviyo changes to Podfile: ' + err);

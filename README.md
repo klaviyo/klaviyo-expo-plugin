@@ -126,7 +126,6 @@ npx expo prebuild
 > npx expo prebuild --no-clean
 > ```
 >
-> On a git working tree with uncommitted changes, `prebuild` asks you to confirm before it continues. Set `EXPO_NO_GIT_STATUS=1` to skip that prompt (for example, in CI).
 
 4. (optional) We recommend using the `expo-notifications` library for push permissions, token retrieval, and reading push content. Check out our `/example` project for some ideas on how to use this.
 
