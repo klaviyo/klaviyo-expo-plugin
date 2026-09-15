@@ -54,12 +54,12 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 | `49.x` and older | **Not supported** | Builds, but push silently never works — see below |
 | `50.x` | **Not supported** | Fails to build on both platforms |
 | `51.x` | **Not supported** | Fails to build on both platforms |
-| `52.0.49` | Not supported; covered by CI | Compiled and launched, iOS + Android |
-| `53.0.27` | Not supported; covered by CI | Compiled and launched, iOS + Android |
-| `54.0.37` | **Supported** | Compiled and launched, iOS + Android |
-| `55.0.31` | **Supported** | Compiled and launched, iOS + Android |
-| `56.0.21` | **Supported** | Compiled and launched, iOS + Android |
-| `57.0.21` | **Supported** (primary target) | Compiled and launched, iOS + Android |
+| `52.0.x` | Not supported; covered by CI | Compiled and launched, iOS + Android |
+| `53.0.x` | Not supported; covered by CI | Compiled and launched, iOS + Android |
+| `54.0.x` | **Supported** | Compiled and launched, iOS + Android |
+| `55.0.x` | **Supported** | Compiled and launched, iOS + Android |
+| `56.0.x` | **Supported** | Compiled and launched, iOS + Android |
+| `57.0.x` | **Supported** (primary target) | Compiled and launched, iOS + Android |
 
 > **Why older SDKs are unsupported.** **SDK 50 and 51:** `klaviyo-react-native-sdk` pulls `klaviyo-android-sdk`, which strictly requires `androidx.core` 1.16.0 — that needs compileSdk 35 and Android Gradle Plugin 8.6, while SDK 50 and 51 ship compileSdk 34 and AGP 8.1–8.2. No Android build is possible on those SDKs, and no plugin setting avoids it. **SDK 49 and older:** Expo autolinking in those versions does not understand the `apple` platform key this plugin uses, so its native iOS module is dropped without any error. Prebuild succeeds and the app builds, but push notification handling is never installed. Use SDK 54 or newer.
 
