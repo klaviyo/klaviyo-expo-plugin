@@ -2,6 +2,31 @@
 
 This guide outlines how to migrate when upgrading to newer versions of the Klaviyo Expo plugin.
 
+## Migrating to v1.1.0
+
+### Expo SDK 57: `expo prebuild` erases the native folders
+
+No plugin props change in v1.1.0. What changes is Expo itself. From Expo SDK 57, `npx expo prebuild`
+deletes the `ios/` and `android/` folders and generates them again on every run, where it used to
+write on top of whatever was already there. It preserves nothing — not gitignored files, not `Pods/`,
+not your `.xcworkspace`.
+
+**If you keep hand-written native code, a checked-in `ios/` or `android/` folder, or anything else
+the plugin does not generate**, pass `--no-clean` to get the previous additive behavior:
+
+```bash
+npx expo prebuild --no-clean
+```
+
+> **Note:** On a git working tree with uncommitted changes, `prebuild` asks you to confirm before it
+> continues. Set `EXPO_NO_GIT_STATUS=1` to skip that prompt in CI:
+> ```bash
+> EXPO_NO_GIT_STATUS=1 npx expo prebuild
+> ```
+
+See [Requirements](./README.md#requirements) for the Expo, iOS, and Android versions this release
+supports, and for the Expo SDK versions verified by a full native build.
+
 ## Migrating to v1.0.0
 
 ### `android.openTracking` removed
