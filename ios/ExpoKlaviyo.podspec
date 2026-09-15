@@ -11,7 +11,7 @@ Pod::Spec.new do |s|
   s.author         = package['author']
   s.homepage       = 'https://github.com/klaviyo/klaviyo-expo-plugin'
   s.platforms      = {
-    :ios => '12'
+    :ios => '15.1'
   }
   s.swift_version  = '5'
   s.source         = { git: 'https://github.com/klaviyo/klaviyo-expo-plugin.git', tag: s.version.to_s }
@@ -19,13 +19,13 @@ Pod::Spec.new do |s|
 
   s.dependency 'ExpoModulesCore'
   s.dependency 'React-Core'
-  s.dependency 'KlaviyoSwift'
+  s.dependency 'KlaviyoSwift', '~> 5.0'
 
   # Conditional location dependency based on environment variable
   # Default is FALSE (opt-in for geofencing)
   include_location = ENV['KLAVIYO_INCLUDE_LOCATION'] == 'true'
   if include_location
-    s.dependency 'KlaviyoLocation'
+    s.dependency 'KlaviyoLocation', '~> 5.0'
   end
 
   # Swift/Objective-C compatibility
