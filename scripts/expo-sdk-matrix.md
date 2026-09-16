@@ -6,6 +6,9 @@ tested against. Both consumers read it directly, so the matrix cannot drift betw
 - `.github/workflows/ci.yml` — the `sdk-matrix` job emits it and `test-peer-dependencies`
   consumes it via `fromJSON`.
 - `scripts/test-peer-dependencies.js` — requires it for the same run locally.
+- `scripts/test-packed-consumer.js` — installs the packed plugin into a throwaway Expo app
+  per row and runs a real `expo prebuild`, which is the only check here that exercises the
+  graph a consumer actually gets rather than this repository's hoisted, partly-mocked tree.
 
 ## Fields
 

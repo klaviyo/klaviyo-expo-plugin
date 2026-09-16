@@ -174,6 +174,17 @@ jobs:
         echo "Building with React $REACT_VERSION, React Native $REACT_NATIVE_VERSION, Expo $EXPO_VERSION"
         npm run build
 
+    # The steps above install each pairing into THIS repository, where package.json pins
+    # @expo/config-plugins exactly and tests/setup.ts mocks most of it - so jest and tsc can
+    # pass while exercising our mocks rather than the graph a consumer gets. This installs the
+    # PACKED plugin into a throwaway app, lets Expo supply its own config-plugins, and runs a
+    # real prebuild. Every consumer-facing defect in the SDK 54->57 upgrade was invisible to
+    # the unit suite and caught by hand; this is what closes that gap.
+    - name: Prebuild the packed plugin in a throwaway consumer
+      env:
+        SDK: ${{ matrix.sdk }}
+      run: npm run test:packed-consumer -- --sdk "$SDK"
+
     # Only fires for unsupported rows, whose failures are otherwise invisible in the PR
     # check summary because continue-on-error marks the job green.
     - name: Surface an unsupported-SDK failure
