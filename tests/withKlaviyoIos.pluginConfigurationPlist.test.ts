@@ -194,8 +194,6 @@ describe('withKlaviyoPluginConfigurationPlist (real xcode project)', () => {
   });
 
   it('is idempotent: running twice does not add a second reference', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const xcode = require('xcode');
     const { project, tmp } = await runPlistMod();
 
     const countRefs = (p: any) =>

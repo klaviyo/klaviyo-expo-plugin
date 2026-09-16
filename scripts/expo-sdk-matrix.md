@@ -14,9 +14,17 @@ tested against. Both consumers read it directly, so the matrix cannot drift betw
 | `sdk` | Expo SDK major, used for job names |
 | `react` / `reactNative` | The versions Expo actually ships with that SDK |
 | `expo` | The range to install |
+| `configPlugins` | The `@expo/config-plugins` range that Expo SDK actually depends on |
 | `supported` | Whether README declares this SDK supported. Drives `continue-on-error` in CI: `false` rows report failures without gating the merge. |
 
 ## Rules
+
+**`configPlugins` must be installed alongside `expo`, or the leg tests nothing.**
+`package.json` pins `@expo/config-plugins` exactly as a devDependency, and that pin wins the
+root hoist. Installing `expo@~54.0.0` alone leaves config-plugins at the pinned version, so the
+plugin under test still resolves the newest one and the SDK 54 leg silently validates the wrong
+pairing. Take the value from `npm view expo@<version> dependencies` - note SDK 52 and 53 predate
+unified versioning and use the `9.x`/`10.x` lines rather than matching the SDK major.
 
 **Use only real Expo-shipped pairings.** Take `react` and `reactNative` from
 `https://api.expo.dev/v2/versions/latest` (`facebookReactVersion` /

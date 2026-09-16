@@ -1,5 +1,10 @@
 name: CI
 
+# Least privilege. Without this block every job inherits the default token scopes;
+# nothing in this workflow writes to the repo, so read is enough.
+permissions:
+  contents: read
+
 on:
   pull_request:
   # The test-peer-dependencies legs install without a lockfile on purpose, so they exist to
@@ -135,27 +140,50 @@ jobs:
       # transitive release anywhere in the Expo graph can turn a leg red with no change in
       # this repo. That is the intended trade - we want to find out - but if a leg goes red
       # and git blame shows nothing, suspect an upstream publish before your own diff.
+      env:
+        REACT_VERSION: ${{ matrix.react }}
+        REACT_NATIVE_VERSION: ${{ matrix.reactNative }}
+        EXPO_VERSION: ${{ matrix.expo }}
+        CONFIG_PLUGINS_VERSION: ${{ matrix.configPlugins }}
       run: |
-        npm install --no-save --no-package-lock react@${{ matrix.react }} react-native@${{ matrix.reactNative }} expo@${{ matrix.expo }}
+        # @expo/config-plugins must be installed explicitly. package.json pins it exactly
+        # as a devDependency and that pin wins the root hoist, so installing expo alone
+        # leaves the plugin resolving the newest config-plugins and the leg validates the
+        # wrong pairing.
+        npm install --no-save --no-package-lock \
+          "react@$REACT_VERSION" \
+          "react-native@$REACT_NATIVE_VERSION" \
+          "expo@$EXPO_VERSION" \
+          "@expo/config-plugins@$CONFIG_PLUGINS_VERSION"
 
     - name: Run tests with specific versions
+      env:
+        REACT_VERSION: ${{ matrix.react }}
+        REACT_NATIVE_VERSION: ${{ matrix.reactNative }}
+        EXPO_VERSION: ${{ matrix.expo }}
       run: |
-        echo "Testing with React ${{ matrix.react }}, React Native ${{ matrix.reactNative }}, Expo ${{ matrix.expo }}"
+        echo "Testing with React $REACT_VERSION, React Native $REACT_NATIVE_VERSION, Expo $EXPO_VERSION"
         npm test
 
     - name: Build with specific versions
+      env:
+        REACT_VERSION: ${{ matrix.react }}
+        REACT_NATIVE_VERSION: ${{ matrix.reactNative }}
+        EXPO_VERSION: ${{ matrix.expo }}
       run: |
-        echo "Building with React ${{ matrix.react }}, React Native ${{ matrix.reactNative }}, Expo ${{ matrix.expo }}"
+        echo "Building with React $REACT_VERSION, React Native $REACT_NATIVE_VERSION, Expo $EXPO_VERSION"
         npm run build
 
     # Only fires for unsupported rows, whose failures are otherwise invisible in the PR
     # check summary because continue-on-error marks the job green.
     - name: Surface an unsupported-SDK failure
       if: failure() && !matrix.supported
+      env:
+        SDK: ${{ matrix.sdk }}
       run: |
-        echo "### Expo SDK ${{ matrix.sdk }} leg failed (not a supported SDK)" >> "$GITHUB_STEP_SUMMARY"
+        echo "### Expo SDK $SDK leg failed (not a supported SDK)" >> "$GITHUB_STEP_SUMMARY"
         echo "" >> "$GITHUB_STEP_SUMMARY"
-        echo "This leg is non-blocking: README declares ${{ matrix.sdk }} tested but not supported." >> "$GITHUB_STEP_SUMMARY"
+        echo "This leg is non-blocking: README declares $SDK tested but not supported." >> "$GITHUB_STEP_SUMMARY"
         echo "It may also be upstream drift - these legs install without a lockfile." >> "$GITHUB_STEP_SUMMARY"
         echo "See scripts/expo-sdk-matrix.md." >> "$GITHUB_STEP_SUMMARY"
 
