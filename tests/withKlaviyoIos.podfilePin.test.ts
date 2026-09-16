@@ -24,7 +24,15 @@ target 'TestApp' do
 end
 `;
 
-/** Runs the ios mod chain and returns the content written back to the Podfile, if any. */
+/**
+ * Runs the ios mod chain and returns every Podfile write plus the final content.
+ *
+ * withKlaviyoPodfileEnvVars always writes the Podfile (it prepends env vars), so there is
+ * exactly one write on the paths where the pin logic is a no-op. Tests assert on `writes`
+ * and `final` unconditionally - an earlier version guarded assertions behind
+ * `if (out !== null)`, which meant a mod that threw before writing would have produced a
+ * silently passing test with zero assertions executed.
+ */
 async function runAndCapturePodfile(podfileContent: string) {
   FileManager.readFile.mockResolvedValue(podfileContent);
   FileManager.writeFile.mockResolvedValue(undefined);
@@ -37,22 +45,28 @@ async function runAndCapturePodfile(podfileContent: string) {
     await result.mods.ios(result);
   }
 
-  const writes = FileManager.writeFile.mock.calls.filter(
-    (c: any) => c && typeof c[0] === 'string' && c[0].endsWith('/Podfile')
-  );
-  // The env-var mod also writes the Podfile; the pin lives in the last write.
-  return writes.length ? String(writes[writes.length - 1][1]) : null;
+  const writes = FileManager.writeFile.mock.calls
+    .filter((c: any) => c && typeof c[0] === 'string' && c[0].endsWith('/Podfile'))
+    .map((c: any) => String(c[1]));
+
+  return { writes, final: writes.length ? writes[writes.length - 1] : null };
 }
 
-const countTargets = (s: string) => s.split(`target '${NSE}'`).length - 1;
+/** Counts NSE target DECLARATIONS, not bare mentions of the name. */
+const countTargets = (s: string) =>
+  (s.match(new RegExp(`^[ \\t]*target '${NSE}' do`, 'gm')) ?? []).length;
+
+/** The canonical single-space pin, i.e. what a rewrite would normalise to. */
+const CANONICAL = "pod 'KlaviyoSwiftExtension', '~> 5.0'";
 
 describe('withKlaviyoPodfile - NSE pod pin', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('appends the NSE target with a pinned pod when neither exists', async () => {
-    const out = await runAndCapturePodfile(base);
-    expect(out).toContain(PINNED);
-    expect(countTargets(out as string)).toBe(1);
+    const { final } = await runAndCapturePodfile(base);
+    expect(final).not.toBeNull();
+    expect(final).toContain(PINNED);
+    expect(countTargets(final as string)).toBe(1);
   });
 
   it('upgrades an existing UNPINNED declaration to the pinned form', async () => {
@@ -61,10 +75,11 @@ describe('withKlaviyoPodfile - NSE pod pin', () => {
     pod 'KlaviyoSwiftExtension'
   end
 `;
-    const out = await runAndCapturePodfile(unpinned);
-    expect(out).toContain(PINNED);
-    expect(out).not.toMatch(/pod 'KlaviyoSwiftExtension'\s*$/m);
-    expect(countTargets(out as string)).toBe(1);
+    const { final } = await runAndCapturePodfile(unpinned);
+    expect(final).not.toBeNull();
+    expect(final).toContain(PINNED);
+    expect(final).not.toMatch(/pod 'KlaviyoSwiftExtension'\s*$/m);
+    expect(countTargets(final as string)).toBe(1);
   });
 
   it('preserves indentation when upgrading', async () => {
@@ -73,8 +88,9 @@ describe('withKlaviyoPodfile - NSE pod pin', () => {
         pod 'KlaviyoSwiftExtension'
   end
 `;
-    const out = await runAndCapturePodfile(unpinned);
-    expect(out).toContain(`        ${PINNED}`);
+    const { final } = await runAndCapturePodfile(unpinned);
+    expect(final).not.toBeNull();
+    expect(final).toContain(`        ${PINNED}`);
   });
 
   it('does not rewrite a declaration that is already pinned, even with odd whitespace', async () => {
@@ -83,12 +99,16 @@ describe('withKlaviyoPodfile - NSE pod pin', () => {
     pod  'KlaviyoSwiftExtension',  '~> 5.0'
   end
 `;
-    const out = await runAndCapturePodfile(pinnedOddWhitespace);
-    // Either no Podfile write at all for the pin, or a write that left the line alone.
-    if (out !== null) {
-      expect(out).toContain("pod  'KlaviyoSwiftExtension',  '~> 5.0'");
-      expect(countTargets(out)).toBe(1);
-    }
+    const { writes, final } = await runAndCapturePodfile(pinnedOddWhitespace);
+
+    // Unconditional. The env-var mod writes the Podfile once regardless, so a no-op pin
+    // means exactly one write whose content still carries the odd spacing. Asserting the
+    // ABSENCE of the canonical form is what makes this fail if the whitespace-collapse
+    // comparison is removed, since an exact-string compare would rewrite the line.
+    expect(writes).toHaveLength(1);
+    expect(final).toContain("pod  'KlaviyoSwiftExtension',  '~> 5.0'");
+    expect(final).not.toContain(CANONICAL);
+    expect(countTargets(final as string)).toBe(1);
   });
 
   it('never appends a second NSE target when the block exists but the pod is commented out', async () => {
@@ -99,13 +119,12 @@ describe('withKlaviyoPodfile - NSE pod pin', () => {
     # pod 'KlaviyoSwiftExtension'
   end
 `;
-    const out = await runAndCapturePodfile(commented);
+    const { final } = await runAndCapturePodfile(commented);
 
-    if (out !== null) {
-      expect(countTargets(out)).toBe(1);
-      // and it must not have pinned a pod inside the comment
-      expect(out).not.toContain(`# ${PINNED}`);
-    }
+    expect(final).not.toBeNull();
+    expect(countTargets(final as string)).toBe(1);
+    // and it must not have pinned a pod inside the comment
+    expect(final).not.toContain(`# ${PINNED}`);
 
     const warnings = (KlaviyoLog.warn as jest.Mock).mock.calls.map((c: any[]) => String(c[0]));
     expect(warnings.some((w: string) => w.includes('declares no'))).toBe(true);
