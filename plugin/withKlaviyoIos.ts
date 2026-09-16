@@ -42,6 +42,25 @@ export default withKlaviyoIos;
  * Adds klaviyo-plugin-configuration.plist to the iOS project and includes it in the app bundle.
  */
 /**
+ * The parts of `xcode`'s pbxProject this file reaches into directly.
+ *
+ * The `xcode` package ships no types, and @expo/config-plugins' XcodeProject does not
+ * describe `hash.project.objects`, which is where the raw sections live. Declaring the
+ * shape we actually depend on documents that surface instead of hiding it behind `any`.
+ */
+interface PbxSectionEntry {
+  fileRef?: string;
+  path?: string;
+  files?: { value?: string }[];
+  children?: { value?: string }[];
+}
+
+interface PbxProjectLike {
+  pbxFileReferenceSection(): Record<string, PbxSectionEntry | undefined>;
+  hash: { project: { objects: Record<string, Record<string, PbxSectionEntry | undefined>> } };
+}
+
+/**
  * Removes any file reference to klaviyo-plugin-configuration.plist that is not the current
  * relative form, along with anything pointing at it.
  *
@@ -55,7 +74,10 @@ export default withKlaviyoIos;
  *
  * Returns the number of legacy references removed.
  */
-function pruneLegacyPlistReferences(xcodeProject: any, relativePlistPath: string): number {
+function pruneLegacyPlistReferences(
+  xcodeProject: PbxProjectLike,
+  relativePlistPath: string
+): number {
   const basename = 'klaviyo-plugin-configuration.plist';
   const unquote = (value: unknown) => String(value ?? '').replace(/^"|"$/g, '');
 
@@ -64,7 +86,12 @@ function pruneLegacyPlistReferences(xcodeProject: any, relativePlistPath: string
     .filter(key => !key.endsWith('_comment'))
     .filter(key => {
       const stored = unquote(fileRefs[key]?.path);
-      return stored.endsWith(basename) && stored !== relativePlistPath;
+      // Compare the basename EXACTLY. endsWith() would also match a consumer's own
+      // `custom-klaviyo-plugin-configuration.plist`, and this function deletes what it
+      // matches - the reference, its group entry and its build-phase entries - so an
+      // over-broad match removes someone else's file from their project.
+      const storedBasename = stored.replace(/\\/g, '/').split('/').pop();
+      return storedBasename === basename && stored !== relativePlistPath;
     });
 
   if (staleRefIds.length === 0) {
@@ -86,7 +113,7 @@ function pruneLegacyPlistReferences(xcodeProject: any, relativePlistPath: string
         for (const phaseKey of Object.keys(phases)) {
           const phase = phases[phaseKey];
           if (phase && Array.isArray(phase.files)) {
-            phase.files = phase.files.filter((entry: any) => entry?.value !== buildFileId);
+            phase.files = phase.files.filter((entry) => entry?.value !== buildFileId);
           }
         }
       }
@@ -99,7 +126,7 @@ function pruneLegacyPlistReferences(xcodeProject: any, relativePlistPath: string
     for (const groupKey of Object.keys(groups)) {
       const group = groups[groupKey];
       if (group && Array.isArray(group.children)) {
-        group.children = group.children.filter((child: any) => child?.value !== refId);
+        group.children = group.children.filter((child) => child?.value !== refId);
       }
     }
 

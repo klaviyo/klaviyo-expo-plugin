@@ -218,9 +218,13 @@ function main() {
     for (const row of rows) {
       const ok = testRow(row, tarball, workRoot);
       if (ok) continue;
-      // Same gating as ci.yml: rows the README does not declare supported report but
-      // do not fail the run. See scripts/expo-sdk-matrix.md.
-      if (row.supported) blockingFailures++;
+      // Advisory gating applies only to a FULL-matrix run, which is the local
+      // `npm run test:packed-consumer` case. With --sdk the caller is CI, where each job
+      // runs one row and already carries `continue-on-error: ${!matrix.supported}` plus an
+      // `if: failure()` summary step. Swallowing the failure here too would double-gate it:
+      // the step would exit 0, failure() would stay false, and a packed-consumer regression
+      // on SDK 52/53 would never reach the summary that exists to make it visible.
+      if (row.supported || only) blockingFailures++;
       else advisoryFailures.push(row.sdk);
     }
   } finally {

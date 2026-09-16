@@ -345,4 +345,46 @@ describe('withKlaviyoPluginConfigurationPlist (real xcode project)', () => {
       )
     ).toBe(true);
   });
+  it('leaves a similarly-named file the app owns alone', async () => {
+    // The prune matched with endsWith(), so a consumer's own
+    // `custom-klaviyo-plugin-configuration.plist` matched too - and the prune deletes what
+    // it matches, including the group entry and build-phase entries. That is data loss in
+    // someone else's project, so the basename is now compared exactly.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const xcode = require('xcode');
+    const project = xcode.project(FIXTURE).parseSync();
+
+    const theirId = 'BBBBBBBBBBBBBBBBBBBBBBBB';
+    const theirPath = 'klaviyopluginexample/custom-klaviyo-plugin-configuration.plist';
+    project.pbxFileReferenceSection()[theirId] = {
+      isa: 'PBXFileReference',
+      lastKnownFileType: 'text.plist.xml',
+      name: '"custom-klaviyo-plugin-configuration.plist"',
+      path: `"${theirPath}"`,
+      sourceTree: '"<group>"',
+    };
+    project.pbxFileReferenceSection()[`${theirId}_comment`] =
+      'custom-klaviyo-plugin-configuration.plist';
+    const groupId = project.findPBXGroupKey({ name: 'klaviyopluginexample' });
+    project.getPBXGroupByKey(groupId).children.push({
+      value: theirId,
+      comment: 'custom-klaviyo-plugin-configuration.plist',
+    });
+
+    await runPlistModOn(project);
+
+    // Their file reference survives, and stays in the group.
+    expect(project.pbxFileReferenceSection()[theirId]).toBeDefined();
+    expect(
+      project.getPBXGroupByKey(groupId).children.map((c: any) => c.value)
+    ).toContain(theirId);
+
+    // Ours was still added.
+    const refs = project.pbxFileReferenceSection();
+    const ourPaths = Object.keys(refs)
+      .filter((k) => !k.endsWith('_comment'))
+      .map((k) => String(refs[k]?.path ?? '').replace(/^"|"$/g, ''))
+      .filter((v) => v.split('/').pop() === 'klaviyo-plugin-configuration.plist');
+    expect(ourPaths).toEqual(['klaviyopluginexample/klaviyo-plugin-configuration.plist']);
+  });
 });
