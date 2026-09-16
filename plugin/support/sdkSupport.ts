@@ -12,20 +12,45 @@ import { KlaviyoLog } from './logger';
 const MIN_SUPPORTED_SDK_VERSION = 54;
 
 /**
- * Lowest Expo SDK that can produce a working native build at all.
+ * Lowest Expo SDK that can produce a working Android build.
  *
  * Below this, klaviyo-react-native-sdk pulls klaviyo-android-sdk, which requires
  * androidx.core 1.16.0 (compileSdk 35 / AGP 8.6). Expo 50 and 51 ship compileSdk 34,
  * so no Android build is possible. Measured, and not fixable from this package.
+ *
+ * Scoped to Android deliberately: that is the failure we reproduced and the one no
+ * plugin setting avoids. iOS on 50/51 is untested, so the warning below says "Android"
+ * rather than claiming both platforms.
  */
-const MIN_BUILDABLE_SDK_VERSION = 52;
+const MIN_BUILDABLE_ANDROID_SDK_VERSION = 52;
 
 /**
- * Lowest Expo SDK whose autolinking understands the `apple` platform key used by
- * expo-module.config.json. Below this, ExpoKlaviyo is dropped without an error:
+ * Highest Expo SDK whose autolinking does NOT understand the `apple` platform key used
+ * by expo-module.config.json. At or below this, ExpoKlaviyo is dropped without an error:
  * prebuild succeeds, the app builds, and push handling is simply never installed.
+ *
+ * Named for the last broken version rather than the first working one so it reads the
+ * same way it is compared (`major <= LAST_SDK_WITHOUT_AUTOLINKING`) and so the message
+ * can use it directly instead of doing arithmetic on it.
  */
-const MIN_AUTOLINK_SDK_VERSION = 50;
+const LAST_SDK_WITHOUT_AUTOLINKING = 49;
+
+/**
+ * Expo resolves the config more than once per command — `expo start` re-resolves on
+ * change, and EAS fingerprinting resolves it again — so warn at most once per version
+ * per process. Without this, a developer on an unsupported SDK sees the same line
+ * repeatedly in one session and learns to scroll past it.
+ *
+ * Keyed by version rather than a single boolean so a changed SDK still reports.
+ */
+const warnedVersions = new Set<string>();
+
+/**
+ * Test-only. Clears the once-per-process dedupe state so each case starts clean.
+ */
+export function resetSdkWarningState(): void {
+  warnedVersions.clear();
+}
 
 /**
  * Warn when the host app is on an Expo SDK this plugin does not support. Never throws.
@@ -34,19 +59,30 @@ const MIN_AUTOLINK_SDK_VERSION = 50;
  * and EAS fingerprinting — so it must stay cheap and free of side effects.
  */
 export function warnOnUnsupportedSdk(sdkVersion: string | undefined): void {
-  // NaN covers both an absent sdkVersion (bare workflow) and an unparseable one.
-  const major = parseInt(String(sdkVersion).split('.')[0], 10);
+  // A bare (non-Expo-managed) project has no sdkVersion at all; say that explicitly
+  // rather than relying on String(undefined) parsing to NaN.
+  if (sdkVersion == null) {
+    return;
+  }
+
+  // Still guard NaN: sdkVersion can be a non-numeric sentinel such as 'UNVERSIONED'.
+  const major = parseInt(sdkVersion.split('.')[0], 10);
   if (Number.isNaN(major) || major >= MIN_SUPPORTED_SDK_VERSION) {
     return;
   }
 
+  if (warnedVersions.has(sdkVersion)) {
+    return;
+  }
+  warnedVersions.add(sdkVersion);
+
   let detail: string;
-  if (major < MIN_AUTOLINK_SDK_VERSION) {
+  if (major <= LAST_SDK_WITHOUT_AUTOLINKING) {
     detail =
-      `On SDK ${MIN_AUTOLINK_SDK_VERSION - 1} and below, Expo autolinking cannot load this plugin's ` +
+      `On SDK ${LAST_SDK_WITHOUT_AUTOLINKING} and below, Expo autolinking cannot load this plugin's ` +
       'native iOS module, so push notification handling will NOT work even though the build succeeds.';
-  } else if (major < MIN_BUILDABLE_SDK_VERSION) {
-    detail = 'The native build is expected to fail.';
+  } else if (major < MIN_BUILDABLE_ANDROID_SDK_VERSION) {
+    detail = 'The Android build is expected to fail.';
   } else {
     detail = 'This SDK built successfully in our testing, but is outside the supported range.';
   }

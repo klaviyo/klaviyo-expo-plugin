@@ -12,11 +12,19 @@ const withKlaviyo: ConfigPlugin<KlaviyoPluginProps | undefined> = (config, props
   warnOnUnsupportedSdk(config.sdkVersion);
 
   const mergedProps = mergeProps(props);
-  // Expo sets _internal.projectRoot before config plugins run. Prefer it over cwd():
-  // on SDK 49/50 autolinking re-invokes config plugins from ios/, where cwd() is wrong
-  // and relative asset paths in app.config.js fail to resolve.
-  const projectRoot = (config as unknown as { _internal?: { projectRoot?: string } })._internal?.projectRoot
-    ?? path.resolve(process.cwd());
+  // Resolve the project root from the config, not from cwd(). process.cwd() is only the
+  // project root when the caller happens to be standing in it; it is wrong for a prebuild
+  // invoked from a subdirectory, for a monorepo where the command runs at the workspace
+  // root, and for any tool that re-invokes config plugins from a platform directory
+  // (SDK 49/50 autolinking did exactly that, re-entering from ios/). A wrong value here
+  // makes relative asset paths in app.config.js - e.g. notificationIconFilePath - resolve
+  // against the wrong directory and fail validation.
+  //
+  // Expo sets _internal.projectRoot in getConfig() before config plugins run, so the
+  // fallback is not for Expo itself: it covers callers that build an ExpoConfig by hand,
+  // such as our own unit tests and third-party tooling, where _internal is absent.
+  const projectRoot: string | undefined = config._internal?.projectRoot;
+  const resolvedProjectRoot = projectRoot ?? path.resolve(process.cwd());
   
   // Apply iOS configuration
   if (mergedProps.ios) {
@@ -26,7 +34,7 @@ const withKlaviyo: ConfigPlugin<KlaviyoPluginProps | undefined> = (config, props
   
   // Apply Android configuration
   if (mergedProps.android) {
-    validateAndroidConfig(mergedProps.android, projectRoot);
+    validateAndroidConfig(mergedProps.android, resolvedProjectRoot);
     config = withKlaviyoAndroid(config, mergedProps.android);
   }
 

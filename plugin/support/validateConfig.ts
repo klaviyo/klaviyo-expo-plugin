@@ -86,7 +86,7 @@ export const validateIosConfig = (config: KlaviyoPluginProps['ios']) => {
   const configWithExtras = config as unknown as Record<string, unknown>;
   if (configWithExtras.projectVersion != null || configWithExtras.marketingVersion != null) {
     KlaviyoLog.warn(
-      'projectVersion and marketingVersion are deprecated in 0.3.0 and are ignored. Use Expo-level version and ios.buildNumber the app config instead.'
+      'projectVersion and marketingVersion are deprecated in 0.3.0 and are ignored. Use Expo-level version and ios.buildNumber in the app config instead.'
     );
   }
 
