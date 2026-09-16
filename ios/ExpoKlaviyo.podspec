@@ -10,6 +10,17 @@ Pod::Spec.new do |s|
   s.license        = package['license']
   s.author         = package['author']
   s.homepage       = 'https://github.com/klaviyo/klaviyo-expo-plugin'
+  # This pod's OWN floor, not the app's. 15.1 tracks ExpoModulesCore, which this pod depends
+  # on: expo-modules-core declares :ios => '15.1' on Expo SDK 54 and 55 (and 16.4 from 56).
+  # NOT KlaviyoSwift - that declares 13.0 on every 5.x release, so it is not the binding
+  # constraint. The previous value of '12' was below what ExpoModulesCore already forced.
+  #
+  # It is deliberately NOT 16.4. README and AGENTS.md quote 16.4 because expo-modules-core
+  # raised the *app* deployment target in Expo SDK 56, and expo-modules-autolinking lifts
+  # this pod to match via reconcile_expo_module_deployment_targets. Both numbers are
+  # correct at their own level: 16.4 is the effective app floor on SDK 56+, 15.1 is the
+  # lowest target this pod can be built against on its own. Do not "fix" one to match
+  # the other - raising this to 16.4 would drop SDK 54/55 consumers, whose app floor is 15.1.
   s.platforms      = {
     :ios => '15.1'
   }
@@ -19,6 +30,10 @@ Pod::Spec.new do |s|
 
   s.dependency 'ExpoModulesCore'
   s.dependency 'React-Core'
+  # Pinned to the same major that klaviyo-react-native-sdk depends on. That package pins
+  # KlaviyoSwift to an exact version (2.5.0 -> '5.4.0'), so this range is deliberately
+  # looser than the companion SDK's requirement and cannot become the binding constraint
+  # on the normal integration path.
   s.dependency 'KlaviyoSwift', '~> 5.0'
 
   # Conditional location dependency based on environment variable

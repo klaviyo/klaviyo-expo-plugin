@@ -52,11 +52,16 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
     // Get the plugin's root directory using a more generic approach
     const pluginRoot = getPluginRoot();
     const srcPlistPath = path.join(pluginRoot, 'ios', 'klaviyo-plugin-configuration.plist');
-    const destPlistPath = path.join(
-      config.modRequest.platformProjectRoot,
-      projectName,
-      'klaviyo-plugin-configuration.plist'
-    );
+    // Two forms, deliberately. fs needs an absolute path to copy to; Xcode must be given
+    // a path RELATIVE to platformProjectRoot, because that is what every other entry in a
+    // generated pbxproj uses (`path = <project>/Images.xcassets; sourceTree = "<group>"`).
+    // Storing an absolute path here bakes one machine's directory into project.pbxproj -
+    // harmless while prebuild regenerates ios/ each run, but this release's migration guide
+    // recommends --no-clean, and a committed ios/ then breaks every other developer and CI
+    // runner with an opaque Xcode "file not found". It also made hasFile() miss across
+    // machines, which is what made the build-phase ambiguity reachable in the first place.
+    const relativePlistPath = path.join(projectName, 'klaviyo-plugin-configuration.plist');
+    const destPlistPath = path.join(config.modRequest.platformProjectRoot, relativePlistPath);
 
     if (fs.existsSync(srcPlistPath)) {
       // Copy the file
@@ -75,13 +80,46 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
       // addFile returns null when the path is already registered, which is the normal
       // case on a non-clean prebuild. Treat that as a no-op rather than a failure —
       // warning there would fire on every incremental rebuild.
-      if (xcodeProject.hasFile(destPlistPath)) {
+      if (xcodeProject.hasFile(relativePlistPath)) {
         KlaviyoLog.log('klaviyo-plugin-configuration.plist is already in the Xcode project');
         return config;
       }
 
-      const fileRef = xcodeProject.addFile(destPlistPath, mainGroupId, {
-        target: xcodeProject.getFirstTarget().uuid,
+      // getFirstTarget() does NOT return undefined on a target-less project - it reads
+      // targets[0].value and throws, and otherwise always returns a {uuid, firstTarget}
+      // object. So a truthiness check on the result cannot catch the failure it looks
+      // like it catches; the throw has to be caught instead. Either way this mod should
+      // degrade to "plist not added" and let the build continue, as it does for every
+      // other failure here, rather than aborting the whole prebuild.
+      let firstTargetUuid: string | undefined;
+      try {
+        const first = xcodeProject.getFirstTarget();
+        // Check firstTarget, not just uuid. getFirstTarget() returns
+        // { uuid, firstTarget: pbxNativeTargetSection()[uuid] }, and firstTarget is
+        // undefined when targets[0] is not a PBXNativeTarget (an aggregate or legacy
+        // target). Passing such a uuid on as fileRef.target makes buildPhase() throw
+        // 'Invalid target', which - unlike the undefined case it short-circuits on -
+        // would abort the whole prebuild from inside addToPbxResourcesBuildPhase.
+        //
+        // Defensive only, and UNTESTED: Expo templates never emit an aggregate first
+        // target, and the test fixture cannot reach this branch, so removing this check
+        // breaks no test. Treat it as belt-and-braces rather than a verified guarantee -
+        // covering it needs a fixture whose targets[0] is a PBXAggregateTarget.
+        firstTargetUuid = first?.firstTarget ? first.uuid : undefined;
+      } catch {
+        firstTargetUuid = undefined;
+      }
+
+      if (!firstTargetUuid) {
+        KlaviyoLog.warn(
+          'Could not find a native target in the Xcode project. klaviyo-plugin-configuration.plist ' +
+            'was not added to the app bundle, so the Klaviyo SDK cannot report the plugin version.'
+        );
+        return config;
+      }
+
+      const fileRef = xcodeProject.addFile(relativePlistPath, mainGroupId, {
+        target: firstTargetUuid,
       });
 
       if (!fileRef) {
@@ -91,6 +129,24 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
         );
         return config;
       }
+
+      // xcode's pbxFile constructor ignores BOTH of these, so addFile's `opt` does not do
+      // what its shape suggests - they have to be assigned after the fact. xcode's own
+      // addResourceFile assigns both explicitly for exactly this reason.
+      //
+      // uuid: addToPbxBuildFileSection keys the PBXBuildFile entry on file.uuid. Without
+      // this the entry is written under the literal key "undefined" - malformed, and a
+      // second file added this way would overwrite it and silently drop this one.
+      //
+      // target: addToPbxResourcesBuildPhase passes file.target to buildPhaseObject to pick
+      // WHICH Resources phase to append to. Undefined means its `buildPhase && ...` skip
+      // check never skips, so it appends to whichever Resources phase the object hash
+      // happens to yield first. This project has two - the host app's and the NSE's, which
+      // this plugin itself creates - so without this the plist can land in the extension's
+      // Copy Bundle Resources instead of the app's, defeating the point of the mod, and
+      // non-deterministically.
+      fileRef.uuid = xcodeProject.generateUuid();
+      fileRef.target = firstTargetUuid;
 
       // addFile creates the PBXFileReference but does not put the file in a build phase.
       // xcode's own addResourceFile cannot be used here: it calls correctForResourcesPath,
@@ -268,17 +324,42 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
         // UNPINNED declaration written by an older plugin version gets upgraded to the
         // pinned one. A plain substring check would match both forms and silently
         // leave upgrading consumers on an unconstrained pod.
-        const nsePodDeclaration = /pod\s+'KlaviyoSwiftExtension'(?:\s*,\s*'[^']*')?/;
+        // Anchored to the start of a line (capturing indentation) so a commented-out
+        // `# pod 'KlaviyoSwiftExtension'` is not treated as an existing declaration and
+        // rewritten in place, which would leave a pinned pod inside a comment.
+        const nsePodDeclaration = /^([ \t]*)pod\s+'KlaviyoSwiftExtension'(?:\s*,\s*'[^']*')?/m;
         const existing = podfile.match(nsePodDeclaration);
 
-        if (!existing) {
+        // Appending is gated on the TARGET block, not the pod line. Anchoring the pod
+        // regex to a line start means a Podfile whose only occurrence is commented out
+        // (`# pod 'KlaviyoSwiftExtension'`) produces no match - and appending then adds a
+        // SECOND `target 'KlaviyoNotificationServiceExtension' do` block, which makes
+        // `pod install` fail outright. Duplicating the target is worse than leaving the
+        // pod unpinned, so only append when the target is genuinely absent.
+        const hasNseTarget = podfile.includes(`target '${NSE_TARGET_NAME}'`);
+
+        if (!existing && !hasNseTarget) {
           await FileManager.writeFile(`${iosRoot}/Podfile`, `${podfile}\n${podInsertion}`);
-        } else if (existing[0] !== NSE_POD_DECLARATION) {
-          KlaviyoLog.log(`Updating Podfile: ${existing[0]} -> ${NSE_POD_DECLARATION}`);
-          await FileManager.writeFile(
-            `${iosRoot}/Podfile`,
-            podfile.replace(nsePodDeclaration, NSE_POD_DECLARATION)
+        } else if (!existing) {
+          KlaviyoLog.warn(
+            `The ${NSE_TARGET_NAME} target exists in the Podfile but declares no ` +
+              `KlaviyoSwiftExtension pod. Add ${NSE_POD_DECLARATION} to it, or remove the ` +
+              'target and re-run prebuild, so rich push notifications work.'
           );
+        } else {
+          const indent = existing[1];
+          // Compare with whitespace collapsed: `pod  'X', '~> 5.0'` is the same declaration
+          // as `pod 'X', '~> 5.0'`, and rewriting it every prebuild would only add log noise.
+          const collapse = (value: string) => value.replace(/\s+/g, ' ').trim();
+          const current = existing[0].slice(indent.length);
+
+          if (collapse(current) !== collapse(NSE_POD_DECLARATION)) {
+            KlaviyoLog.log(`Updating Podfile: ${current} -> ${NSE_POD_DECLARATION}`);
+            await FileManager.writeFile(
+              `${iosRoot}/Podfile`,
+              podfile.replace(nsePodDeclaration, `${indent}${NSE_POD_DECLARATION}`)
+            );
+          }
         }
       } catch (err) {
         KlaviyoLog.log('Could not write Klaviyo changes to Podfile: ' + err);
