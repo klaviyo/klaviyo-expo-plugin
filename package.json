@@ -7,7 +7,8 @@
     "dist",
     "ios",
     "KlaviyoNotificationServiceExtension",
-    "expo-module.config.json"
+    "expo-module.config.json",
+    "MIGRATION_GUIDE.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -21,8 +22,9 @@
     "test:coverage:html": "jest --coverage --coverageReporters=html --coverageReporters=text && open coverage/index.html",
     "bump-version": "node scripts/bump-version.js",
     "test:peer-deps": "node scripts/test-peer-dependencies.js",
-    "test:peer-deps:sdk54": "npm install --no-save react@19.1.0 react-native@0.81.5 expo@~54.0.0 && npm test",
-    "test:peer-deps:sdk57": "npm install --no-save react@19.2.3 react-native@0.86.3 expo@~57.0.0 && npm test"
+    "test:peer-deps:sdk54": "npm install --no-save --no-package-lock react@19.1.0 react-native@0.81.5 expo@~54.0.0 && npm test",
+    "test:peer-deps:sdk57": "npm install --no-save --no-package-lock react@19.2.3 react-native@0.86.3 expo@~57.0.0 && npm test",
+    "verify:package": "node scripts/verify-package-contents.js"
   },
   "keywords": [
     "expo",

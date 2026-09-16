@@ -4,19 +4,10 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// Test matrix - same as CI.
-// Each row is a real Expo SDK pairing from https://api.expo.dev/v2/versions/latest
-// (facebookReactNativeVersion / facebookReactVersion). Do not hand-edit these to
-// arbitrary versions: a combination Expo never shipped tests nothing a customer can hit.
-// The supported range is documented in README.md; this matrix is a subset of it.
-const testMatrix = [
-  { react: "18.3.1", reactNative: "0.76.9",  expo: "~52.0.0" },
-  { react: "19.0.0", reactNative: "0.79.6",  expo: "~53.0.0" },
-  { react: "19.1.0", reactNative: "0.81.5",  expo: "~54.0.0" },
-  { react: "19.2.0", reactNative: "0.83.10", expo: "~55.0.0" },
-  { react: "19.2.3", reactNative: "0.85.3",  expo: "~56.0.0" },
-  { react: "19.2.3", reactNative: "0.86.3",  expo: "~57.0.0" },
-];
+// Sourced from the SAME file CI reads (see scripts/expo-sdk-matrix.md). Previously this
+// list was a second hand-written copy of the ci.yml matrix with a "same as CI" comment
+// and nothing enforcing it.
+const testMatrix = require('./expo-sdk-matrix.json');
 
 function runCommand(command, description) {
   console.log(`\n🔄 ${description}...`);
@@ -35,13 +26,10 @@ function testWithVersions(reactVersion, reactNativeVersion, expoVersion) {
   console.log('='.repeat(80));
   
   // Install specific versions
-  // --no-package-lock is required: the committed lock pins the Expo 57 graph, and
-  // installing an older pairing on top of it retains @expo/router-server@57, whose
-  // optional peer on @expo/metro-runtime "^57.0.15" makes npm resolve that package
-  // fresh (it is never itself in the lock). That package optionally peers
-  // react-dom "*" -> react-dom@19.3.0 -> peer react@^19.3.0, which conflicts with
-  // the older react in the pairing. Ignoring the lock drops the Expo 57 graph, so
-  // nothing pulls either package in - the way a real consumer on that SDK resolves.
+  // --no-package-lock is required, and these runs are deliberately not reproducible.
+  // The full reasoning lives in ONE place - the "Install dependencies with specific peer
+  // dependency versions" step in .github/workflows/ci.yml. Do not restate it here; two
+  // copies of that analysis will drift.
   const installCommand = `npm install --no-save --no-package-lock react@${reactVersion} react-native@${reactNativeVersion} expo@${expoVersion}`;
   if (!runCommand(installCommand, `Installing React ${reactVersion}, React Native ${reactNativeVersion}, Expo ${expoVersion}`)) {
     return false;

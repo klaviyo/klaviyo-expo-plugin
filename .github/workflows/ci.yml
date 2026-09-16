@@ -2,6 +2,12 @@ name: CI
 
 on:
   pull_request:
+  # The test-peer-dependencies legs install without a lockfile on purpose, so they exist to
+  # catch upstream Expo/RN graph drift. On pull_request alone that drift is only ever found
+  # the next time somebody happens to open a PR, which defeats the point and lands the
+  # failure on an unrelated contributor. A weekly run puts it on a clock instead.
+  schedule:
+    - cron: '0 6 * * 1'
 
 jobs:
   lint-and-type-check:
@@ -59,51 +65,54 @@ jobs:
     - name: Run tests with coverage
       run: npm run test:coverage
 
-  test-peer-dependencies:
+  # Emits scripts/expo-sdk-matrix.json so test-peer-dependencies and
+  # scripts/test-peer-dependencies.js read the SAME matrix. Previously the rows were
+  # written out in both places with a "same as CI" comment and nothing enforcing it.
+  sdk-matrix:
     runs-on: ubuntu-22.04
-    
-    strategy:
-      matrix:
-        # Real Expo SDK pairings from https://api.expo.dev/v2/versions/latest
-        # (facebookReactNativeVersion / facebookReactVersion). Do not substitute
-        # arbitrary versions: a combination Expo never shipped tests nothing a
-        # customer can hit. The supported range is documented in README.md.
-        include:
-          # Expo SDK 52
-          - react-version: "18.3.1"
-            react-native-version: "0.76.9"
-            expo-version: "~52.0.0"
-          # Expo SDK 53
-          - react-version: "19.0.0"
-            react-native-version: "0.79.6"
-            expo-version: "~53.0.0"
-          # Expo SDK 54
-          - react-version: "19.1.0"
-            react-native-version: "0.81.5"
-            expo-version: "~54.0.0"
-          # Expo SDK 55
-          - react-version: "19.2.0"
-            react-native-version: "0.83.10"
-            expo-version: "~55.0.0"
-          # Expo SDK 56
-          - react-version: "19.2.3"
-            react-native-version: "0.85.3"
-            expo-version: "~56.0.0"
-          # Expo SDK 57
-          - react-version: "19.2.3"
-            react-native-version: "0.86.3"
-            expo-version: "~57.0.0"
-    
+    outputs:
+      matrix: ${{ steps.load.outputs.matrix }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
+    - name: Load the Expo SDK matrix
+      id: load
+      run: echo "matrix=$(jq -c . scripts/expo-sdk-matrix.json)" >> "$GITHUB_OUTPUT"
+
+  test-peer-dependencies:
+    runs-on: ubuntu-22.04
+    needs: sdk-matrix
+    name: "test-peer-dependencies (SDK ${{ matrix.sdk }})"
+    # Rows the README does not declare supported report failures without gating the merge.
+    # The matrix is deliberately wider than the support statement (52 and 53 are tested but
+    # unsupported), and a break on an SDK we explicitly disclaim should not block a release.
+    # Supported rows (54+) still fail the build. Driven by the `supported` field in
+    # scripts/expo-sdk-matrix.json.
+    #
+    # CAVEAT: job-level continue-on-error makes the job's CONCLUSION success, so a failing
+    # 52/53 leg renders as a green check in the PR summary - only the job list shows the
+    # warning icon. It is non-blocking as intended, but "visible" only if you click in.
+    # The summary step below is what actually surfaces it.
+    continue-on-error: ${{ !matrix.supported }}
+
+    strategy:
+      # Sourced from scripts/expo-sdk-matrix.json - see scripts/expo-sdk-matrix.md for the
+      # rules, why SDK 52/53 are included though unsupported, and why 50/51 are not.
+      matrix:
+        include: ${{ fromJSON(needs.sdk-matrix.outputs.matrix) }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # No `cache: 'npm'` here on purpose: setup-node keys the npm cache off the lockfile, and
+    # the install below deliberately ignores the lock, so the cached tree would never be used.
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20.x'
-        cache: 'npm'
-        
+
     - name: Install dependencies with specific peer dependency versions
       # Deliberately NOT `npm ci` first, and deliberately --no-package-lock.
       # The committed lock pins the Expo 57 graph. Installing an older pairing on top
@@ -120,18 +129,35 @@ jobs:
       # nothing requires it or react-dom - which is what a real consumer on that SDK
       # gets. Lock integrity is still enforced by the lint-and-type-check, test, and
       # build jobs, which all use npm ci.
+      #
+      # CONSEQUENCE, for whoever hits this later: because no lock is used, these legs are
+      # NOT reproducible. Every run re-resolves the whole tree from package.json, so a new
+      # transitive release anywhere in the Expo graph can turn a leg red with no change in
+      # this repo. That is the intended trade - we want to find out - but if a leg goes red
+      # and git blame shows nothing, suspect an upstream publish before your own diff.
       run: |
-        npm install --no-save --no-package-lock react@${{ matrix.react-version }} react-native@${{ matrix.react-native-version }} expo@${{ matrix.expo-version }}
-        
+        npm install --no-save --no-package-lock react@${{ matrix.react }} react-native@${{ matrix.reactNative }} expo@${{ matrix.expo }}
+
     - name: Run tests with specific versions
       run: |
-        echo "Testing with React ${{ matrix.react-version }}, React Native ${{ matrix.react-native-version }}, Expo ${{ matrix.expo-version }}"
+        echo "Testing with React ${{ matrix.react }}, React Native ${{ matrix.reactNative }}, Expo ${{ matrix.expo }}"
         npm test
-        
+
     - name: Build with specific versions
       run: |
-        echo "Building with React ${{ matrix.react-version }}, React Native ${{ matrix.react-native-version }}, Expo ${{ matrix.expo-version }}"
+        echo "Building with React ${{ matrix.react }}, React Native ${{ matrix.reactNative }}, Expo ${{ matrix.expo }}"
         npm run build
+
+    # Only fires for unsupported rows, whose failures are otherwise invisible in the PR
+    # check summary because continue-on-error marks the job green.
+    - name: Surface an unsupported-SDK failure
+      if: failure() && !matrix.supported
+      run: |
+        echo "### Expo SDK ${{ matrix.sdk }} leg failed (not a supported SDK)" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "This leg is non-blocking: README declares ${{ matrix.sdk }} tested but not supported." >> "$GITHUB_STEP_SUMMARY"
+        echo "It may also be upstream drift - these legs install without a lockfile." >> "$GITHUB_STEP_SUMMARY"
+        echo "See scripts/expo-sdk-matrix.md." >> "$GITHUB_STEP_SUMMARY"
 
   build:
     runs-on: ubuntu-22.04
@@ -152,3 +178,9 @@ jobs:
       
     - name: Build project
       run: npm run build
+
+    # `files` in package.json is a hard allowlist, and the example app installs the plugin
+    # with `file:../`, so it sees the whole working tree and can never catch an omission.
+    # Without this, a missing entry fails only for real consumers, after publish.
+    - name: Verify the published tarball contains everything the plugin reads
+      run: npm run verify:package
