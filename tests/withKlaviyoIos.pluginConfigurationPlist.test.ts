@@ -420,4 +420,42 @@ describe('withKlaviyoPluginConfigurationPlist (real xcode project)', () => {
       project.getPBXGroupByKey(groupId).children.map((c: any) => c.value)
     ).toContain(theirId);
   });
+  it('removes a legacy Windows absolute reference too, not just POSIX', async () => {
+    // path.isAbsolute() uses POSIX rules when prebuild runs on macOS or Linux, so a
+    // `C:\\...` reference left by a teammate who generated ios/ on Windows would survive
+    // a POSIX-only check - and that stale reference is exactly what this removes.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const xcode = require('xcode');
+    const project = xcode.project(FIXTURE).parseSync();
+
+    const legacyId = 'DDDDDDDDDDDDDDDDDDDDDDDD';
+    project.pbxFileReferenceSection()[legacyId] = {
+      isa: 'PBXFileReference',
+      lastKnownFileType: 'text.plist.xml',
+      name: '"klaviyo-plugin-configuration.plist"',
+      path: '"C:\\\\Users\\\\teammate\\\\app\\\\ios\\\\klaviyopluginexample\\\\klaviyo-plugin-configuration.plist"',
+      sourceTree: '"<group>"',
+    };
+    project.pbxFileReferenceSection()[`${legacyId}_comment`] =
+      'klaviyo-plugin-configuration.plist';
+    const groupId = project.findPBXGroupKey({ name: 'klaviyopluginexample' });
+    project.getPBXGroupByKey(groupId).children.push({
+      value: legacyId,
+      comment: 'klaviyo-plugin-configuration.plist',
+    });
+
+    await runPlistModOn(project);
+
+    expect(project.pbxFileReferenceSection()[legacyId]).toBeUndefined();
+    expect(
+      project.getPBXGroupByKey(groupId).children.map((c: any) => c.value)
+    ).not.toContain(legacyId);
+
+    const refs = project.pbxFileReferenceSection();
+    const survivors = Object.keys(refs)
+      .filter((k) => !k.endsWith('_comment'))
+      .map((k) => String(refs[k]?.path ?? '').replace(/^"|"$/g, ''))
+      .filter((v) => v.replace(/\\/g, '/').split('/').pop() === 'klaviyo-plugin-configuration.plist');
+    expect(survivors).toEqual(['klaviyopluginexample/klaviyo-plugin-configuration.plist']);
+  });
 });

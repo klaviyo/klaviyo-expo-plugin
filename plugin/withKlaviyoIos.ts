@@ -97,7 +97,13 @@ function pruneLegacyPlistReferences(
       // matches (the reference, its group entry, its build-phase entries), so a
       // basename-only rule would remove their file from their own project. We do not get
       // to reserve this filename globally.
-      return path.isAbsolute(stored);
+      //
+      // Both path flavours are checked. path.isAbsolute() applies POSIX rules when the
+      // prebuild runs on macOS or Linux, so it returns false for a `C:\...` reference left
+      // by a teammate who generated ios/ on Windows - and that stale reference is exactly
+      // what this is meant to remove. win32.isAbsolute also covers UNC paths, and returns
+      // false for both relative forms, so consumer-owned files stay safe either way.
+      return path.isAbsolute(stored) || path.win32.isAbsolute(stored);
     });
 
   if (staleRefIds.length === 0) {
