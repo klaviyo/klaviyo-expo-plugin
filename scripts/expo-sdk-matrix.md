@@ -1,7 +1,7 @@
 # Expo SDK test matrix
 
 `expo-sdk-matrix.json` is the single source of truth for the Expo SDK pairings this plugin is
-tested against. Both consumers read it directly, so the matrix cannot drift between them:
+tested against. All three consumers read it directly, so the matrix cannot drift between them:
 
 - `.github/workflows/ci.yml` — the `sdk-matrix` job emits it and `test-peer-dependencies`
   consumes it via `fromJSON`.

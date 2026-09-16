@@ -133,6 +133,45 @@ function verifyIos(appDir, slug) {
   check('ios: no "undefined" pbxproj keys', !/\n\t\tundefined /.test(text));
   check('ios: NSE target created', text.includes('KlaviyoNotificationServiceExtension'));
 
+  // The checks above pass if the reference merely EXISTS, which is not enough: a reference
+  // in no build phase ships nothing. Parse the project properly and require the plist in
+  // the first target's Resources phase.
+  //
+  // LIMITATION, measured rather than assumed: this cannot catch a missing `fileRef.target`.
+  // In a freshly generated project the app's Resources phase is at position 0 and the
+  // extension's is appended after it, so xcode's buildPhaseObject fallback picks the app's
+  // phase anyway and the plist still lands correctly. The bug only surfaces once a project
+  // has been through Xcode, which re-sorts each section by UUID. Verified: stubbing out
+  // `fileRef.target` leaves every check here green. What does catch it is the inverted
+  // fixture in tests/withKlaviyoIos.pluginConfigurationPlist.test.ts, which orders the
+  // extension's phase first on purpose. Do not treat this check as covering that case.
+  let inAppPhase = false;
+  let inNsePhase = false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const xcode = require(path.join(appDir, 'node_modules', 'xcode'));
+    const project = xcode.project(pbxproj).parseSync();
+    const firstTargetUuid = project.getFirstTarget().uuid;
+
+    const phases = project.hash.project.objects['PBXResourcesBuildPhase'] || {};
+    const appPhase = project.pbxResourcesBuildPhaseObj(firstTargetUuid);
+    const holdsPlist = (phase) =>
+      (phase?.files || []).some((f) =>
+        String(f?.comment || '').includes('klaviyo-plugin-configuration.plist')
+      );
+
+    inAppPhase = holdsPlist(appPhase);
+    inNsePhase = Object.keys(phases)
+      .filter((k) => !k.endsWith('_comment'))
+      .filter((k) => phases[k] !== appPhase)
+      .some((k) => holdsPlist(phases[k]));
+  } catch (err) {
+    check('ios: could parse pbxproj to verify build phases', false, String(err).slice(0, 160));
+  }
+
+  check('ios: plist is in the HOST APP Resources phase', inAppPhase);
+  check('ios: plist is NOT in the extension Resources phase', !inNsePhase);
+
   const podfile = path.join(appDir, 'ios/Podfile');
   check(
     'ios: NSE pod pinned',

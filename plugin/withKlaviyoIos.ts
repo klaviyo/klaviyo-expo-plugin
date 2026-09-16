@@ -86,12 +86,18 @@ function pruneLegacyPlistReferences(
     .filter(key => !key.endsWith('_comment'))
     .filter(key => {
       const stored = unquote(fileRefs[key]?.path);
-      // Compare the basename EXACTLY. endsWith() would also match a consumer's own
-      // `custom-klaviyo-plugin-configuration.plist`, and this function deletes what it
-      // matches - the reference, its group entry and its build-phase entries - so an
-      // over-broad match removes someone else's file from their project.
       const storedBasename = stored.replace(/\\/g, '/').split('/').pop();
-      return storedBasename === basename && stored !== relativePlistPath;
+      if (storedBasename !== basename) {
+        return false;
+      }
+      // Only ABSOLUTE paths are pruned, because that is the exact signature of what
+      // 1.0.0 wrote - it always recorded destPlistPath, which was absolute. Matching on
+      // the basename alone is still too broad: a consumer may legitimately own
+      // `Config/klaviyo-plugin-configuration.plist`, and this function deletes what it
+      // matches (the reference, its group entry, its build-phase entries), so a
+      // basename-only rule would remove their file from their own project. We do not get
+      // to reserve this filename globally.
+      return path.isAbsolute(stored);
     });
 
   if (staleRefIds.length === 0) {

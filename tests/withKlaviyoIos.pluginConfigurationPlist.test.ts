@@ -387,4 +387,37 @@ describe('withKlaviyoPluginConfigurationPlist (real xcode project)', () => {
       .filter((v) => v.split('/').pop() === 'klaviyo-plugin-configuration.plist');
     expect(ourPaths).toEqual(['klaviyopluginexample/klaviyo-plugin-configuration.plist']);
   });
+  it('leaves a same-named plist the app owns at its own relative path alone', async () => {
+    // Matching on the basename alone was still too broad: we do not get to reserve this
+    // filename globally. Only an ABSOLUTE path is pruned, because that is what 1.0.0 wrote.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const xcode = require('xcode');
+    const project = xcode.project(FIXTURE).parseSync();
+
+    const theirId = 'CCCCCCCCCCCCCCCCCCCCCCCC';
+    const theirPath = 'Config/klaviyo-plugin-configuration.plist';
+    project.pbxFileReferenceSection()[theirId] = {
+      isa: 'PBXFileReference',
+      lastKnownFileType: 'text.plist.xml',
+      name: '"klaviyo-plugin-configuration.plist"',
+      path: `"${theirPath}"`,
+      sourceTree: '"<group>"',
+    };
+    project.pbxFileReferenceSection()[`${theirId}_comment`] = 'klaviyo-plugin-configuration.plist';
+    const groupId = project.findPBXGroupKey({ name: 'klaviyopluginexample' });
+    project.getPBXGroupByKey(groupId).children.push({
+      value: theirId,
+      comment: 'klaviyo-plugin-configuration.plist',
+    });
+
+    await runPlistModOn(project);
+
+    expect(project.pbxFileReferenceSection()[theirId]).toBeDefined();
+    expect(
+      String(project.pbxFileReferenceSection()[theirId].path).replace(/^"|"$/g, '')
+    ).toBe(theirPath);
+    expect(
+      project.getPBXGroupByKey(groupId).children.map((c: any) => c.value)
+    ).toContain(theirId);
+  });
 });
