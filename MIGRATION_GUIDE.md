@@ -6,7 +6,8 @@ This guide outlines how to migrate when upgrading to newer versions of the Klavi
 
 ### Expo SDK 57: `expo prebuild` erases the native folders
 
-No plugin props change in v1.1.0. What changes is Expo itself. From Expo SDK 57, `npx expo prebuild`
+No plugin props change in v1.1.0, but two plugin behaviours do change on iOS - see the two
+sections below. The first change is Expo's, not ours. From Expo SDK 57, `npx expo prebuild`
 deletes the `ios/` and `android/` folders and generates them again on every run, where it used to
 write on top of whatever was already there. It preserves nothing — not gitignored files, not `Pods/`,
 not your `.xcworkspace`.
@@ -17,6 +18,58 @@ the plugin does not generate**, pass `--no-clean` to get the previous additive b
 ```bash
 npx expo prebuild --no-clean
 ```
+
+### iOS: the plugin no longer writes version keys into your app's `Info.plist`
+
+Previously this plugin set `CFBundleShortVersionString` and `CFBundleVersion` in the **host app's**
+`Info.plist` while configuring remote notifications. It no longer does.
+
+Nothing is lost: Expo's own `withVersion` and `withBuildNumber` mods already set both keys from your
+`version` and `ios.buildNumber`, and they run in the same prebuild. The plugin was overwriting values
+Expo had just written, which meant a plugin-ordering change could silently alter your app's version.
+
+**What to check.** If your app's version or build number ever depended on this plugin writing them —
+for example if `version` is absent from your Expo config, or a custom config plugin ran after this one
+and relied on the values being present — set them explicitly instead:
+
+```js
+{
+  "version": "1.2.3",
+  "ios": { "buildNumber": "42" }
+}
+```
+
+The Notification Service Extension is unaffected: it still receives the host app's version, so the
+NSE and the app continue to report matching versions.
+
+### iOS: Klaviyo pods are now pinned to `~> 5.0`
+
+`ExpoKlaviyo.podspec` previously depended on `KlaviyoSwift` and `KlaviyoLocation` with no version
+constraint. Both are now pinned to `~> 5.0` (any `5.x`), matching the major that
+`klaviyo-react-native-sdk` requires.
+
+**This requires `klaviyo-react-native-sdk` 2.0.0 or newer.**
+
+That package pins these pods to an exact version, and the major line decides which:
+
+| `klaviyo-react-native-sdk` | pins `KlaviyoSwift` | with this plugin's `~> 5.0` |
+| --- | --- | --- |
+| `1.x` (e.g. 1.1.1) | `4.1.1` | **`pod install` fails** - hard version conflict |
+| `2.x` (e.g. 2.0.3, 2.5.0) | `5.0.3`, `5.4.0` | resolves fine |
+
+**If you are on `klaviyo-react-native-sdk` 1.x, upgrade it before taking this release:**
+
+```bash
+npm install klaviyo-react-native-sdk@^2
+```
+
+On 2.x this changes nothing: the companion SDK's exact pin, not this range, determines the resolved
+version, and this range is deliberately looser than its requirement so it can never override it.
+
+**One other case.** If you depend on `KlaviyoSwift` outside `5.x` directly in your own Podfile,
+`pod install` now reports a conflict instead of silently resolving a version the plugin was not built
+against. Align it with your `klaviyo-react-native-sdk` version, or remove it and let the SDK bring
+the pod in.
 
 
 See [Requirements](./README.md#requirements) for the Expo, iOS, and Android versions this release

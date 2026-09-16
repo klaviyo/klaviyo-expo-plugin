@@ -52,10 +52,10 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 | Expo SDK | Status | Evidence |
 | --- | --- | --- |
 | `49.x` and older | **Not supported** | Builds, but push silently never works — see below |
-| `50.x` | **Not supported** | Fails to build on both platforms |
-| `51.x` | **Not supported** | Fails to build on both platforms |
-| `52.0.x` | Not supported; covered by CI | Compiled and launched, iOS + Android |
-| `53.0.x` | Not supported; covered by CI | Compiled and launched, iOS + Android |
+| `50.x` | **Not supported** | Android build impossible — see below |
+| `51.x` | **Not supported** | Android build impossible — see below |
+| `52.0.x` | Tested, not supported | Compiled and launched, iOS + Android |
+| `53.0.x` | Tested, not supported | Compiled and launched, iOS + Android |
 | `54.0.x` | **Supported** | Compiled and launched, iOS + Android |
 | `55.0.x` | **Supported** | Compiled and launched, iOS + Android |
 | `56.0.x` | **Supported** | Compiled and launched, iOS + Android |
@@ -68,10 +68,19 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 ### Android
 
 - `minSdkVersion` of `24+`
-- `compileSdkVersion` of `36+`
+- `compileSdkVersion` of `35+`
+
+The `compileSdk` floor is `35`, not `36`: this plugin sets no `compileSdk` itself, and the binding
+constraint is `androidx.core` 1.16.0 (pulled in by `klaviyo-android-sdk` via
+`klaviyo-react-native-sdk`), which requires `35`. That is also why Expo SDK 50 and 51 cannot work -
+they ship `34`. Expo SDK 57 defaults to `36`, so a normal install is already above the floor; `35` is
+stated here so a working project on `35` is not told it is unsupported.
 
 ### iOS
 
+- `klaviyo-react-native-sdk` **`2.0.0`+**. This plugin's pod depends on `KlaviyoSwift ~> 5.0`, and
+  `klaviyo-react-native-sdk` 1.x pins `KlaviyoSwift 4.1.1` - the two cannot resolve together, so
+  `pod install` fails on 1.x. See the [Migration Guide](./MIGRATION_GUIDE.md).
 - Minimum Deployment Target `15.1+` (the floor declared by the plugin's pod). Expo SDK 56 and later require an app deployment target of `16.4`
 - Apple Push Notification Service (APNs) set up
 
