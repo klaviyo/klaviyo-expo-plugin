@@ -282,7 +282,7 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
   });
 };
 
-const NSE_POD_DECLARATION = "pod 'KlaviyoSwiftExtension', '~> 5.0'";
+const NSE_POD_DECLARATION = "pod 'KlaviyoSwiftExtension'";
 
 const NSE_TARGET_NAME = "KlaviyoNotificationServiceExtension";
 const NSE_EXT_FILES = [
@@ -464,21 +464,11 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
               `KlaviyoSwiftExtension pod. Add ${NSE_POD_DECLARATION} to it, or remove the ` +
               'target and re-run prebuild, so rich push notifications work.'
           );
-        } else {
-          const indent = existing[1];
-          // Compare with whitespace collapsed: `pod  'X', '~> 5.0'` is the same declaration
-          // as `pod 'X', '~> 5.0'`, and rewriting it every prebuild would only add log noise.
-          const collapse = (value: string) => value.replace(/\s+/g, ' ').trim();
-          const current = existing[0].slice(indent.length);
-
-          if (collapse(current) !== collapse(NSE_POD_DECLARATION)) {
-            KlaviyoLog.log(`Updating Podfile: ${current} -> ${NSE_POD_DECLARATION}`);
-            await FileManager.writeFile(
-              `${iosRoot}/Podfile`,
-              podfile.replace(nsePodDeclaration, `${indent}${NSE_POD_DECLARATION}`)
-            );
-          }
         }
+        // No third branch: the declaration already exists, so there is nothing to change.
+        // This used to rewrite it to our exact string, which was only meaningful while we
+        // declared a version. Now that we declare none, rewriting would STRIP a version the
+        // consumer chose for themselves - so an existing declaration is left exactly as written.
       } catch (err) {
         KlaviyoLog.log('Could not write Klaviyo changes to Podfile: ' + err);
       }

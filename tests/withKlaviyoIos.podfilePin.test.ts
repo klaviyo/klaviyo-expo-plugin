@@ -14,7 +14,7 @@ const { FileManager } = require('../plugin/support/fileManager');
 const { KlaviyoLog } = require('../plugin/support/logger');
 
 const NSE = 'KlaviyoNotificationServiceExtension';
-const PINNED = "pod 'KlaviyoSwiftExtension', '~> 5.0'";
+const DECLARATION = "pod 'KlaviyoSwiftExtension'";
 
 const base = `platform :ios, '15.1'
 use_frameworks! :linkage => :static
@@ -56,64 +56,45 @@ async function runAndCapturePodfile(podfileContent: string) {
 const countTargets = (s: string) =>
   (s.match(new RegExp(`^[ \\t]*target '${NSE}' do`, 'gm')) ?? []).length;
 
-/** The canonical single-space pin, i.e. what a rewrite would normalise to. */
-const CANONICAL = "pod 'KlaviyoSwiftExtension', '~> 5.0'";
 
-describe('withKlaviyoPodfile - NSE pod pin', () => {
+describe('withKlaviyoPodfile - NSE pod declaration', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('appends the NSE target with a pinned pod when neither exists', async () => {
+  it('appends the NSE target with the pod when neither exists', async () => {
     const { final } = await runAndCapturePodfile(base);
     expect(final).not.toBeNull();
-    expect(final).toContain(PINNED);
+    expect(final).toContain(DECLARATION);
     expect(countTargets(final as string)).toBe(1);
   });
 
-  it('upgrades an existing UNPINNED declaration to the pinned form', async () => {
-    const unpinned = `${base}
+  it('leaves an existing bare declaration untouched', async () => {
+    const existing = `${base}
   target '${NSE}' do
-    pod 'KlaviyoSwiftExtension'
+    ${DECLARATION}
   end
 `;
-    const { final } = await runAndCapturePodfile(unpinned);
-    expect(final).not.toBeNull();
-    expect(final).toContain(PINNED);
-    expect(final).not.toMatch(/pod 'KlaviyoSwiftExtension'\s*$/m);
-    expect(countTargets(final as string)).toBe(1);
-  });
-
-  it('preserves indentation when upgrading', async () => {
-    const unpinned = `${base}
-  target '${NSE}' do
-        pod 'KlaviyoSwiftExtension'
-  end
-`;
-    const { final } = await runAndCapturePodfile(unpinned);
-    expect(final).not.toBeNull();
-    expect(final).toContain(`        ${PINNED}`);
-  });
-
-  it('does not rewrite a declaration that is already pinned, even with odd whitespace', async () => {
-    const pinnedOddWhitespace = `${base}
-  target '${NSE}' do
-    pod  'KlaviyoSwiftExtension',  '~> 5.0'
-  end
-`;
-    const { writes, final } = await runAndCapturePodfile(pinnedOddWhitespace);
-
-    // Unconditional. The env-var mod writes the Podfile once regardless, so a no-op pin
-    // means exactly one write whose content still carries the odd spacing. Asserting the
-    // ABSENCE of the canonical form is what makes this fail if the whitespace-collapse
-    // comparison is removed, since an exact-string compare would rewrite the line.
+    const { writes, final } = await runAndCapturePodfile(existing);
+    // One write, from the env-var mod. The pod branch must not rewrite anything.
     expect(writes).toHaveLength(1);
-    expect(final).toContain("pod  'KlaviyoSwiftExtension',  '~> 5.0'");
-    expect(final).not.toContain(CANONICAL);
+    expect(final).toContain(DECLARATION);
+    expect(countTargets(final as string)).toBe(1);
+  });
+
+  it("leaves a version the consumer chose themselves alone", async () => {
+    // We declare no version, so an existing declaration WITH one is the consumer's
+    // choice. Rewriting it to our bare form would silently strip their pin.
+    const consumerPinned = `${base}
+  target '${NSE}' do
+    pod  'KlaviyoSwiftExtension',  '~> 5.4'
+  end
+`;
+    const { writes, final } = await runAndCapturePodfile(consumerPinned);
+    expect(writes).toHaveLength(1);
+    expect(final).toContain("pod  'KlaviyoSwiftExtension',  '~> 5.4'");
     expect(countTargets(final as string)).toBe(1);
   });
 
   it('never appends a second NSE target when the block exists but the pod is commented out', async () => {
-    // This is the case line-anchoring the regex introduced: the commented pod correctly
-    // fails to match, and a naive append would duplicate the target and break pod install.
     const commented = `${base}
   target '${NSE}' do
     # pod 'KlaviyoSwiftExtension'
@@ -123,8 +104,7 @@ describe('withKlaviyoPodfile - NSE pod pin', () => {
 
     expect(final).not.toBeNull();
     expect(countTargets(final as string)).toBe(1);
-    // and it must not have pinned a pod inside the comment
-    expect(final).not.toContain(`# ${PINNED}`);
+    expect(final).not.toContain(`# ${DECLARATION}, '`);
 
     const warnings = (KlaviyoLog.warn as jest.Mock).mock.calls.map((c: any[]) => String(c[0]));
     expect(warnings.some((w: string) => w.includes('declares no'))).toBe(true);

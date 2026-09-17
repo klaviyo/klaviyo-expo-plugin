@@ -78,9 +78,6 @@ stated here so a working project on `35` is not told it is unsupported.
 
 ### iOS
 
-- `klaviyo-react-native-sdk` **`2.0.0`+**. This plugin's pod depends on `KlaviyoSwift ~> 5.0`, and
-  `klaviyo-react-native-sdk` 1.x pins `KlaviyoSwift 4.1.1` - the two cannot resolve together, so
-  `pod install` fails on 1.x. See the [Migration Guide](./MIGRATION_GUIDE.md).
 - Minimum Deployment Target `15.1+` (the floor declared by the plugin's pod). Expo SDK 56 and later require an app deployment target of `16.4`
 - Apple Push Notification Service (APNs) set up
 

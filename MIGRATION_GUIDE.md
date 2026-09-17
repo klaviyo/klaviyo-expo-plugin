@@ -42,39 +42,6 @@ and relied on the values being present — set them explicitly instead:
 The Notification Service Extension is unaffected: it still receives the host app's version, so the
 NSE and the app continue to report matching versions.
 
-### iOS: Klaviyo pods are now pinned to `~> 5.0`
-
-`ExpoKlaviyo.podspec` previously depended on `KlaviyoSwift` and `KlaviyoLocation` with no version
-constraint. Both are now pinned to `~> 5.0` (any `5.x`), matching the major that
-`klaviyo-react-native-sdk` requires.
-
-**This requires `klaviyo-react-native-sdk` 2.0.0 or newer.**
-
-That package pins these pods to an exact version, and the major line decides which:
-
-| `klaviyo-react-native-sdk` | pins `KlaviyoSwift` | with this plugin's `~> 5.0` |
-| --- | --- | --- |
-| `1.x` (e.g. 1.1.1) | `4.1.1` | **`pod install` fails** - hard version conflict |
-| `2.x` (e.g. 2.0.3, 2.5.0) | `5.0.3`, `5.4.0` | resolves fine |
-
-**If you are on `klaviyo-react-native-sdk` 1.x, upgrade it before taking this release:**
-
-```bash
-npm install klaviyo-react-native-sdk@^2
-```
-
-On 2.x this changes nothing: the companion SDK's exact pin, not this range, determines the resolved
-version, and this range is deliberately looser than its requirement so it can never override it.
-
-**One other case.** If you depend on `KlaviyoSwift` outside `5.x` directly in your own Podfile,
-`pod install` now reports a conflict instead of silently resolving a version the plugin was not built
-against. Align it with your `klaviyo-react-native-sdk` version, or remove it and let the SDK bring
-the pod in.
-
-
-See [Requirements](./README.md#requirements) for the Expo, iOS, and Android versions this release
-supports, and for the Expo SDK versions verified by a full native build.
-
 ## Migrating to v1.0.0
 
 ### `android.openTracking` removed

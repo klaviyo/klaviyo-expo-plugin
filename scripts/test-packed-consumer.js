@@ -174,9 +174,9 @@ function verifyIos(appDir, slug) {
 
   const podfile = path.join(appDir, 'ios/Podfile');
   check(
-    'ios: NSE pod pinned',
+    'ios: NSE pod declared',
     fs.existsSync(podfile) &&
-      /pod 'KlaviyoSwiftExtension', '~> 5\.0'/.test(fs.readFileSync(podfile, 'utf8'))
+      /^[ \t]*pod 'KlaviyoSwiftExtension'/m.test(fs.readFileSync(podfile, 'utf8'))
   );
 }
 

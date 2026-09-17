@@ -30,17 +30,17 @@ Pod::Spec.new do |s|
 
   s.dependency 'ExpoModulesCore'
   s.dependency 'React-Core'
-  # Pinned to the same major that klaviyo-react-native-sdk depends on. That package pins
-  # KlaviyoSwift to an exact version (2.5.0 -> '5.4.0'), so this range is deliberately
-  # looser than the companion SDK's requirement and cannot become the binding constraint
-  # on the normal integration path.
-  s.dependency 'KlaviyoSwift', '~> 5.0'
+  # Deliberately unversioned. klaviyo-react-native-sdk pins KlaviyoSwift to an exact
+  # version per release, so it governs resolution wherever it is present. A range here
+  # adds nothing on that path and becomes a hard `pod install` failure the moment the
+  # companion SDK pins a major this range excludes.
+  s.dependency 'KlaviyoSwift'
 
   # Conditional location dependency based on environment variable
   # Default is FALSE (opt-in for geofencing)
   include_location = ENV['KLAVIYO_INCLUDE_LOCATION'] == 'true'
   if include_location
-    s.dependency 'KlaviyoLocation', '~> 5.0'
+    s.dependency 'KlaviyoLocation'
   end
 
   # Swift/Objective-C compatibility
