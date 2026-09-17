@@ -10,10 +10,8 @@ Pod::Spec.new do |s|
   s.license        = package['license']
   s.author         = package['author']
   s.homepage       = 'https://github.com/klaviyo/klaviyo-expo-plugin'
-  # This pod's OWN floor, not the app's. 15.1 tracks ExpoModulesCore, which this pod depends
-  # on: expo-modules-core declares :ios => '15.1' on Expo SDK 54 and 55 (and 16.4 from 56).
-  # NOT KlaviyoSwift - that declares 13.0 on every 5.x release, so it is not the binding
-  # constraint. The previous value of '12' was below what ExpoModulesCore already forced.
+  # This pod's own floor, tracking ExpoModulesCore (15.1 on SDK 54/55, 16.4 from 56).
+  # The app's effective target is higher on SDK 56+; do not conflate the two.
   #
   # It is deliberately NOT 16.4. README and AGENTS.md quote 16.4 because expo-modules-core
   # raised the *app* deployment target in Expo SDK 56, and expo-modules-autolinking lifts

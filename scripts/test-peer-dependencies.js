@@ -54,6 +54,12 @@ function testWithVersions(reactVersion, reactNativeVersion, expoVersion, configP
 }
 
 function main() {
+  // --sdk <major> runs one row, so `npm run test:peer-deps -- --sdk 54` replaces the old
+  // per-SDK shortcuts. Those installed expo/react/react-native but not the matching
+  // @expo/config-plugins, so they reported green while testing the wrong graph.
+  const sdkArgIndex = process.argv.indexOf('--sdk');
+  const only = sdkArgIndex !== -1 ? process.argv[sdkArgIndex + 1] : null;
+
   console.log('🚀 Starting peer dependency compatibility tests...');
   console.log('This will test your plugin against multiple React and React Native versions');
   
@@ -64,15 +70,23 @@ function main() {
   // fail the run. Unsupported rows still RUN and still report; they just do not gate.
   // Without this, running this script locally was stricter than CI on the same matrix,
   // which is the one thing sourcing both from expo-sdk-matrix.json was meant to prevent.
+  const rows = only ? testMatrix.filter((r) => r.sdk === only) : testMatrix;
+  if (rows.length === 0) {
+    console.error(`No matrix row for --sdk ${only}. Known: ${testMatrix.map((r) => r.sdk).join(', ')}`);
+    process.exit(1);
+  }
+
   const required = [];
   const optionalFailures = [];
 
-  for (const { sdk, react, reactNative, expo, configPlugins, supported } of testMatrix) {
+  for (const { sdk, react, reactNative, expo, configPlugins, supported } of rows) {
     const passed = testWithVersions(react, reactNative, expo, configPlugins);
     if (supported) {
       required.push(passed);
     } else if (!passed) {
-      optionalFailures.push(sdk);
+      // With --sdk the caller is asking about one row; do not swallow its failure.
+      if (only) required.push(false);
+      else optionalFailures.push(sdk);
     }
   }
 

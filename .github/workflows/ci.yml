@@ -89,16 +89,9 @@ jobs:
     runs-on: ubuntu-22.04
     needs: sdk-matrix
     name: "test-peer-dependencies (SDK ${{ matrix.sdk }})"
-    # Rows the README does not declare supported report failures without gating the merge.
-    # The matrix is deliberately wider than the support statement (52 and 53 are tested but
-    # unsupported), and a break on an SDK we explicitly disclaim should not block a release.
-    # Supported rows (54+) still fail the build. Driven by the `supported` field in
-    # scripts/expo-sdk-matrix.json.
-    #
-    # CAVEAT: job-level continue-on-error makes the job's CONCLUSION success, so a failing
-    # 52/53 leg renders as a green check in the PR summary - only the job list shows the
-    # warning icon. It is non-blocking as intended, but "visible" only if you click in.
-    # The summary step below is what actually surfaces it.
+    # Unsupported rows (52, 53) report without gating; supported rows still fail the build.
+    # Note this makes the job's conclusion success, so the failure is only visible in the
+    # job list - the summary step below is what surfaces it.
     continue-on-error: ${{ !matrix.supported }}
 
     strategy:
@@ -119,27 +112,12 @@ jobs:
         node-version-file: .nvmrc
 
     - name: Install dependencies with specific peer dependency versions
-      # Deliberately NOT `npm ci` first, and deliberately --no-package-lock.
-      # The committed lock pins the Expo 57 graph. Installing an older pairing on top
-      # of it retains @expo/router-server@57, whose optional peer on
-      # @expo/metro-runtime "^57.0.15" makes npm resolve that package fresh. It in
-      # turn optionally peers react-dom "*", which resolves to latest, and that
-      # react-dom requires a react the pairing does not have:
+      # No `npm ci` and no lockfile on purpose: the committed lock pins the Expo 57 graph,
+      # which ERESOLVEs against an older pairing. Resolving fresh is what a real consumer
+      # on that SDK gets. Lock integrity is covered by the other three jobs.
       #
-      #   @expo/router-server@57.0.9 -> @expo/metro-runtime@57.0.15
-      #     -> react-dom@19.3.0 -> peer react@^19.3.0   vs   react@18.3.1
-      #
-      # Note @expo/metro-runtime is never itself an entry in the lock; it is pulled in
-      # only to satisfy that peer. Ignoring the lock drops the Expo 57 graph, so
-      # nothing requires it or react-dom - which is what a real consumer on that SDK
-      # gets. Lock integrity is still enforced by the lint-and-type-check, test, and
-      # build jobs, which all use npm ci.
-      #
-      # CONSEQUENCE, for whoever hits this later: because no lock is used, these legs are
-      # NOT reproducible. Every run re-resolves the whole tree from package.json, so a new
-      # transitive release anywhere in the Expo graph can turn a leg red with no change in
-      # this repo. That is the intended trade - we want to find out - but if a leg goes red
-      # and git blame shows nothing, suspect an upstream publish before your own diff.
+      # These legs are therefore NOT reproducible - an upstream publish can turn one red
+      # with no change here. If a leg fails and git blame shows nothing, suspect upstream.
       env:
         REACT_VERSION: ${{ matrix.react }}
         REACT_NATIVE_VERSION: ${{ matrix.reactNative }}
@@ -174,12 +152,9 @@ jobs:
         echo "Building with React $REACT_VERSION, React Native $REACT_NATIVE_VERSION, Expo $EXPO_VERSION"
         npm run build
 
-    # The steps above install each pairing into THIS repository, where package.json pins
-    # @expo/config-plugins exactly and tests/setup.ts mocks most of it - so jest and tsc can
-    # pass while exercising our mocks rather than the graph a consumer gets. This installs the
-    # PACKED plugin into a throwaway app, lets Expo supply its own config-plugins, and runs a
-    # real prebuild. Every consumer-facing defect in the SDK 54->57 upgrade was invisible to
-    # the unit suite and caught by hand; this is what closes that gap.
+    # The steps above install into THIS repository, where config-plugins is pinned and most
+    # of it is mocked. This installs the PACKED plugin into a throwaway app and runs a real
+    # prebuild, which is the only check here that sees the graph a consumer actually gets.
     - name: Prebuild the packed plugin in a throwaway consumer
       env:
         SDK: ${{ matrix.sdk }}

@@ -1,48 +1,21 @@
 import { KlaviyoLog } from './logger';
 
-/**
- * Lowest Expo SDK this plugin officially supports.
- *
- * Set to match Expo's own documented support window rather than the lowest version
- * that happens to work: Expo removes an SDK from its documentation roughly a year
- * after release, and we do not want to promise support for an SDK upstream has
- * abandoned. SDK 52 and 53 are covered by CI and did build and launch in testing,
- * but are not a support commitment.
- */
+/** Lowest Expo SDK this plugin officially supports. Matches Expo's own support window. */
 const MIN_SUPPORTED_SDK_VERSION = 54;
 
 /**
- * Lowest Expo SDK that can produce a working Android build.
- *
- * Below this, klaviyo-react-native-sdk pulls klaviyo-android-sdk, which requires
- * androidx.core 1.16.0 (compileSdk 35 / AGP 8.6). Expo 50 and 51 ship compileSdk 34,
- * so no Android build is possible. Measured, and not fixable from this package.
- *
- * Scoped to Android deliberately: that is the failure we reproduced and the one no
- * plugin setting avoids. iOS on 50/51 is untested, so the warning below says "Android"
- * rather than claiming both platforms.
+ * Lowest Expo SDK that can produce a working Android build. Below this, klaviyo-android-sdk
+ * needs androidx.core 1.16.0 (compileSdk 35), and Expo 50/51 ship compileSdk 34.
  */
 const MIN_BUILDABLE_ANDROID_SDK_VERSION = 52;
 
 /**
- * Highest Expo SDK whose autolinking does NOT understand the `apple` platform key used
- * by expo-module.config.json. At or below this, ExpoKlaviyo is dropped without an error:
- * prebuild succeeds, the app builds, and push handling is simply never installed.
- *
- * Named for the last broken version rather than the first working one so it reads the
- * same way it is compared (`major <= LAST_SDK_WITHOUT_AUTOLINKING`) and so the message
- * can use it directly instead of doing arithmetic on it.
+ * Highest Expo SDK whose autolinking does not understand the `apple` platform key. At or
+ * below this, ExpoKlaviyo is dropped silently: the build succeeds, push never works.
  */
 const LAST_SDK_WITHOUT_AUTOLINKING = 49;
 
-/**
- * Expo resolves the config more than once per command — `expo start` re-resolves on
- * change, and EAS fingerprinting resolves it again — so warn at most once per version
- * per process. Without this, a developer on an unsupported SDK sees the same line
- * repeatedly in one session and learns to scroll past it.
- *
- * Keyed by version rather than a single boolean so a changed SDK still reports.
- */
+/** Expo resolves the config several times per command, so warn once per version. */
 const warnedVersions = new Set<string>();
 
 /**

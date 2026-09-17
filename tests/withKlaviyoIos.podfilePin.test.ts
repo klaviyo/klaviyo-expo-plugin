@@ -109,4 +109,49 @@ describe('withKlaviyoPodfile - NSE pod declaration', () => {
     const warnings = (KlaviyoLog.warn as jest.Mock).mock.calls.map((c: any[]) => String(c[0]));
     expect(warnings.some((w: string) => w.includes('declares no'))).toBe(true);
   });
+  it('still creates the NSE block when an UNRELATED target declares the same pod', async () => {
+    // A file-wide match let this suppress our block entirely, leaving the Xcode NSE
+    // target created with no pod behind it - a link failure with no obvious cause.
+    const otherTargetHasIt = `${base}
+  target 'SomeOtherExtension' do
+    ${DECLARATION}
+  end
+`;
+    const { final } = await runAndCapturePodfile(otherTargetHasIt);
+
+    expect(final).not.toBeNull();
+    expect(countTargets(final as string)).toBe(1);
+    // and the other target is untouched
+    expect(final).toContain("target 'SomeOtherExtension' do");
+  });
+
+  it('treats a fully commented-out NSE target as absent and creates a real one', async () => {
+    const commentedTarget = `${base}
+  # target '${NSE}' do
+  #   ${DECLARATION}
+  # end
+`;
+    const { final } = await runAndCapturePodfile(commentedTarget);
+
+    expect(final).not.toBeNull();
+    // exactly one REAL target declaration, and the commented lines left alone
+    expect(countTargets(final as string)).toBe(1);
+    expect(final).toContain(`# target '${NSE}' do`);
+  });
+  it('warns when the NSE target lacks the pod even though another target declares it', async () => {
+    // The case that makes block scoping load-bearing: a file-wide search finds the pod in
+    // the OTHER target, stays silent, and leaves the NSE target with no pod behind it.
+    const nseEmptyOtherHasPod = `${base}
+  target 'SomeOtherExtension' do
+    ${DECLARATION}
+  end
+
+  target '${NSE}' do
+  end
+`;
+    await runAndCapturePodfile(nseEmptyOtherHasPod);
+
+    const warnings = (KlaviyoLog.warn as jest.Mock).mock.calls.map((c: any[]) => String(c[0]));
+    expect(warnings.some((w: string) => w.includes('declares no'))).toBe(true);
+  });
 });

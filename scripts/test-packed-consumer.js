@@ -133,18 +133,11 @@ function verifyIos(appDir, slug) {
   check('ios: no "undefined" pbxproj keys', !/\n\t\tundefined /.test(text));
   check('ios: NSE target created', text.includes('KlaviyoNotificationServiceExtension'));
 
-  // The checks above pass if the reference merely EXISTS, which is not enough: a reference
-  // in no build phase ships nothing. Parse the project properly and require the plist in
-  // the first target's Resources phase.
+  // A reference in no build phase ships nothing, so require it in the app target's phase.
   //
-  // LIMITATION, measured rather than assumed: this cannot catch a missing `fileRef.target`.
-  // In a freshly generated project the app's Resources phase is at position 0 and the
-  // extension's is appended after it, so xcode's buildPhaseObject fallback picks the app's
-  // phase anyway and the plist still lands correctly. The bug only surfaces once a project
-  // has been through Xcode, which re-sorts each section by UUID. Verified: stubbing out
-  // `fileRef.target` leaves every check here green. What does catch it is the inverted
-  // fixture in tests/withKlaviyoIos.pluginConfigurationPlist.test.ts, which orders the
-  // extension's phase first on purpose. Do not treat this check as covering that case.
+  // This cannot catch a missing `fileRef.target`: in a freshly generated project the app's
+  // Resources phase comes first, so xcode's fallback picks it anyway. The inverted fixture
+  // in tests/withKlaviyoIos.pluginConfigurationPlist.test.ts is what covers that.
   let inAppPhase = false;
   let inNsePhase = false;
   try {
@@ -191,7 +184,15 @@ function testRow(row, tarball, workRoot) {
   scaffoldApp(appDir, slug);
 
   try {
-    run('npm', ['install', '--no-fund', '--no-audit', tarball, `expo@${expo}`], appDir);
+    // react and react-native are installed explicitly. Expo peers them as "*" and our own
+    // peers are wide, so npm otherwise auto-installs the newest satisfying pair and the row
+    // silently tests modern React against an old Expo.
+    run(
+      'npm',
+      ['install', '--no-fund', '--no-audit', tarball, `expo@${expo}`,
+       `react@${row.react}`, `react-native@${row.reactNative}`],
+      appDir
+    );
   } catch (err) {
     console.error(`❌ install failed\n${err.stdout || ''}${err.stderr || ''}`);
     return false;
@@ -214,6 +215,12 @@ function testRow(row, tarball, workRoot) {
     `config-plugins matches ${configPlugins}`,
     Boolean(cpVersion) && cpVersion.split('.')[0] === configPlugins.replace(/^[~^]/, '').split('.')[0],
     cpVersion
+  );
+  check(`react pinned to ${row.react}`, installed('react') === row.react, installed('react'));
+  check(
+    `react-native pinned to ${row.reactNative}`,
+    installed('react-native') === row.reactNative,
+    installed('react-native')
   );
   check('packed plugin installed', Boolean(installed('klaviyo-expo-plugin')), installed('klaviyo-expo-plugin'));
 
@@ -257,12 +264,9 @@ function main() {
     for (const row of rows) {
       const ok = testRow(row, tarball, workRoot);
       if (ok) continue;
-      // Advisory gating applies only to a FULL-matrix run, which is the local
-      // `npm run test:packed-consumer` case. With --sdk the caller is CI, where each job
-      // runs one row and already carries `continue-on-error: ${!matrix.supported}` plus an
-      // `if: failure()` summary step. Swallowing the failure here too would double-gate it:
-      // the step would exit 0, failure() would stay false, and a packed-consumer regression
-      // on SDK 52/53 would never reach the summary that exists to make it visible.
+      // Advisory gating applies only to a full-matrix run. With --sdk the caller is CI,
+      // which already has continue-on-error plus an `if: failure()` step - swallowing the
+      // failure here too would double-gate it and the summary would never fire.
       if (row.supported || only) blockingFailures++;
       else advisoryFailures.push(row.sdk);
     }
