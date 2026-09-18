@@ -54,7 +54,7 @@ async function runAndCapturePodfile(podfileContent: string) {
 
 /** Counts NSE target DECLARATIONS, not bare mentions of the name. */
 const countTargets = (s: string) =>
-  (s.match(new RegExp(`^[ \\t]*target '${NSE}' do`, 'gm')) ?? []).length;
+  (s.match(new RegExp(`^[ \\t]*target ['\"]${NSE}['\"] do`, 'gm')) ?? []).length;
 
 
 describe('withKlaviyoPodfile - NSE pod declaration', () => {
@@ -153,5 +153,23 @@ describe('withKlaviyoPodfile - NSE pod declaration', () => {
 
     const warnings = (KlaviyoLog.warn as jest.Mock).mock.calls.map((c: any[]) => String(c[0]));
     expect(warnings.some((w: string) => w.includes('declares no'))).toBe(true);
+  });
+  it('recognises a DOUBLE-quoted target and pod, which Ruby accepts too', async () => {
+    // Single-quote-only patterns read a double-quoted target as absent and appended a
+    // duplicate block, which `pod install` rejects outright.
+    const doubleQuoted = `${base}
+  target "${NSE}" do
+    pod "KlaviyoSwiftExtension"
+  end
+`;
+    const { writes, final } = await runAndCapturePodfile(doubleQuoted);
+
+    // One write from the env-var mod; no second target appended, nothing rewritten.
+    expect(writes).toHaveLength(1);
+    expect(countTargets(final as string)).toBe(1);
+    expect(final).toContain('pod "KlaviyoSwiftExtension"');
+
+    const warnings = (KlaviyoLog.warn as jest.Mock).mock.calls.map((c: any[]) => String(c[0]));
+    expect(warnings.some((w: string) => w.includes('declares no'))).toBe(false);
   });
 });

@@ -7,8 +7,8 @@ tested against. All three consumers read it directly, so the matrix cannot drift
   consumes it via `fromJSON`.
 - `scripts/test-peer-dependencies.js` — requires it for the same run locally.
 - `scripts/test-packed-consumer.js` — installs the packed plugin into a throwaway Expo app
-  per row and runs a real `expo prebuild`, which is the only check here that exercises the
-  graph a consumer actually gets rather than this repository's hoisted, partly-mocked tree.
+  per row and runs a real `expo prebuild`, exercising the published plugin against the Expo
+  graph a consumer resolves. It runs `--no-install`, so pods and Gradle are out of scope.
 
 ## Fields
 

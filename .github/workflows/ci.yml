@@ -154,7 +154,7 @@ jobs:
 
     # The steps above install into THIS repository, where config-plugins is pinned and most
     # of it is mocked. This installs the PACKED plugin into a throwaway app and runs a real
-    # prebuild, which is the only check here that sees the graph a consumer actually gets.
+    # prebuild, exercising the plugin against the Expo graph a consumer resolves.
     - name: Prebuild the packed plugin in a throwaway consumer
       env:
         SDK: ${{ matrix.sdk }}

@@ -47,12 +47,9 @@ interface PbxProjectLike {
 }
 
 /**
- * Warns about a stale absolute reference to the config plist left by plugin 1.0.0.
+ * Finds stale absolute references to the config plist left by plugin 1.0.0.
  *
- * Detection only - nothing is removed. A false positive here costs a log line, whereas
- * deleting a reference we misidentified would remove a file registration the consumer owns.
- *
- * Returns the stale paths found.
+ * Read-only; returns the paths found. Callers warn rather than remove.
  */
 function findLegacyPlistReferences(
   xcodeProject: PbxProjectLike,
@@ -331,14 +328,19 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
   `;
         // Scoped to the NSE block: a file-wide search lets an unrelated target's pod
         // suppress our warning. Both patterns anchor to their keyword at a line start,
-        // so commented-out lines already fail to match.
+        // so commented-out lines already fail to match. Ruby accepts either quote style,
+        // so both are matched - otherwise a double-quoted target reads as absent and we
+        // append a duplicate, which `pod install` rejects.
         const nseBlock = podfile.match(
-          new RegExp(`^([ \\t]*)target\\s+'${NSE_TARGET_NAME}'\\s+do\\b([\\s\\S]*?)^\\1end`, 'm')
+          new RegExp(
+            `^([ \\t]*)target\\s+['"]${NSE_TARGET_NAME}['"]\\s+do\\b([\\s\\S]*?)^\\1end`,
+            'm'
+          )
         );
 
         if (!nseBlock) {
           await FileManager.writeFile(`${iosRoot}/Podfile`, `${podfile}\n${podInsertion}`);
-        } else if (!/^[ \t]*pod\s+'KlaviyoSwiftExtension'/m.test(nseBlock[2])) {
+        } else if (!/^[ \t]*pod\s+['"]KlaviyoSwiftExtension['"]/m.test(nseBlock[2])) {
           KlaviyoLog.warn(
             `The ${NSE_TARGET_NAME} target exists in the Podfile but declares no ` +
               `KlaviyoSwiftExtension pod. Add ${NSE_POD_DECLARATION} to it, or remove the ` +

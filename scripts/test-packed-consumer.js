@@ -2,21 +2,9 @@
 /**
  * Installs the PACKED plugin into a throwaway Expo app and runs a real prebuild.
  *
- * Why this exists, when scripts/test-peer-dependencies.js already runs a matrix:
- * that script installs each Expo pairing into THIS repository, where the tree is
- * deliberately unlike a consumer's. package.json pins @expo/config-plugins exactly,
- * tests/setup.ts mocks most of @expo/config-plugins, and node_modules is hoisted our
- * way. Jest and tsc can therefore stay green while exercising our mocks rather than
- * the SDK graph a customer actually gets.
- *
- * Every consumer-facing defect found during the SDK 54 -> 57 upgrade was invisible to
- * the unit suite and caught by hand or in review: MIGRATION_GUIDE.md missing from the
- * `files` allowlist, an absolute machine-specific path in project.pbxproj, and the
- * matrix validating config-plugins 57 while claiming to test SDK 54. All three are
- * "what does a real install look like" questions, which is what this checks.
- *
- * Deliberately runs `expo prebuild --no-install`: CocoaPods needs macOS, and the point
- * here is the config plugin's output, not pod resolution.
+ * Validates the published config plugin and its prebuild output against the Expo graph a
+ * consumer resolves - NOT the full consumer graph. `--no-install` means CocoaPods and
+ * Gradle never run, so native dependency resolution is out of scope here.
  *
  * Usage:
  *   node scripts/test-packed-consumer.js            # every row in the matrix
