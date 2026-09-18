@@ -1,7 +1,6 @@
 {
     "platforms": [
-      "apple",
-      "android"
+      "apple"
     ],
     "apple": {
       "appDelegateSubscribers": ["KlaviyoAppDelegate"]

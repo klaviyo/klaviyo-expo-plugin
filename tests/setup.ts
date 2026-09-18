@@ -26,6 +26,23 @@ jest.mock('glob', () => ({
 
 // Mock @expo/config-plugins
 jest.mock('@expo/config-plugins', () => ({
+  // Real implementation: withKlaviyoIos delegates version resolution to Expo rather
+  // than reimplementing it, so the tests must exercise Expo's actual functions.
+  IOSConfig: {
+    // withKlaviyoIos delegates version resolution to Expo, so these tests must exercise
+    // Expo's real getVersion/getBuildNumber rather than a stand-in that could drift.
+    //
+    // Deliberately narrowed to the Version submodule. requireActual on the full
+    // '@expo/config-plugins' barrel pulls in modules that destructure fs.promises at
+    // import time, which the fs mock above does not provide — that fails three suites
+    // with "Cannot destructure property 'readFile'". Version.js itself only builds
+    // lazily-required plugin wrappers at load time, so it never touches the mocked fs.
+    //
+    // This is a build/ deep import with no public subpath guarantee. If config-plugins
+    // restructures its output this breaks loudly at test time only; production code uses
+    // the stable public IOSConfig.Version barrel export.
+    Version: jest.requireActual('@expo/config-plugins/build/ios/Version'),
+  },
   AndroidConfig: {
     Colors: {
       // Pure function: set or remove a color entry by name
