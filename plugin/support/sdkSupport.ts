@@ -28,8 +28,8 @@ export function resetSdkWarningState(): void {
 /**
  * Warn when the host app is on an Expo SDK this plugin does not support. Never throws.
  *
- * Runs on every config resolution — `expo prebuild`, but also `expo start`, `expo config`
- * and EAS fingerprinting — so it must stay cheap and free of side effects.
+ * Runs on every config resolution. That includes `expo prebuild`, `expo start`,
+ * `expo config` and EAS fingerprinting, so it must stay cheap and free of side effects.
  */
 export function warnOnUnsupportedSdk(sdkVersion: string | undefined): void {
   // A bare (non-Expo-managed) project has no sdkVersion at all; say that explicitly

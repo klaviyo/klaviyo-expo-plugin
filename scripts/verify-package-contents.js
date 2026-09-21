@@ -3,7 +3,7 @@
  * Asserts the published tarball contains every file the plugin reads at prebuild time.
  *
  * This exists because `files` in package.json is a hard allowlist, and the example app
- * installs the plugin with `file:../` — so it sees the whole working tree and can never
+ * installs the plugin with `file:../`, so it sees the whole working tree and can never
  * catch an omission. A missing entry here fails only for real consumers, after publish.
  *
  * Run: node scripts/verify-package-contents.js

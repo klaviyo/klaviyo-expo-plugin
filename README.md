@@ -46,14 +46,14 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 
 - Your Expo app needs to be run as a [development build](https://docs.expo.dev/develop/development-builds/introduction/). This plugin will not work in Expo Go.
 - **Supported: Expo SDK 54 through 57.** That matches Expo's own documented support window. SDK 57 is the primary target.
-- SDK 52 and 53 are covered by CI and did build and launch in testing, but are **not** a support commitment — Expo no longer documents them.
+- SDK 52 and 53 are covered by CI and did build and launch in testing, but are **not** a support commitment. Expo no longer documents them.
 - The `expo` peer range is `*`, following [Expo's guidance for library authors](https://docs.expo.dev/modules/existing-library/). npm will therefore not block installation on any SDK. **The table below is the support statement, not the peer range.** On an unsupported SDK the plugin prints a warning during `expo prebuild`.
 
 | Expo SDK | Status | Evidence |
 | --- | --- | --- |
-| `49.x` and older | **Not supported** | Builds, but push silently never works — see below |
-| `50.x` | **Not supported** | Android build impossible — see below |
-| `51.x` | **Not supported** | Android build impossible — see below |
+| `49.x` and older | **Not supported** | Builds, but push silently never works. See below |
+| `50.x` | **Not supported** | Android build impossible. See below |
+| `51.x` | **Not supported** | Android build impossible. See below |
 | `52.0.x` | Tested, not supported | Compiled and launched, iOS + Android |
 | `53.0.x` | Tested, not supported | Compiled and launched, iOS + Android |
 | `54.0.x` | **Supported** | Compiled and launched, iOS + Android |
@@ -61,7 +61,7 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 | `56.0.x` | **Supported** | Compiled and launched, iOS + Android |
 | `57.0.x` | **Supported** (primary target) | Compiled and launched, iOS + Android |
 
-> **Why older SDKs are unsupported.** **SDK 50 and 51:** `klaviyo-react-native-sdk` pulls `klaviyo-android-sdk`, which strictly requires `androidx.core` 1.16.0 — that needs compileSdk 35 and Android Gradle Plugin 8.6, while SDK 50 and 51 ship compileSdk 34 and AGP 8.1–8.2. No Android build is possible on those SDKs, and no plugin setting avoids it. **SDK 49 and older:** Expo autolinking in those versions does not understand the `apple` platform key this plugin uses, so its native iOS module is dropped without any error. Prebuild succeeds and the app builds, but push notification handling is never installed. Use SDK 54 or newer.
+> **Why older SDKs are unsupported.** **SDK 50 and 51:** `klaviyo-react-native-sdk` pulls `klaviyo-android-sdk`, which strictly requires `androidx.core` 1.16.0. That needs compileSdk 35 and Android Gradle Plugin 8.6, while SDK 50 and 51 ship compileSdk 34 and AGP 8.1 to 8.2. No Android build is possible on those SDKs, and no plugin setting avoids it. **SDK 49 and older:** Expo autolinking in those versions does not understand the `apple` platform key this plugin uses, so its native iOS module is dropped without any error. Prebuild succeeds and the app builds, but push notification handling is never installed. Use SDK 54 or newer.
 
 > **Note on Expo 56 and iOS deployment targets.** `expo-modules-core` raised its iOS deployment target to 16.4 in 56.0.0. The `reconcile_expo_module_deployment_targets` step that lifts this plugin's pod to match arrived in `expo-modules-autolinking` 56.0.13. Every `expo@56.0.x` release depends on that package with a range that resolves to the newest 56.0.x, so a normal install already has the fix. If your lockfile pins `expo-modules-autolinking` at 56.0.12 or lower, run `npm update expo-modules-autolinking`.
 
@@ -126,7 +126,7 @@ npx expo install klaviyo-expo-plugin
 npx expo prebuild
 ```
 
-> **⚠️ `prebuild` changed in Expo SDK 57.** From SDK 57, `npx expo prebuild` erases the `ios/` and `android/` folders and generates them again on every run. It preserves nothing — not gitignored files, not `Pods/`, not your `.xcworkspace`. If you keep anything in those folders that the plugin does not generate, use `--no-clean` for the previous additive behavior:
+> **⚠️ `prebuild` changed in Expo SDK 57.** From SDK 57, `npx expo prebuild` erases the `ios/` and `android/` folders and generates them again on every run. It preserves nothing. Not gitignored files, not `Pods/`, not your `.xcworkspace`. If you keep anything in those folders that the plugin does not generate, use `--no-clean` for the previous additive behavior:
 >
 > ```bash
 > npx expo prebuild --no-clean

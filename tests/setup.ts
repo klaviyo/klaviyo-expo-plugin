@@ -34,7 +34,7 @@ jest.mock('@expo/config-plugins', () => ({
     //
     // Deliberately narrowed to the Version submodule. requireActual on the full
     // '@expo/config-plugins' barrel pulls in modules that destructure fs.promises at
-    // import time, which the fs mock above does not provide — that fails three suites
+    // import time, which the fs mock above does not provide. That fails three suites
     // with "Cannot destructure property 'readFile'". Version.js itself only builds
     // lazily-required plugin wrappers at load time, so it never touches the mocked fs.
     //

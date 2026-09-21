@@ -3,10 +3,10 @@
 `expo-sdk-matrix.json` is the single source of truth for the Expo SDK pairings this plugin is
 tested against. All three consumers read it directly, so the matrix cannot drift between them:
 
-- `.github/workflows/ci.yml` — the `sdk-matrix` job emits it and `test-peer-dependencies`
+- `.github/workflows/ci.yml`: the `sdk-matrix` job emits it and `test-peer-dependencies`
   consumes it via `fromJSON`.
-- `scripts/test-peer-dependencies.js` — requires it for the same run locally.
-- `scripts/test-packed-consumer.js` — installs the packed plugin into a throwaway Expo app
+- `scripts/test-peer-dependencies.js`: requires it for the same run locally.
+- `scripts/test-packed-consumer.js`: installs the packed plugin into a throwaway Expo app
   per row and runs a real `expo prebuild`, exercising the published plugin against the Expo
   graph a consumer resolves. It runs `--no-install`, so pods and Gradle are out of scope.
 

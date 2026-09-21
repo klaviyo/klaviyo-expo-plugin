@@ -9,8 +9,8 @@ import { getPluginRoot } from './support/pluginResolver';
 /**
  * Version helpers come straight from @expo/config-plugins rather than being reimplemented here.
  * The notification service extension must report the same CFBundleShortVersionString as the host
- * app — App Store validation rejects a mismatch — and the host app's value is written by Expo's
- * own withVersion/withBuildNumber using exactly these functions.
+ * app, because App Store validation rejects a mismatch. The host app's value is written by
+ * Expo's own withVersion/withBuildNumber using exactly these functions.
  */
 const getMarketingVersion = IOSConfig.Version.getVersion;
 const getBuildNumber = IOSConfig.Version.getBuildNumber;
@@ -112,8 +112,8 @@ const withKlaviyoPluginConfigurationPlist: ConfigPlugin = config => {
       }
 
       // addFile returns null when the path is already registered, which is the normal
-      // case on a non-clean prebuild. Treat that as a no-op rather than a failure —
-      // warning there would fire on every incremental rebuild.
+      // case on a non-clean prebuild. Treat that as a no-op rather than a failure.
+      // Warning there would fire on every incremental rebuild.
       if (xcodeProject.hasFile(relativePlistPath)) {
         KlaviyoLog.log('klaviyo-plugin-configuration.plist is already in the Xcode project');
         return config;

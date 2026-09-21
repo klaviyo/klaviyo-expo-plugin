@@ -9,8 +9,8 @@ This guide outlines how to migrate when upgrading to newer versions of the Klavi
 No plugin props change in v1.1.0, but two plugin behaviours do change on iOS - see the two
 sections below. The first change is Expo's, not ours. From Expo SDK 57, `npx expo prebuild`
 deletes the `ios/` and `android/` folders and generates them again on every run, where it used to
-write on top of whatever was already there. It preserves nothing — not gitignored files, not `Pods/`,
-not your `.xcworkspace`.
+write on top of whatever was already there. It preserves nothing. Not gitignored files, not
+`Pods/`, not your `.xcworkspace`.
 
 **If you keep hand-written native code, a checked-in `ios/` or `android/` folder, or anything else
 the plugin does not generate**, pass `--no-clean` to get the previous additive behavior:
@@ -28,9 +28,9 @@ Nothing is lost: Expo's own `withVersion` and `withBuildNumber` mods already set
 `version` and `ios.buildNumber`, and they run in the same prebuild. The plugin was overwriting values
 Expo had just written, which meant a plugin-ordering change could silently alter your app's version.
 
-**What to check.** If your app's version or build number ever depended on this plugin writing them —
-for example if `version` is absent from your Expo config, or a custom config plugin ran after this one
-and relied on the values being present — set them explicitly instead:
+**What to check.** Your app's version or build number may have depended on this plugin writing
+them, for example if `version` is absent from your Expo config, or a custom config plugin ran
+after this one and relied on the values being present. In that case, set them explicitly:
 
 ```js
 {
