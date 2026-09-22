@@ -45,15 +45,40 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 ### Expo
 
 - Your Expo app needs to be run as a [development build](https://docs.expo.dev/develop/development-builds/introduction/). This plugin will not work in Expo Go.
+- **Supported: Expo SDK 54 through 57.** That matches Expo's own documented support window. SDK 57 is the primary target.
+- SDK 52 and 53 are covered by CI and did build and launch in testing, but are **not** a support commitment. Expo no longer documents them.
+- The `expo` peer range is `*`, following [Expo's guidance for library authors](https://docs.expo.dev/modules/existing-library/). npm will therefore not block installation on any SDK. **The table below is the support statement, not the peer range.** On an older unsupported SDK the plugin prints a warning during `expo prebuild`. There is no upper ceiling, so a newer SDK never warns.
+
+| Expo SDK | Status | Evidence |
+| --- | --- | --- |
+| `49.x` and older | **Not supported** | Builds, but push silently never works. See below |
+| `50.x` | **Not supported** | Android build impossible. See below |
+| `51.x` | **Not supported** | Android build impossible. See below |
+| `52.0.x` | Tested, not supported | Compiled and launched, iOS + Android |
+| `53.0.x` | Tested, not supported | Compiled and launched, iOS + Android |
+| `54.0.x` | **Supported** | Compiled and launched, iOS + Android |
+| `55.0.x` | **Supported** | Compiled and launched, iOS + Android |
+| `56.0.x` | **Supported** | Compiled and launched, iOS + Android |
+| `57.0.x` | **Supported** (primary target) | Compiled and launched, iOS + Android |
+
+> **Why older SDKs are unsupported.** **SDK 50 and 51:** `klaviyo-react-native-sdk` pulls `klaviyo-android-sdk`, which strictly requires `androidx.core` 1.16.0. That needs compileSdk 35 and Android Gradle Plugin 8.6, while SDK 50 and 51 ship compileSdk 34 and AGP 8.1 to 8.2. No Android build is possible on those SDKs, and no plugin setting avoids it. **SDK 49 and older:** Expo autolinking in those versions does not understand the `apple` platform key this plugin uses, so its native iOS module is dropped without any error. Prebuild succeeds and the app builds, but push notification handling is never installed. Use SDK 54 or newer.
+
+> **Note on Expo 56 and iOS deployment targets.** `expo-modules-core` raised its iOS deployment target to 16.4 in 56.0.0. The `reconcile_expo_module_deployment_targets` step that lifts this plugin's pod to match arrived in `expo-modules-autolinking` 56.0.13. Every `expo@56.0.x` release depends on that package with a range that resolves to the newest 56.0.x, so a normal install already has the fix. If your lockfile pins `expo-modules-autolinking` at 56.0.12 or lower, run `npm update expo-modules-autolinking`.
 
 ### Android
 
-- `minSdkVersion` of `23+`
-- `compileSdkVersion` of `34+`
+- `minSdkVersion` of `24+`
+- `compileSdkVersion` of `35+`
+
+The `compileSdk` floor is `35`, not `36`: this plugin sets no `compileSdk` itself, and the binding
+constraint is `androidx.core` 1.16.0 (pulled in by `klaviyo-android-sdk` via
+`klaviyo-react-native-sdk`), which requires `35`. That is also why Expo SDK 50 and 51 cannot work -
+they ship `34`. Expo SDK 57 defaults to `36`, so a normal install is already above the floor; `35` is
+stated here so a working project on `35` is not told it is unsupported.
 
 ### iOS
 
-- Minimum Deployment Target `13.0+`
+- Minimum Deployment Target `15.1+` (the floor declared by the plugin's pod). Expo SDK 56 and later require an app deployment target of `16.4`
 - Apple Push Notification Service (APNs) set up
 
 > **⚠️ Important Note for Federated Apple Developer Accounts:** If you're using a federated Apple Developer account, you'll need to provide an ASC API token with Admin access. While Expo supports federated accounts through ASC API tokens, the EAS CLI cannot directly log into federated accounts for credential management. See [Expo's documentation on federated accounts](https://docs.expo.dev/app-signing/apple-developer-program-roles-and-permissions/#federated-apple-developer-accounts) for more details.
@@ -100,6 +125,13 @@ npx expo install klaviyo-expo-plugin
 ```bash
 npx expo prebuild
 ```
+
+> **⚠️ `prebuild` changed in Expo SDK 57.** From SDK 57, `npx expo prebuild` erases the `ios/` and `android/` folders and generates them again on every run. It preserves nothing. Not gitignored files, not `Pods/`, not your `.xcworkspace`. If you keep anything in those folders that the plugin does not generate, use `--no-clean` for the previous additive behavior:
+>
+> ```bash
+> npx expo prebuild --no-clean
+> ```
+>
 
 4. (optional) We recommend using the `expo-notifications` library for push permissions, token retrieval, and reading push content. Check out our `/example` project for some ideas on how to use this.
 

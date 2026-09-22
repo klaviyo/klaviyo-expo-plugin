@@ -2,6 +2,46 @@
 
 This guide outlines how to migrate when upgrading to newer versions of the Klaviyo Expo plugin.
 
+## Migrating to v1.1.0
+
+### Expo SDK 57: `expo prebuild` erases the native folders
+
+No plugin props change in v1.1.0, but two plugin behaviours do change on iOS - see the two
+sections below. The first change is Expo's, not ours. From Expo SDK 57, `npx expo prebuild`
+deletes the `ios/` and `android/` folders and generates them again on every run, where it used to
+write on top of whatever was already there. It preserves nothing. Not gitignored files, not
+`Pods/`, not your `.xcworkspace`.
+
+**If you keep hand-written native code, a checked-in `ios/` or `android/` folder, or anything else
+the plugin does not generate**, pass `--no-clean` to get the previous additive behavior:
+
+```bash
+npx expo prebuild --no-clean
+```
+
+### iOS: the plugin no longer writes version keys into your app's `Info.plist`
+
+Previously this plugin set `CFBundleShortVersionString` and `CFBundleVersion` in the **host app's**
+`Info.plist` while configuring remote notifications. It no longer does.
+
+Nothing is lost: Expo's own `withVersion` and `withBuildNumber` mods already set both keys from your
+`version` and `ios.buildNumber`, and they run in the same prebuild. The plugin was overwriting values
+Expo had just written, which meant a plugin-ordering change could silently alter your app's version.
+
+**What to check.** Your app's version or build number may have depended on this plugin writing
+them, for example if `version` is absent from your Expo config, or a custom config plugin ran
+after this one and relied on the values being present. In that case, set them explicitly:
+
+```js
+{
+  "version": "1.2.3",
+  "ios": { "buildNumber": "42" }
+}
+```
+
+The Notification Service Extension is unaffected: it still receives the host app's version, so the
+NSE and the app continue to report matching versions.
+
 ## Migrating to v1.0.0
 
 ### `android.openTracking` removed
@@ -105,7 +145,7 @@ plugins: [
 }
 ```
 
-Use top-level `version` for the marketing version (CFBundleShortVersionString) and `ios.buildNumber` for the build number (CFBundleVersion). The plugin applies these to both the main app and the Notification Service Extension.
+Use top-level `version` for the marketing version (CFBundleShortVersionString) and `ios.buildNumber` for the build number (CFBundleVersion). Expo applies these to the main app. The plugin reads the same values and applies them to the Notification Service Extension, so the two stay in step.
 
 ### Optional module toggles (Android & iOS)
 

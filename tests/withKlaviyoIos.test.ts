@@ -232,53 +232,68 @@ describe('withKlaviyoIos', () => {
     });
   });
 
+  // Guards the deep import in tests/setup.ts. If @expo/config-plugins restructures build/,
+  // the requireActual there yields an object without these functions and the version tests
+  // fail with a confusing "not a function" deep inside the mod. This fails first, and says why.
+  describe('test harness: real IOSConfig.Version is wired up', () => {
+    it('exposes getVersion and getBuildNumber from the real @expo/config-plugins', () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { IOSConfig } = require('@expo/config-plugins');
+      expect(typeof IOSConfig?.Version?.getVersion).toBe('function');
+      expect(typeof IOSConfig?.Version?.getBuildNumber).toBe('function');
+    });
+  });
+
   describe('version synchronization', () => {
+    // Expo's own withVersion/withBuildNumber own CFBundleShortVersionString and CFBundleVersion on
+    // the host app, and resolve them as `ios.version || version || '1.0.0'`. This plugin used to
+    // overwrite both with a narrower `version ?? '1.0'`, which silently replaced an app author's
+    // ios.version on every prebuild and could ship a lower version than their last App Store
+    // upload. We no longer touch them.
     describe('main app target Info.plist', () => {
-      it('should set CFBundleShortVersionString from config.version', () => {
+      it('should not overwrite CFBundleShortVersionString or CFBundleVersion from config.version', () => {
+        // Seeded with sentinels rather than the fixture default of 1.0 / 1 deliberately. The
+        // old buggy code wrote `version ?? '1.0'`, so a fixture seeded with '1.0' would pass
+        // this test even if the defect came back. These values match no code path, so the only
+        // way they survive is if the plugin genuinely leaves both keys alone.
         const configWithVersion = createMockIosConfig({
           version: '0.11.0',
           ios: { buildNumber: '25' },
+          modResults: {
+            CFBundleShortVersionString: 'SEEDED-SHORT-VERSION',
+            CFBundleVersion: 'SEEDED-BUILD-NUMBER',
+          },
         });
         const modifiedConfig = withKlaviyoIos(configWithVersion, mockProps) as any;
-        
+
         expect(modifiedConfig.modResults).toBeDefined();
-        expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('0.11.0');
+        expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('SEEDED-SHORT-VERSION');
+        expect(modifiedConfig.modResults.CFBundleVersion).toBe('SEEDED-BUILD-NUMBER');
       });
 
-      it('should set CFBundleVersion from config.ios.buildNumber', () => {
+      it('should not touch the version keys at all, whatever they contain', () => {
+        // Direct absence check rather than a value comparison: whatever the plugin added, the
+        // two version keys must not be among the keys it changed.
+        const before = {
+          CFBundleShortVersionString: 'SEEDED-SHORT-VERSION',
+          CFBundleVersion: 'SEEDED-BUILD-NUMBER',
+        };
         const configWithVersion = createMockIosConfig({
           version: '0.11.0',
           ios: { buildNumber: '25' },
+          modResults: { ...before },
         });
+
         const modifiedConfig = withKlaviyoIos(configWithVersion, mockProps) as any;
-        
-        expect(modifiedConfig.modResults).toBeDefined();
-        expect(modifiedConfig.modResults.CFBundleVersion).toBe('25');
+        const after = modifiedConfig.modResults;
+
+        const changed = Object.keys(after).filter(
+          (key) => key in before && after[key] !== (before as Record<string, string>)[key]
+        );
+        expect(changed).toEqual([]);
       });
 
-      it('should default CFBundleShortVersionString to "1.0" when config.version is not provided', () => {
-        const configWithoutVersion = createMockIosConfig({
-          version: undefined,
-          ios: { buildNumber: '25' },
-        });
-        const modifiedConfig = withKlaviyoIos(configWithoutVersion, mockProps) as any;
-        
-        expect(modifiedConfig.modResults).toBeDefined();
-        expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('1.0');
-      });
-
-      it('should default CFBundleVersion to "1" when config.ios.buildNumber is not provided', () => {
-        const configWithoutBuildNumber = createMockIosConfig({
-          version: '0.11.0',
-          ios: { buildNumber: undefined },
-        });
-        const modifiedConfig = withKlaviyoIos(configWithoutBuildNumber, mockProps) as any;
-        
-        expect(modifiedConfig.modResults).toBeDefined();
-        expect(modifiedConfig.modResults.CFBundleVersion).toBe('1');
-      });
-
-      it('should override existing CFBundleShortVersionString in Info.plist', () => {
+      it('should leave an existing version in the Info.plist untouched', () => {
         const configWithExistingVersion = createMockIosConfig({
           version: '0.11.0',
           ios: { buildNumber: '25' },
@@ -288,9 +303,27 @@ describe('withKlaviyoIos', () => {
           },
         });
         const modifiedConfig = withKlaviyoIos(configWithExistingVersion, mockProps) as any;
-        
-        expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('0.11.0');
-        expect(modifiedConfig.modResults.CFBundleVersion).toBe('25');
+
+        expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('2.0.0');
+        expect(modifiedConfig.modResults.CFBundleVersion).toBe('100');
+      });
+
+      it('should still write the Klaviyo keys it does own, with the right values', () => {
+        const configWithVersion = createMockIosConfig({
+          version: '0.11.0',
+          ios: { buildNumber: '25' },
+        });
+        const modifiedConfig = withKlaviyoIos(configWithVersion, mockProps) as any;
+
+        // Assert values, not just presence: this mod was just edited to stop writing two
+        // keys, and toBeDefined() would not catch a fat-finger in the keys it kept.
+        expect(modifiedConfig.modResults.klaviyo_app_group).toBe(
+          'group.com.test.app.KlaviyoNotificationServiceExtension.shared'
+        );
+        expect(modifiedConfig.modResults.klaviyo_badge_autoclearing).toBe(
+          mockProps.badgeAutoclearing
+        );
+        expect(modifiedConfig.modResults.klaviyo_badge_autoclearing).toBe(true);
       });
     });
 
@@ -361,21 +394,41 @@ describe('withKlaviyoIos', () => {
         expect(writtenContent).toContain('<string>25</string>');
       });
 
-      it('should default CFBundleShortVersionString to "1.0" in NSE when config.version is not provided', async () => {
+      it('should default CFBundleShortVersionString to "1.0.0" in NSE when config.version is not provided', async () => {
         const configWithoutVersion = createMockIosConfig({
           version: undefined,
           ios: { buildNumber: '25' },
         });
-        
+
         await runIosMod(configWithoutVersion, mockProps);
-        
+
         expect(FileManager.writeFile).toHaveBeenCalled();
-        const writeCall = FileManager.writeFile.mock.calls.find(call => 
+        const writeCall = FileManager.writeFile.mock.calls.find(call =>
           call && call[0] && typeof call[0] === 'string' && call[0].includes('KlaviyoNotificationServiceExtension-Info.plist')
         );
-        
+
+        // '1.0.0' matches Expo's own getVersion() default. The host app gets its version from
+        // Expo's withVersion, so any other default here produces an app/appex mismatch that
+        // App Store validation rejects at upload.
         const writtenContent = writeCall[1];
-        expect(writtenContent).toContain('<string>1.0</string>');
+        expect(writtenContent).toContain('<string>1.0.0</string>');
+      });
+
+      it('should prefer ios.version over the top-level version in the NSE, matching Expo', async () => {
+        const configWithIosVersion = createMockIosConfig({
+          version: '1.2.3',
+          ios: { version: '4.5.6', buildNumber: '25' },
+        });
+
+        await runIosMod(configWithIosVersion, mockProps);
+
+        const writeCall = FileManager.writeFile.mock.calls.find(call =>
+          call && call[0] && typeof call[0] === 'string' && call[0].includes('KlaviyoNotificationServiceExtension-Info.plist')
+        );
+
+        const writtenContent = writeCall[1];
+        expect(writtenContent).toContain('<string>4.5.6</string>');
+        expect(writtenContent).not.toContain('<string>1.2.3</string>');
       });
 
       it('should default CFBundleVersion to "1" in NSE when config.ios.buildNumber is not provided', async () => {
@@ -415,24 +468,19 @@ describe('withKlaviyoIos', () => {
         expect(writtenContent).not.toContain('<string>1</string>');
       });
 
-      it('should ensure main app and NSE extension have matching versions', async () => {
+      it('should write the NSE version using the same resolution Expo uses for the app', async () => {
         const configWithVersion = createMockIosConfig({
           version: '0.11.0',
           ios: { buildNumber: '25' },
         });
-        
-        const modifiedConfig = await runIosMod(configWithVersion, mockProps) as any;
-        
-        // Check main app version
-        expect(modifiedConfig.modResults.CFBundleShortVersionString).toBe('0.11.0');
-        expect(modifiedConfig.modResults.CFBundleVersion).toBe('25');
-        
-        // Check NSE extension version was written
+
+        await runIosMod(configWithVersion, mockProps);
+
         expect(FileManager.writeFile).toHaveBeenCalled();
-        const writeCall = FileManager.writeFile.mock.calls.find(call => 
+        const writeCall = FileManager.writeFile.mock.calls.find(call =>
           call && call[0] && typeof call[0] === 'string' && call[0].includes('KlaviyoNotificationServiceExtension-Info.plist')
         );
-        
+
         const writtenContent = writeCall[1];
         expect(writtenContent).toContain('<string>0.11.0</string>');
         expect(writtenContent).toContain('<string>25</string>');

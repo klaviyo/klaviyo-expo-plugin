@@ -25,8 +25,13 @@ and enables:
 
 ## Key Technical Context
 
-- **Platforms**: iOS 13.0+ | Android API 23+ (minSdk 23, compileSdk 34+)
-- **Runtime**: prebuild time only (`expo prebuild`); ships no runtime code
+- **Platforms**: iOS 15.1+ pod floor (Expo SDK 56+ requires an app deployment target of 16.4) |
+  Android API 24+ (minSdk 24, compileSdk 35+, which is the `androidx.core` 1.16.0 floor.
+  Expo SDK 57 defaults to 36)
+- **Runtime**: mostly prebuild time (`expo prebuild`), but the package also autolinks a native iOS
+  module. `expo-module.config.json` declares `apple.appDelegateSubscribers: ["KlaviyoAppDelegate"]`,
+  and `ios/ExpoKlaviyo.podspec` adds `ExpoModulesCore`, `React-Core` and `KlaviyoSwift` to every
+  consumer's Pods graph, so `ios/ExpoKlaviyo/KlaviyoAppDelegate.swift` compiles into the customer app.
 
 ## Repository Structure
 

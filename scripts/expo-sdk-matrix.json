@@ -1,0 +1,8 @@
+[
+  { "sdk": "52", "react": "18.3.1", "reactNative": "0.76.9",  "expo": "~52.0.0", "configPlugins": "~9.0.17",  "supported": false },
+  { "sdk": "53", "react": "19.0.0", "reactNative": "0.79.6",  "expo": "~53.0.0", "configPlugins": "~10.1.2",  "supported": false },
+  { "sdk": "54", "react": "19.1.0", "reactNative": "0.81.5",  "expo": "~54.0.0", "configPlugins": "~54.0.5",  "supported": true  },
+  { "sdk": "55", "react": "19.2.0", "reactNative": "0.83.10", "expo": "~55.0.0", "configPlugins": "~55.0.11", "supported": true  },
+  { "sdk": "56", "react": "19.2.3", "reactNative": "0.85.3",  "expo": "~56.0.0", "configPlugins": "~56.0.16", "supported": true  },
+  { "sdk": "57", "react": "19.2.3", "reactNative": "0.86.3",  "expo": "~57.0.0", "configPlugins": "~57.0.9",  "supported": true  }
+]

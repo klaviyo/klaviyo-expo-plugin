@@ -2,12 +2,11 @@ module.exports = () => {
   return {
     name: 'klaviyo plugin example',
     slug: 'klaviyo-plugin-example',
-    version: '1.0.0',
+    version: '1.1.0',
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'expoexample',
     userInterfaceStyle: 'automatic',
-    newArchEnabled: false,
     ios: {
       // Make sure to increment this and the version as needed when making builds
       buildNumber: '1',
