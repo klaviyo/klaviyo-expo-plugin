@@ -47,7 +47,7 @@ The plugin is designed to work with the [klaviyo-react-native-sdk](https://githu
 - Your Expo app needs to be run as a [development build](https://docs.expo.dev/develop/development-builds/introduction/). This plugin will not work in Expo Go.
 - **Supported: Expo SDK 54 through 57.** That matches Expo's own documented support window. SDK 57 is the primary target.
 - SDK 52 and 53 are covered by CI and did build and launch in testing, but are **not** a support commitment. Expo no longer documents them.
-- The `expo` peer range is `*`, following [Expo's guidance for library authors](https://docs.expo.dev/modules/existing-library/). npm will therefore not block installation on any SDK. **The table below is the support statement, not the peer range.** On an unsupported SDK the plugin prints a warning during `expo prebuild`.
+- The `expo` peer range is `*`, following [Expo's guidance for library authors](https://docs.expo.dev/modules/existing-library/). npm will therefore not block installation on any SDK. **The table below is the support statement, not the peer range.** On an older unsupported SDK the plugin prints a warning during `expo prebuild`. There is no upper ceiling, so a newer SDK never warns.
 
 | Expo SDK | Status | Evidence |
 | --- | --- | --- |

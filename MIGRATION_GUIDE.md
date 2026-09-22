@@ -145,7 +145,7 @@ plugins: [
 }
 ```
 
-Use top-level `version` for the marketing version (CFBundleShortVersionString) and `ios.buildNumber` for the build number (CFBundleVersion). The plugin applies these to both the main app and the Notification Service Extension.
+Use top-level `version` for the marketing version (CFBundleShortVersionString) and `ios.buildNumber` for the build number (CFBundleVersion). Expo applies these to the main app. The plugin reads the same values and applies them to the Notification Service Extension, so the two stay in step.
 
 ### Optional module toggles (Android & iOS)
 

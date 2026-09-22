@@ -197,10 +197,8 @@ const withRemoteNotificationsPermissions: ConfigPlugin<KlaviyoPluginIosProps> = 
     const actualAppGroupName = `group.${bundleIdentifier}.${NSE_TARGET_NAME}.shared`;
     infoPlist.klaviyo_app_group = actualAppGroupName;
     infoPlist.klaviyo_badge_autoclearing = props.badgeAutoclearing;
-    // Deliberately NOT writing CFBundleShortVersionString / CFBundleVersion here. This mod runs
-    // against the host app's Info.plist, and Expo's own withVersion/withBuildNumber already set
-    // both keys with fuller precedence (config.ios.version first). Writing them here overwrote
-    // the app author's `ios.version` with the top-level `version` on every prebuild.
+    // Expo's withVersion/withBuildNumber own CFBundleShortVersionString and CFBundleVersion
+    // on the host app. This mod does not write them.
 
     // Manage klaviyo_automatic_push_token_forwarding flag (opt-in; native iOS defaults to OFF).
     // Write only when true; remove the key when omitted so the native default applies.
@@ -326,11 +324,8 @@ const withKlaviyoPodfile: ConfigPlugin<KlaviyoPluginIosProps> = (config) => {
     ${NSE_POD_DECLARATION}
   end
   `;
-        // Scoped to the NSE block: a file-wide search lets an unrelated target's pod
-        // suppress our warning. Both patterns anchor to their keyword at a line start,
-        // so commented-out lines already fail to match. Ruby accepts either quote style,
-        // so both are matched - otherwise a double-quoted target reads as absent and we
-        // append a duplicate, which `pod install` rejects.
+        // Ruby accepts either quote style, and both patterns anchor to their keyword at a
+        // line start so commented-out lines do not match.
         const nseBlock = podfile.match(
           new RegExp(
             `^([ \\t]*)target\\s+['"]${NSE_TARGET_NAME}['"]\\s+do\\b([\\s\\S]*?)^\\1end`,
