@@ -1,0 +1,31 @@
+name: Set up EAS for the example app
+description: Installs Node, the plugin and example app dependencies, and EAS CLI. Expects EXPO_TOKEN in the job environment.
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+        cache-dependency-path: |
+          package-lock.json
+          example/package-lock.json
+
+    # The root install runs `prepare`, which builds dist/ so the example's
+    # file:../ dependency resolves when EAS CLI reads the app config.
+    - name: Install plugin dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Install example dependencies
+      shell: bash
+      working-directory: example
+      run: npm ci
+
+    - name: Setup EAS CLI
+      uses: expo/expo-github-action@v8
+      with:
+        eas-version: latest
+        packager: npm

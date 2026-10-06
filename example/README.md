@@ -101,3 +101,37 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Continuous deployment
+
+`.github/workflows/publish-example.yml` builds this app on EAS and submits it to the Play Store internal testing track and TestFlight. It runs on pushes to `master` and `rel/**`, on `release: published`, and by hand through `workflow_dispatch`. Until `EXPO_TOKEN` and `KLAVIYO_EAS_PROJECT_ID` are set, the workflow skips with a warning.
+
+Signing credentials are EAS-hosted. The Android keystore, iOS distribution certificate and provisioning profiles (app and `KlaviyoNotificationServiceExtension`), and the store submit keys all live on expo.dev. CI only holds an Expo access token.
+
+Build numbers (`android.versionCode`, `ios.buildNumber`) come from EAS's remote counter (`cli.appVersionSource: "remote"` and `build.production.autoIncrement: true` in `eas.json`), so every EAS build gets a higher number than the last. If a store still rejects an upload as a duplicate, because the counter fell behind builds uploaded outside EAS, `scripts/ci/eas-deploy.sh` rebuilds with the next number and resubmits, up to 3 attempts. Run `eas build:version:set` once to move the counter past any existing store build.
+
+Every deploy's store notes start with the plugin version, the `klaviyo-react-native-sdk` version, the short commit SHA and the UTC build date (`scripts/ci/release-notes.sh`). For `release: published` the GitHub release body follows. iOS notes go to TestFlight "What to Test" through `eas submit --what-to-test`. `eas submit` has no Android release notes option, so `scripts/ci/play-release-notes.js` sets them through the Play Developer API.
+
+Slack messages link to the GitHub Actions run and to the EAS build page (visible only to members of the Expo account). They don't include binary or internal-distribution links because this repo is public. Testers install through the Play internal testing track or TestFlight, and only testers added in the store consoles get access.
+
+### One-time setup
+
+GitHub repository secrets:
+
+- `EXPO_TOKEN`: Expo robot user access token with access to the `klaviyo` account.
+- `SLACK_WEBHOOK_URL`: incoming webhook for the publish notification channel.
+- `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`: Play service account key, used only to set Android release notes. Without it the Android deploy still runs and logs a warning.
+
+GitHub repository variables (not secret):
+
+- `KLAVIYO_EAS_PROJECT_ID`: EAS project ID for `klaviyo/klaviyo-plugin-example`.
+- `APPLE_TEAM_ID`: Apple Developer team ID that signs the app.
+- `ASC_APP_ID`: App Store Connect app ID for `com.klaviyo.expoexample`.
+
+EAS (expo.dev) setup:
+
+- Create the project and set `KLAVIYO_EAS_PROJECT_ID` and `APPLE_TEAM_ID` as EAS environment variables in the `production` environment. EAS build servers evaluate `app.config.js` again and don't see GitHub variables. You can instead commit the real values in `app.config.js`; neither is secret.
+- Upload or generate credentials with `eas credentials`: Android upload keystore, iOS distribution certificate, and provisioning profiles for `com.klaviyo.expoexample` and `com.klaviyo.expoexample.KlaviyoNotificationServiceExtension`.
+- Add submit credentials on EAS: a Google Play service account key and an App Store Connect API key.
+- Upload `google-services.json` as an EAS file environment variable named `GOOGLE_SERVICES_JSON` in the `production` environment.
+- Create the Play Console app (the first upload to a new app must be manual) and the App Store Connect app record.
