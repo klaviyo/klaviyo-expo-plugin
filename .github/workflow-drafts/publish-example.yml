@@ -1,3 +1,7 @@
+# DRAFT LOCATION: move this file to .github/workflows/publish-example.yml.
+# The automation that wrote it could not push to .github/workflows/ (token
+# lacks the `workflow` scope).
+#
 # Build the example app on EAS and submit it to the Play internal track and
 # TestFlight. Android and iOS are independent jobs; both run on Expo's build
 # servers, so the GitHub runners only start, wait on and submit the builds.
