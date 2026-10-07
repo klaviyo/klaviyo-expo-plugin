@@ -9,7 +9,8 @@ module.exports = () => {
     userInterfaceStyle: 'automatic',
     newArchEnabled: false,
     ios: {
-      // Make sure to increment this and the version as needed when making builds
+      // EAS builds take the build number from EAS's remote counter (eas.json
+      // appVersionSource: remote); this value only applies to local builds.
       buildNumber: '1',
       bundleIdentifier: 'com.klaviyo.expoexample',
       infoPlist: {
@@ -47,7 +48,8 @@ module.exports = () => {
           ios: {
             badgeAutoclearing: true,
             codeSigningStyle: 'Automatic',
-            devTeam: 'XXXXXXXXXX',
+            // CI sets APPLE_TEAM_ID; replace the placeholder for local builds
+            devTeam: process.env.APPLE_TEAM_ID || 'XXXXXXXXXX',
             geofencingEnabled: true,
             formsEnabled: true,
             includeNotificationServiceExtension: true,
@@ -62,7 +64,8 @@ module.exports = () => {
     extra: {
       router: {},
       eas: {
-        projectId: 'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX',
+        // CI sets KLAVIYO_EAS_PROJECT_ID; replace the placeholder for local builds
+        projectId: process.env.KLAVIYO_EAS_PROJECT_ID || 'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX',
         build: {
           experimental: {
             ios: {

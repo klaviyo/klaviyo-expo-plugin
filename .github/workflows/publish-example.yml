@@ -1,0 +1,192 @@
+# Build the example app on EAS and submit it to the Play internal track and
+# TestFlight. Android and iOS are independent jobs; both run on Expo's build
+# servers, so the GitHub runners only start, wait on and submit the builds.
+#
+# Triggers:
+#   - push to master or rel/**  (both platforms)
+#   - release: published        (both platforms; release body goes into notes)
+#   - workflow_dispatch         (manual; choose `both` / `android` / `ios`)
+#
+# Credentials are EAS-hosted: signing keys, provisioning profiles and the
+# store submit keys live on expo.dev, and CI authenticates with EXPO_TOKEN.
+# Build numbers come from EAS's remote auto-increment (see example/eas.json).
+# Required secrets and one-time setup are listed in example/README.md.
+
+name: Publish Example App
+
+on:
+  push:
+    branches:
+      - master
+      - "rel/**"
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Which platform(s) to publish"
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - android
+          - ios
+
+# One deploy per platform at a time, never cancelled mid-flight: a cancelled
+# runner leaves the EAS build running and burns a build number.
+concurrency:
+  group: publish-example-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: Check EAS configuration
+    runs-on: ubuntu-24.04
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      # Skip (with a warning) instead of failing every push until the EAS
+      # project and EXPO_TOKEN are set up.
+      - name: Check EXPO_TOKEN and EAS project
+        id: check
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
+        run: |
+          if [ -z "${EXPO_TOKEN}" ] || [ -z "${KLAVIYO_EAS_PROJECT_ID}" ]; then
+            echo "::warning::EXPO_TOKEN secret or KLAVIYO_EAS_PROJECT_ID variable is not set; skipping example app publish. See example/README.md."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy-android:
+    name: Publish to Play Store internal track
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    if: |
+      needs.preflight.outputs.configured == 'true'
+      && (github.event_name != 'workflow_dispatch' || inputs.platform == 'both' || inputs.platform == 'android')
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup EAS
+        uses: ./.github/actions/setup-eas
+
+      - name: Prepare release notes
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: ./scripts/ci/release-notes.sh "${RUNNER_TEMP}/release-notes.txt"
+
+      - name: EAS build + submit
+        id: deploy
+        working-directory: example
+        run: ../scripts/ci/eas-deploy.sh android "${RUNNER_TEMP}/release-notes.txt"
+
+      # `eas submit` has no Android release-notes option, so set them on the
+      # Play track release directly. Skipped with a warning if the service
+      # account key is only stored on EAS.
+      - name: Set Play release notes
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          VERSION_CODE: ${{ steps.deploy.outputs.build_number }}
+        run: |
+          if [ -z "${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON}" ]; then
+            echo "::warning::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is not set; Play release notes were not updated."
+            exit 0
+          fi
+          node scripts/ci/play-release-notes.js "${VERSION_CODE}" "${RUNNER_TEMP}/release-notes.txt"
+
+      - name: Notify Slack on success
+        if: success()
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: success
+          platform: Play Store
+          version_label: ${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})
+          build_url: ${{ steps.deploy.outputs.build_url }}
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: failure
+          platform: Play Store
+          version_label: ${{ steps.deploy.outputs.app_version || '?' }} (${{ steps.deploy.outputs.build_number || '?' }})
+          build_url: ${{ steps.deploy.outputs.build_url }}
+
+  deploy-ios:
+    name: Publish to TestFlight
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    if: |
+      needs.preflight.outputs.configured == 'true'
+      && (github.event_name != 'workflow_dispatch' || inputs.platform == 'both' || inputs.platform == 'ios')
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup EAS
+        uses: ./.github/actions/setup-eas
+
+      # Non-interactive iOS submits need the App Store Connect app ID. It is
+      # not secret, but it is kept out of the public eas.json until the app
+      # record exists.
+      - name: Set App Store Connect app ID
+        working-directory: example
+        env:
+          ASC_APP_ID: ${{ vars.ASC_APP_ID }}
+        run: |
+          if [ -z "${ASC_APP_ID}" ]; then
+            echo "::error::ASC_APP_ID repository variable is not set. See example/README.md."
+            exit 1
+          fi
+          jq --arg id "${ASC_APP_ID}" '.submit.production.ios.ascAppId = $id' eas.json > eas.json.tmp
+          mv eas.json.tmp eas.json
+
+      - name: Prepare release notes
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: ./scripts/ci/release-notes.sh "${RUNNER_TEMP}/release-notes.txt"
+
+      # Release notes reach TestFlight's "What to Test" through
+      # `eas submit --what-to-test`.
+      - name: EAS build + submit
+        id: deploy
+        working-directory: example
+        run: ../scripts/ci/eas-deploy.sh ios "${RUNNER_TEMP}/release-notes.txt"
+
+      - name: Notify Slack on success
+        if: success()
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: success
+          platform: TestFlight
+          version_label: ${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})
+          build_url: ${{ steps.deploy.outputs.build_url }}
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: failure
+          platform: TestFlight
+          version_label: ${{ steps.deploy.outputs.app_version || '?' }} (${{ steps.deploy.outputs.build_number || '?' }})
+          build_url: ${{ steps.deploy.outputs.build_url }}

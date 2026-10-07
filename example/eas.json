@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 16.17.3"
+    "version": ">= 16.17.3",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -11,10 +12,17 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": false
+      "autoIncrement": true,
+      "environment": "production"
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "completed"
+      },
+      "ios": {}
+    }
   }
 }
