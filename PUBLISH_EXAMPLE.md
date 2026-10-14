@@ -26,18 +26,18 @@ A cleanup job removes the label when the run ends, so adding it again deploys ag
 
 ### Switching it off
 
-Deploys are skipped, not failed, until the required secrets exist. Each platform has a preflight job in the same GitHub environment as its deploy job (`android-internal-track`, `testflight`), because environment secrets are visible only to jobs that declare the environment. The preflight checks the platform's required secrets and variables and prints their names, never their values. A push or a published release with something missing skips that platform with a notice naming the missing names. A `workflow_dispatch` or a label deploy with something missing fails, because a person asked for the deploy and a green skip would read as success. The notes jobs skip along with the deploy, and the label cleanup still runs. Each preflight job also records a deployment in its environment, so the Deployments page lists two entries per platform per run.
+Deploys are skipped, not failed, until the required secrets exist. One `preflight` job checks the required secrets and variables for the platforms that were asked for and prints their names, never their values. A push or a published release with something missing skips that platform with a notice naming the missing names. A `workflow_dispatch` or a label deploy with something missing fails, because a person asked for the deploy and a green skip would read as success. The notes jobs skip along with the deploy, and the label cleanup still runs. Store secrets must be repository secrets, not environment secrets; the preflight cannot see environment secrets and would skip forever. The preflight job declares no environment, and the deploy jobs declare one only for the store link and deploy history, so put no required reviewers on the `android-internal-track` and `testflight` environments.
 
 ---
 
 ## Required GitHub secrets
 
-The Android preflight checks `EXPO_TOKEN`, `SERVICE_ACCOUNT_JSON`, `SLACK_WEBHOOK_URL` and `KLAVIYO_EAS_PROJECT_ID`. The iOS preflight checks `EXPO_TOKEN`, the three `APP_STORE_CONNECT_API_KEY_*` secrets, `SLACK_WEBHOOK_URL`, `KLAVIYO_EAS_PROJECT_ID`, `APPLE_TEAM_ID` and `ASC_APP_ID`.
+Create all of these as repository secrets and variables. The Android preflight checks `EXPO_TOKEN`, `SERVICE_ACCOUNT_JSON` and `KLAVIYO_EAS_PROJECT_ID`. The iOS preflight checks `EXPO_TOKEN`, the three `APP_STORE_CONNECT_API_KEY_*` secrets, `KLAVIYO_EAS_PROJECT_ID`, `APPLE_TEAM_ID` and `ASC_APP_ID`.
 
 | Secret | Description |
 |--------|-------------|
 | `EXPO_TOKEN` | Access token for an Expo robot user with access to the `klaviyo` account |
-| `SLACK_WEBHOOK_URL` | Incoming webhook for deploy notifications |
+| `SLACK_WEBHOOK_URL` | Optional. Incoming webhook for deploy notifications. When it is empty the Slack steps skip quietly |
 | `SERVICE_ACCOUNT_JSON` | Google Play service account key (JSON contents). Used for the versionCode preflight and to set the Play release notes, so it needs release permissions on the app |
 | `APP_STORE_CONNECT_API_KEY_KEY_ID` | App Store Connect API key ID |
 | `APP_STORE_CONNECT_API_KEY_ISSUER_ID` | App Store Connect API issuer ID |
@@ -197,4 +197,3 @@ EAS builds and signs on Expo's servers, so some pieces of the native workflows d
 - Concurrency never cancels a started run. See [Overview](#overview).
 - Android release notes are set after the submit through the Play Developer API, since `eas submit` has no notes option. iOS notes go through the App Store Connect API in their own job, as in the iOS test app.
 - The Slack message has no EAS build page link. The layout is shared across the example apps and has no slot for it, so the build page URL stays in the job log, where only the job output reaches it.
-- Each preflight job runs in its platform's GitHub environment so it can see that environment's secrets, which records a deployment entry for the preflight as well as for the deploy.
