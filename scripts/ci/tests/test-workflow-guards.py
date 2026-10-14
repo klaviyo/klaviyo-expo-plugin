@@ -147,6 +147,23 @@ intolerant = [f"{job}: {block.splitlines()[0]}" for job, block in slack_steps if
 report(bool(slack_steps) and not intolerant, f"every Slack step has continue-on-error ({len(slack_steps)} checked)",
        "\n".join(intolerant) or "no Slack steps found")
 
+# Nothing posts to Slack except through the composite action, so the rules above see every message.
+direct = [os.path.basename(path) for path in [DEPLOY_PATH, CHECKS_PATH]
+          if "slackapi/slack-github-action" in read(path)]
+report(not direct, "Slack is only posted through the composite action", "direct use in: " + ", ".join(direct))
+
+# Each platform posts a success, a failure and a notes warning, and every one is a covered Slack step.
+kinds = {}
+for job, block in slack_steps:
+    match = re.search(r"(?m)^\s+result: (\S+)", block)
+    platform = "android" if "android" in job else "ios"
+    kinds.setdefault(platform, set()).add(match.group(1) if match else "?")
+wanted = {"success", "failure", "notes-failure"}
+missing_kinds = [f"{platform}: {', '.join(sorted(wanted - found))}" for platform, found in sorted(kinds.items()) if wanted - found]
+report(set(kinds) == {"android", "ios"} and not missing_kinds,
+       "each platform posts a success, a failure and a notes warning through a checked step",
+       "missing: " + "; ".join(missing_kinds or ["a platform"]))
+
 # The Slack action tolerates a failure of its own payload step.
 payload_step = find_step("\n" + slack.split("steps:\n", 1)[1].replace("\n    - ", "\n      - ") if "steps:\n" in slack else "", "Build the Slack payload")
 report(bool(payload_step) and "continue-on-error: true" in payload_step, "the Slack action tolerates a payload failure",
@@ -179,6 +196,13 @@ report("COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}" in 
 for job in ("deploy-android", "deploy-ios"):
     needs = re.search(r"(?m)^    needs: (.+)$", jobs.get(job, ""))
     report(bool(needs) and re.search(r"\bchecks\b", needs.group(1)) is not None, f"the {job} job needs the checks job")
+
+# A fork pull request must not reach any job that can see secrets: every job that can run on a
+# pull_request needs the same-repo condition, not only the first one.
+SAME_REPO = "github.event.pull_request.head.repo.full_name == github.repository"
+for job in ("plan", "preflight", "checks", "deploy-android", "android-notes", "deploy-ios", "what-to-test", "cleanup-label"):
+    condition = re.search(r"(?ms)^    if:(.*?)(?=^    [a-z-]+:)", jobs.get(job, ""))
+    report(bool(condition) and SAME_REPO in condition.group(1), f"the {job} job requires a same-repo pull request")
 
 # An unrelated label must not start the first job, and a label only deploys same-repo pull requests.
 plan = jobs.get("plan", "")

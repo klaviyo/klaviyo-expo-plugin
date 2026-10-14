@@ -180,5 +180,56 @@ fresh_copy
 edit "$DEPLOY" 's = s.replace("      always()\n      && github.event_name == \x27pull_request\x27", "      github.event_name == \x27pull_request\x27", 1)'
 expect_fail "a label cleanup that skips on failure is caught" "the label cleanup runs with always()"
 
+for job in preflight checks deploy-android android-notes deploy-ios what-to-test; do
+  fresh_copy
+  edit "$DEPLOY" "
+import re
+m = re.search(r'(?m)^  $job:\n', s)
+a = m.start()
+n = re.search(r'(?m)^  [a-z][a-z0-9-]*:\n', s[m.end():])
+b = m.end() + n.start() if n else len(s)
+seg = s[a:b].replace(\"\\n      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)\", '').replace(\"    if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)\\n\", '')
+s = s[:a] + seg + s[b:]
+"
+  expect_fail "a $job job without the same-repo condition is caught" "the $job job requires a same-repo pull request"
+done
+
+fresh_copy
+edit "$DEPLOY" '
+i = s.index("  cleanup-label:")
+s = s[:i] + s[i:].replace("      && github.event.pull_request.head.repo.full_name == github.repository\n", "", 1)
+'
+expect_fail "a cleanup job without the same-repo condition is caught" "the cleanup-label job requires a same-repo pull request"
+
+fresh_copy
+edit "$DEPLOY" '
+i = s.index("          result: notes-failure")
+j = s.rindex("        continue-on-error: true\n", 0, i)
+s = s[:j] + s[j + len("        continue-on-error: true\n"):]
+'
+expect_fail "a notes warning step without continue-on-error is caught" "every Slack step has continue-on-error"
+
+fresh_copy
+edit "$DEPLOY" '
+i = s.index("          result: failure")
+j = s.rindex("        continue-on-error: true\n", 0, i)
+s = s[:j] + s[j + len("        continue-on-error: true\n"):]
+'
+expect_fail "a failure notifier step without continue-on-error is caught" "every Slack step has continue-on-error"
+
+fresh_copy
+edit "$DEPLOY" '
+i = s.index("          result: notes-failure")
+s = s[:i] + s[i:].replace("          result: notes-failure", "          result: failure", 1)
+'
+expect_fail "a platform that never posts a notes warning is caught" "each platform posts a success, a failure and a notes warning"
+
+fresh_copy
+edit "$DEPLOY" '
+i = s.index("  android-notes:")
+s = s[:i] + s[i:].replace("      - name: Set up Node.js", "      - name: Post to Slack directly\n        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1\n        with:\n          webhook: x\n\n      - name: Set up Node.js", 1)
+'
+expect_fail "a step that posts to Slack without the composite is caught" "Slack is only posted through the composite action"
+
 echo "SUMMARY: $PASSED passed, $FAILED failed"
 ((FAILED == 0))
