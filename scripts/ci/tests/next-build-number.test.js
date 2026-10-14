@@ -1,0 +1,344 @@
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const crypto = require("crypto");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+
+const nbn = require("../next-build-number.js");
+
+const { privateKey: ascKey } = crypto.generateKeyPairSync("ec", {
+  namedCurve: "prime256v1",
+});
+const ASC_PEM = ascKey.export({ type: "pkcs8", format: "pem" });
+
+const { privateKey: rsaKey } = crypto.generateKeyPairSync("rsa", {
+  modulusLength: 2048,
+});
+const RSA_PEM = rsaKey.export({ type: "pkcs8", format: "pem" });
+
+const ASC_ENV = {
+  APP_STORE_CONNECT_API_KEY_KEY_ID: "KEYID",
+  APP_STORE_CONNECT_API_KEY_ISSUER_ID: "ISSUER",
+  APP_STORE_CONNECT_API_KEY_KEY: ASC_PEM,
+};
+
+const PLAY_ENV = {
+  SERVICE_ACCOUNT_JSON: JSON.stringify({
+    client_email: "ci@example.iam.gserviceaccount.com",
+    private_key: RSA_PEM,
+    token_uri: "https://oauth2.googleapis.com/token",
+  }),
+};
+
+function jsonResponse(status, body) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    text: async () => (body === undefined ? "" : JSON.stringify(body)),
+  };
+}
+
+// --- pure helpers ---
+
+test("maxBuildNumber returns 0 for an empty list", () => {
+  assert.equal(nbn.maxBuildNumber([]), 0);
+});
+
+test("maxBuildNumber ignores non-integer strings", () => {
+  assert.equal(nbn.maxBuildNumber(["abc", "1.5", " 7 ", "3"]), 7);
+  assert.equal(nbn.maxBuildNumber(["abc"]), 0);
+});
+
+test("nextBuildNumber is latest plus one, floored at minimum", () => {
+  assert.equal(nbn.nextBuildNumber(0), 1);
+  assert.equal(nbn.nextBuildNumber(7), 8);
+  assert.equal(nbn.nextBuildNumber(7, 10), 10);
+});
+
+// --- ios preflight ---
+
+function makeIosFetch(calls, { apps, builds } = {}) {
+  return async (url, options = {}) => {
+    calls.push({ method: options.method || "GET", url, headers: options.headers, body: options.body });
+    if (url.startsWith("https://api.appstoreconnect.apple.com/v1/apps")) {
+      return jsonResponse(200, { data: apps });
+    }
+    if (url.startsWith("https://api.appstoreconnect.apple.com/v1/builds?")) {
+      return jsonResponse(200, { data: builds });
+    }
+    throw new Error(`unexpected fetch: ${url}`);
+  };
+}
+
+const IOS_ARGV = ["ios", "--bundle-id", "com.example", "--marketing-version", "1.2.0"];
+
+test("ios: no builds for the marketing version -> build number 1", async () => {
+  const calls = [];
+  const fetchImpl = makeIosFetch(calls, {
+    apps: [{ id: "APP1", attributes: { bundleId: "com.example" } }],
+    builds: [],
+  });
+  const printed = [];
+  await nbn.run({ argv: IOS_ARGV, env: ASC_ENV, fetchImpl, out: (s) => printed.push(s) });
+  assert.deepEqual(JSON.parse(printed[0]), {
+    app_id: "APP1",
+    marketing_version: "1.2.0",
+    latest_build_number: 0,
+    build_number: 1,
+  });
+});
+
+test("ios: builds 3, 7, 5 -> next build 8", async () => {
+  const calls = [];
+  const fetchImpl = makeIosFetch(calls, {
+    apps: [{ id: "APP1", attributes: { bundleId: "com.example" } }],
+    builds: ["3", "7", "5"].map((v) => ({ id: v, attributes: { version: v } })),
+  });
+  const printed = [];
+  await nbn.run({ argv: IOS_ARGV, env: ASC_ENV, fetchImpl, out: (s) => printed.push(s) });
+  assert.equal(JSON.parse(printed[0]).build_number, 8);
+});
+
+test("ios: builds request filters by app and marketing version", async () => {
+  const calls = [];
+  const fetchImpl = makeIosFetch(calls, {
+    apps: [{ id: "APP1", attributes: { bundleId: "com.example" } }],
+    builds: [],
+  });
+  await nbn.run({ argv: IOS_ARGV, env: ASC_ENV, fetchImpl, out: () => {} });
+  const buildsCall = calls.find((c) => c.url.includes("/v1/builds?"));
+  const params = new URLSearchParams(buildsCall.url.split("?")[1]);
+  assert.equal(params.get("filter[app]"), "APP1");
+  assert.equal(params.get("filter[preReleaseVersion.version]"), "1.2.0");
+});
+
+test("ios: exact bundleId match wins over a prefix match", async () => {
+  const calls = [];
+  const fetchImpl = makeIosFetch(calls, {
+    apps: [
+      { id: "WRONG", attributes: { bundleId: "com.example.extra" } },
+      { id: "RIGHT", attributes: { bundleId: "com.example" } },
+    ],
+    builds: [{ id: "b", attributes: { version: "4" } }],
+  });
+  const printed = [];
+  await nbn.run({ argv: IOS_ARGV, env: ASC_ENV, fetchImpl, out: (s) => printed.push(s) });
+  const result = JSON.parse(printed[0]);
+  assert.equal(result.app_id, "RIGHT");
+  assert.equal(result.build_number, 5);
+});
+
+test("ios: minimum raises the build number above latest plus one", async () => {
+  const calls = [];
+  const fetchImpl = makeIosFetch(calls, {
+    apps: [{ id: "APP1", attributes: { bundleId: "com.example" } }],
+    builds: [{ id: "b", attributes: { version: "2" } }],
+  });
+  const printed = [];
+  await nbn.run({
+    argv: [...IOS_ARGV, "--minimum", "50"],
+    env: ASC_ENV,
+    fetchImpl,
+    out: (s) => printed.push(s),
+  });
+  assert.equal(JSON.parse(printed[0]).build_number, 50);
+});
+
+test("ios: error when the marketing version has no matching app", async () => {
+  const calls = [];
+  const fetchImpl = makeIosFetch(calls, { apps: [], builds: [] });
+  await assert.rejects(
+    nbn.run({ argv: IOS_ARGV, env: ASC_ENV, fetchImpl, out: () => {} }),
+    /No App Store Connect app found/,
+  );
+});
+
+// --- android preflight ---
+
+function makePlayFetch(calls, { bundles = [], tracks = [], failBundles = false } = {}) {
+  return async (url, options = {}) => {
+    const method = options.method || "GET";
+    calls.push({ method, url, headers: options.headers, body: options.body });
+    if (url === "https://oauth2.googleapis.com/token") {
+      return jsonResponse(200, { access_token: "TOKEN" });
+    }
+    if (url.endsWith("/edits") && method === "POST") {
+      return jsonResponse(200, { id: "EDIT1" });
+    }
+    if (url.endsWith("/edits/EDIT1/bundles")) {
+      if (failBundles) {
+        return jsonResponse(500, { error: { message: "backend exploded" } });
+      }
+      return jsonResponse(200, { bundles });
+    }
+    if (url.endsWith("/edits/EDIT1/tracks")) {
+      return jsonResponse(200, { tracks });
+    }
+    if (url.endsWith("/edits/EDIT1") && method === "DELETE") {
+      return jsonResponse(200, {});
+    }
+    throw new Error(`unexpected fetch: ${method} ${url}`);
+  };
+}
+
+const ANDROID_ARGV = ["android", "--package", "com.example.app"];
+
+test("android: highest versionCode across bundles and tracks, plus one", async () => {
+  const calls = [];
+  const fetchImpl = makePlayFetch(calls, {
+    bundles: [{ versionCode: 10 }, { versionCode: 42 }],
+    tracks: [
+      { track: "internal", releases: [{ versionCodes: ["50", "9"] }] },
+      { track: "production", releases: [{ versionCodes: ["30"] }] },
+    ],
+  });
+  const printed = [];
+  await nbn.run({ argv: ANDROID_ARGV, env: PLAY_ENV, fetchImpl, out: (s) => printed.push(s) });
+  assert.deepEqual(JSON.parse(printed[0]), {
+    package: "com.example.app",
+    highest_version_code: 50,
+    build_number: 51,
+  });
+});
+
+test("android: track-only code counts when missing from the bundle list", async () => {
+  const calls = [];
+  const fetchImpl = makePlayFetch(calls, {
+    bundles: [{ versionCode: 7 }],
+    tracks: [{ track: "internal", releases: [{ versionCodes: ["99"] }] }],
+  });
+  const printed = [];
+  await nbn.run({ argv: ANDROID_ARGV, env: PLAY_ENV, fetchImpl, out: (s) => printed.push(s) });
+  assert.equal(JSON.parse(printed[0]).build_number, 100);
+});
+
+test("android: empty app starts at 1", async () => {
+  const calls = [];
+  const fetchImpl = makePlayFetch(calls, { bundles: [], tracks: [] });
+  const printed = [];
+  await nbn.run({ argv: ANDROID_ARGV, env: PLAY_ENV, fetchImpl, out: (s) => printed.push(s) });
+  assert.deepEqual(JSON.parse(printed[0]), {
+    package: "com.example.app",
+    highest_version_code: 0,
+    build_number: 1,
+  });
+});
+
+test("android: minimum is respected", async () => {
+  const calls = [];
+  const fetchImpl = makePlayFetch(calls, { bundles: [{ versionCode: 3 }], tracks: [] });
+  const printed = [];
+  await nbn.run({
+    argv: [...ANDROID_ARGV, "--minimum", "20"],
+    env: PLAY_ENV,
+    fetchImpl,
+    out: (s) => printed.push(s),
+  });
+  assert.equal(JSON.parse(printed[0]).build_number, 20);
+});
+
+test("android: edit is deleted even when listing bundles fails", async () => {
+  const calls = [];
+  const fetchImpl = makePlayFetch(calls, { failBundles: true });
+  await assert.rejects(
+    nbn.run({ argv: ANDROID_ARGV, env: PLAY_ENV, fetchImpl, out: () => {} }),
+    /HTTP 500/,
+  );
+  assert.equal(calls.at(-1).method, "DELETE");
+  assert.ok(calls.at(-1).url.endsWith("/edits/EDIT1"));
+});
+
+test("android: error when SERVICE_ACCOUNT_JSON is missing", async () => {
+  await assert.rejects(
+    nbn.run({ argv: ANDROID_ARGV, env: {}, fetchImpl: async () => {}, out: () => {} }),
+    /SERVICE_ACCOUNT_JSON/,
+  );
+});
+
+// --- CLI parsing and output ---
+
+test("parseArgs rejects a missing platform and an unknown platform", () => {
+  assert.throws(() => nbn.parseArgs([]), /Unknown platform/);
+  assert.throws(() => nbn.parseArgs(["windows"]), /Unknown platform/);
+});
+
+test("parseArgs requires --bundle-id and --marketing-version for ios", () => {
+  assert.throws(() => nbn.parseArgs(["ios"]), /--bundle-id/);
+  assert.throws(() => nbn.parseArgs(["ios", "--bundle-id", "x"]), /--bundle-id/);
+});
+
+test("parseArgs requires --package for android", () => {
+  assert.throws(() => nbn.parseArgs(["android"]), /--package/);
+});
+
+test("parseArgs rejects unknown flags and bad minimums", () => {
+  assert.throws(() => nbn.parseArgs(["android", "--package", "x", "--nope"]), /Unknown argument/);
+  assert.throws(
+    () => nbn.parseArgs(["android", "--package", "x", "--minimum", "abc"]),
+    /--minimum/,
+  );
+  assert.throws(
+    () => nbn.parseArgs(["android", "--package", "x", "--minimum", "0"]),
+    /--minimum/,
+  );
+});
+
+test("run appends build_number to $GITHUB_OUTPUT when set", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nbn-output-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const outputFile = path.join(dir, "github_output");
+  const calls = [];
+  const fetchImpl = makeIosFetch(calls, {
+    apps: [{ id: "APP1", attributes: { bundleId: "com.example" } }],
+    builds: [{ id: "b", attributes: { version: "6" } }],
+  });
+  await nbn.run({
+    argv: IOS_ARGV,
+    env: { ...ASC_ENV, GITHUB_OUTPUT: outputFile },
+    fetchImpl,
+    out: () => {},
+  });
+  assert.equal(fs.readFileSync(outputFile, "utf8"), "build_number=7\n");
+});
+
+test("run skips $GITHUB_OUTPUT when unset", async () => {
+  const calls = [];
+  const fetchImpl = makeIosFetch(calls, {
+    apps: [{ id: "APP1", attributes: { bundleId: "com.example" } }],
+    builds: [],
+  });
+  const printed = [];
+  await nbn.run({ argv: IOS_ARGV, env: ASC_ENV, fetchImpl, out: (s) => printed.push(s) });
+  assert.equal(printed.length, 1);
+});
+
+// --- secret hygiene ---
+
+test("no request URL, header, or body leaks key material", async () => {
+  const calls = [];
+  const iosFetch = makeIosFetch(calls, {
+    apps: [{ id: "APP1", attributes: { bundleId: "com.example" } }],
+    builds: [],
+  });
+  await nbn.run({ argv: IOS_ARGV, env: ASC_ENV, fetchImpl: iosFetch, out: () => {} });
+
+  const playFetch = makePlayFetch(calls, {
+    bundles: [{ versionCode: 1 }],
+    tracks: [],
+  });
+  await nbn.run({ argv: ANDROID_ARGV, env: PLAY_ENV, fetchImpl: playFetch, out: () => {} });
+
+  for (const call of calls) {
+    const headers = Object.entries(call.headers || {})
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(" ");
+    for (const haystack of [call.url, headers, call.body || ""]) {
+      assert.ok(!haystack.includes("PRIVATE KEY"), `leak: ${call.url}`);
+      assert.ok(!haystack.includes(ASC_PEM.trim()), `leak: ${call.url}`);
+      assert.ok(!haystack.includes(RSA_PEM.trim()), `leak: ${call.url}`);
+    }
+    // JWT assertions and bearer tokens are signed credentials, not raw keys,
+    // but the PEM body itself must never appear anywhere.
+  }
+});

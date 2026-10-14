@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-/**
+/*
  * Sets en-US release notes on the Play track release that contains a given
  * versionCode. `eas submit` has no Android release-notes option, so this
  * calls the Play Developer API (edits.tracks) directly after the submission.
@@ -9,9 +9,10 @@
  *   node scripts/ci/play-release-notes.js <versionCode> <notes-file>
  *
  * Env:
- *   GOOGLE_PLAY_SERVICE_ACCOUNT_JSON  service account key JSON (contents, not a path)
- *   PLAY_PACKAGE_NAME                 defaults to com.klaviyo.expoexample
- *   PLAY_TRACK                        defaults to internal
+ *   SERVICE_ACCOUNT_JSON   service account key JSON (contents, not a path)
+ *   PLAY_PACKAGE_NAME      defaults to com.klaviyo.expoexample
+ *   PLAY_TRACK             defaults to internal
+ *   PLAY_RELEASE_NAME      when set, written to the release's name field
  */
 
 const crypto = require("crypto");
@@ -30,7 +31,28 @@ function base64url(input) {
     .replace(/\//g, "_");
 }
 
-async function request(method, url, { token, body, form } = {}) {
+function truncateNotes(text, max) {
+  // Array.from splits by code point so a multi-byte character at the cutoff stays whole.
+  return Array.from(text).slice(0, max).join("");
+}
+
+function applyReleaseNotes(releases, versionCode, notes, releaseName) {
+  const target = (releases || []).find((r) =>
+    (r.versionCodes || []).includes(String(versionCode)),
+  );
+  if (!target) {
+    throw new Error(`No release contains versionCode ${versionCode}`);
+  }
+  return releases.map((r) => {
+    if (r !== target) return r;
+    const updated = { ...r, releaseNotes: [{ language: "en-US", text: notes }] };
+    if (releaseName) updated.name = releaseName;
+    return updated;
+  });
+}
+
+async function request(method, url, { token, body, form, fetchImpl } = {}) {
+  const doFetch = fetchImpl || fetch;
   const headers = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   let payload;
@@ -41,17 +63,23 @@ async function request(method, url, { token, body, form } = {}) {
     headers["Content-Type"] = "application/json";
     payload = JSON.stringify(body);
   }
-  const res = await fetch(url, { method, headers, body: payload });
+  const res = await doFetch(url, { method, headers, body: payload });
   const text = await res.text();
   if (!res.ok) {
+    let detail = "";
+    try {
+      detail = JSON.parse(text).error?.message || "";
+    } catch (err) {
+      detail = "";
+    }
     throw new Error(
-      `${method} ${url.split("?")[0]} failed: HTTP ${res.status} ${text}`,
+      `${method} ${url.split("?")[0]} failed: HTTP ${res.status}${detail ? " " + detail : ""}`,
     );
   }
   return text ? JSON.parse(text) : {};
 }
 
-async function getAccessToken(serviceAccount) {
+async function getAccessToken(serviceAccount, fetchImpl) {
   const now = Math.floor(Date.now() / 1000);
   const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claims = base64url(
@@ -72,6 +100,7 @@ async function getAccessToken(serviceAccount) {
     "POST",
     serviceAccount.token_uri || "https://oauth2.googleapis.com/token",
     {
+      fetchImpl,
       form: {
         grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
         assertion,
@@ -81,52 +110,53 @@ async function getAccessToken(serviceAccount) {
   return res.access_token;
 }
 
-async function main() {
-  const [versionCode, notesFile] = process.argv.slice(2);
+async function run({ argv, env, fetchImpl } = {}) {
+  const [versionCode, notesFile] = argv;
   if (!versionCode || !notesFile) {
-    console.error(
+    throw new Error(
       "Usage: node scripts/ci/play-release-notes.js <versionCode> <notes-file>",
     );
-    process.exit(1);
   }
-  const rawKey = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
+  const rawKey = env.SERVICE_ACCOUNT_JSON;
   if (!rawKey) {
-    throw new Error("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is not set");
+    throw new Error("SERVICE_ACCOUNT_JSON is not set");
   }
-  const packageName =
-    process.env.PLAY_PACKAGE_NAME || "com.klaviyo.expoexample";
-  const track = process.env.PLAY_TRACK || "internal";
-  // Array.from splits by code point so a multi-byte character at the cutoff stays whole.
-  const notes = Array.from(fs.readFileSync(notesFile, "utf8").trim())
-    .slice(0, MAX_NOTES_LENGTH)
-    .join("");
+  const packageName = env.PLAY_PACKAGE_NAME || "com.klaviyo.expoexample";
+  const track = env.PLAY_TRACK || "internal";
+  const releaseName = env.PLAY_RELEASE_NAME || "";
+  const notes = truncateNotes(
+    fs.readFileSync(notesFile, "utf8").trim(),
+    MAX_NOTES_LENGTH,
+  );
 
-  const token = await getAccessToken(JSON.parse(rawKey));
+  const token = await getAccessToken(JSON.parse(rawKey), fetchImpl);
   const appApi = `${API}/${packageName}`;
-  const edit = await request("POST", `${appApi}/edits`, { token, body: {} });
+  const edit = await request("POST", `${appApi}/edits`, {
+    token,
+    body: {},
+    fetchImpl,
+  });
   const editApi = `${appApi}/edits/${edit.id}`;
 
   try {
     const current = await request("GET", `${editApi}/tracks/${track}`, {
       token,
+      fetchImpl,
     });
-    const releases = current.releases || [];
-    const target = releases.find((r) =>
-      (r.versionCodes || []).includes(String(versionCode)),
+    const releases = applyReleaseNotes(
+      current.releases || [],
+      versionCode,
+      notes,
+      releaseName,
     );
-    if (!target) {
-      throw new Error(
-        `No release on the ${track} track contains versionCode ${versionCode}`,
-      );
-    }
-    target.releaseNotes = [{ language: "en-US", text: notes }];
     await request("PUT", `${editApi}/tracks/${track}`, {
       token,
       body: { track, releases },
+      fetchImpl,
     });
-    await request("POST", `${editApi}:commit`, { token });
+    await request("POST", `${editApi}:commit`, { token, fetchImpl });
   } catch (err) {
-    await request("DELETE", editApi, { token }).catch(() => {});
+    await request("DELETE", editApi, { token, fetchImpl }).catch(() => {});
     throw err;
   }
   console.log(
@@ -134,7 +164,17 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  console.error(`::error::${err.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  run({ argv: process.argv.slice(2), env: process.env }).catch((err) => {
+    console.error(`::error::${err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  truncateNotes,
+  applyReleaseNotes,
+  getAccessToken,
+  request,
+  run,
+};

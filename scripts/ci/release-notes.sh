@@ -1,36 +1,67 @@
 #!/usr/bin/env bash
 # Writes the store release notes for an example app deploy to the file given
-# as $1 and prints them. Every deploy's notes start with the plugin and SDK
-# versions, the commit, and the build date so testers can tell builds apart.
-# On `release: published` the GitHub release body follows that line; on other
-# triggers the notes are synthesized from git metadata alone.
+# as $2 and also prints them, truncated to $1 characters maximum.
 #
-# Reads: GITHUB_EVENT_NAME, GITHUB_REF_NAME, GITHUB_SHA, RELEASE_BODY (optional)
+# Usage: release-notes.sh <max-chars> <output-file>
+#
+# Optional env: GITHUB_EVENT_NAME, SOURCE_LABEL (falls back to
+# GITHUB_REF_NAME, then the current git branch), COMMIT_SHA (falls back to
+# GITHUB_SHA, then git HEAD), RELEASE_NAME, RELEASE_BODY, APP_VERSION (falls back to the
+# plugin version), BUILD_NUMBER (defaults to "?"), RUN_URL, BUILD_DATE
+# (defaults to the current UTC time).
 set -euo pipefail
+export LC_ALL=C.UTF-8
 
-OUT_FILE="${1:?usage: release-notes.sh <output-file>}"
+MAX_CHARS="${1:?usage: release-notes.sh <max-chars> <output-file>}"
+OUT_FILE="${2:?usage: release-notes.sh <max-chars> <output-file>}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
-PLUGIN_VERSION=$(node -p "require('${ROOT}/package.json').version")
-# Resolved version from the lockfile, falling back to the declared range.
-RN_SDK_VERSION=$(node -p "
-  const lock = require('${ROOT}/example/package-lock.json');
-  const pkg = require('${ROOT}/example/package.json');
-  (lock.packages['node_modules/klaviyo-react-native-sdk'] || {}).version
-    || pkg.dependencies['klaviyo-react-native-sdk']
-")
-SHA="${GITHUB_SHA:-$(git -C "$ROOT" rev-parse HEAD)}"
-SHORT_SHA="${SHA:0:7}"
-REF="${GITHUB_REF_NAME:-$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)}"
-BUILD_DATE=$(date -u +'%Y-%m-%d %H:%M UTC')
+SHA="${COMMIT_SHA:-${GITHUB_SHA:-$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)}}"
+SUBJECT=$(git -C "$ROOT" log -1 --format=%s "$SHA" 2>/dev/null || true)
+SOURCE_LABEL="${SOURCE_LABEL:-${GITHUB_REF_NAME:-$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)}}"
+APP_VERSION="${APP_VERSION:-$(node -p "require('${ROOT}/package.json').version")}"
+BUILD_NUMBER="${BUILD_NUMBER:-?}"
+BUILD_DATE="${BUILD_DATE:-$(date -u '+%Y-%m-%d %H:%M UTC')}"
+EVENT="${GITHUB_EVENT_NAME:-manual}"
+SDK_REF=$("$ROOT/scripts/ci/sdk-ref.sh")
 
-META="klaviyo-expo-plugin ${PLUGIN_VERSION}, klaviyo-react-native-sdk ${RN_SDK_VERSION}. Commit ${SHORT_SHA}, built ${BUILD_DATE}."
-
-if [[ "${GITHUB_EVENT_NAME:-}" == "release" && -n "${RELEASE_BODY:-}" ]]; then
-  printf '%s\n\n%s\n' "$META" "$RELEASE_BODY" > "$OUT_FILE"
-else
-  printf 'Automatic build from %s @ %s, built %s.\nklaviyo-expo-plugin %s, klaviyo-react-native-sdk %s.\n' \
-    "$REF" "$SHORT_SHA" "$BUILD_DATE" "$PLUGIN_VERSION" "$RN_SDK_VERSION" > "$OUT_FILE"
+COMMIT_LINE="Commit: ${SHA:0:7}"
+if [[ -n "$SUBJECT" ]]; then
+  COMMIT_LINE+=" $SUBJECT"
 fi
 
-cat "$OUT_FILE"
+NOTES="Version ${APP_VERSION} (build ${BUILD_NUMBER})
+SDK: ${SDK_REF}
+${COMMIT_LINE}
+Ref: ${SOURCE_LABEL} (${EVENT})
+Built: ${BUILD_DATE}"
+if [[ -n "${RUN_URL:-}" ]]; then
+  NOTES+="
+CI run: ${RUN_URL}"
+fi
+
+if [[ "$EVENT" == "release" && -n "${RELEASE_BODY//[[:space:]]/}" ]]; then
+  HEADER="Release notes:"
+  if [[ -n "${RELEASE_NAME:-}" ]]; then
+    HEADER="Release notes (${RELEASE_NAME}):"
+  fi
+  # Trim leading/trailing whitespace from the release body.
+  BODY_TRIMMED=$(printf '%s' "$RELEASE_BODY" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+  NOTES+="
+
+${HEADER}
+${BODY_TRIMMED}"
+fi
+
+# ${#var} counts characters with LC_ALL=C.UTF-8, so the suffix math is exact.
+if ((${#NOTES} > MAX_CHARS)); then
+  SUFFIX=$'\n[truncated]'
+  KEEP=$((MAX_CHARS - ${#SUFFIX}))
+  if ((KEEP < 0)); then
+    KEEP=0
+  fi
+  NOTES="${NOTES:0:$KEEP}${SUFFIX}"
+fi
+
+printf '%s' "$NOTES" > "$OUT_FILE"
+printf '%s\n' "$NOTES"
