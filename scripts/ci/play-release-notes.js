@@ -51,6 +51,8 @@ function applyReleaseNotes(releases, versionCode, notes, releaseName) {
   });
 }
 
+const REQUEST_TIMEOUT_MS = 30 * 1000;
+
 async function request(method, url, { token, body, form, fetchImpl } = {}) {
   const doFetch = fetchImpl || fetch;
   const headers = {};
@@ -63,7 +65,12 @@ async function request(method, url, { token, body, form, fetchImpl } = {}) {
     headers["Content-Type"] = "application/json";
     payload = JSON.stringify(body);
   }
-  const res = await doFetch(url, { method, headers, body: payload });
+  const res = await doFetch(url, {
+    method,
+    headers,
+    body: payload,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
   const text = await res.text();
   if (!res.ok) {
     let detail = "";

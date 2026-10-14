@@ -117,7 +117,7 @@ function makeFakeFetch(calls, { buildStates = ["VALID"], localizations = [] } = 
   let polls = 0;
   return async (url, options = {}) => {
     const method = options.method || "GET";
-    calls.push({ method, url, headers: options.headers, body: options.body });
+    calls.push({ method, url, headers: options.headers, body: options.body, signal: options.signal });
     if (url.startsWith("https://api.appstoreconnect.apple.com/v1/apps")) {
       return jsonResponse(200, {
         data: [{ id: "APP1", attributes: { bundleId: "com.example" } }],
@@ -404,4 +404,13 @@ test("findBuild refuses a blank marketing version without sending a request", as
   await assert.rejects(() => client.findBuild("APP1", "", "7"), /findBuild needs a marketing version/);
   await assert.rejects(() => client.findBuild("APP1", undefined, "7"), /findBuild needs a marketing version/);
   assert.equal(calls.length, 0);
+});
+
+test("every App Store Connect request carries a timeout signal", async (t) => {
+  const calls = [];
+  await asc.run({ ...runArgs(withNotesFile(t)), fetchImpl: makeFakeFetch(calls, { localizations: [] }) });
+  assert.ok(calls.length > 0);
+  for (const call of calls) {
+    assert.ok(call.signal instanceof AbortSignal, `${call.method} ${call.url} has no timeout signal`);
+  }
 });

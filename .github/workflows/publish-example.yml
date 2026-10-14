@@ -210,9 +210,10 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          BUILD_NUMBER: ${{ steps.number.outputs.build_number }}
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           RECHECK_CMD: node ../scripts/ci/next-build-number.js android --package "$ANDROID_PACKAGE"
-        run: ../scripts/ci/eas-deploy.sh android "${{ steps.number.outputs.build_number }}"
+        run: ../scripts/ci/eas-deploy.sh android "$BUILD_NUMBER"
 
       - name: Record install link
         id: result
@@ -431,11 +432,13 @@ jobs:
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           EXPECTED_VERSION: ${{ steps.marketing.outputs.version }}
+          MARKETING_VERSION: ${{ steps.marketing.outputs.version }}
+          BUILD_NUMBER: ${{ steps.number.outputs.build_number }}
           APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
-          RECHECK_CMD: node ../scripts/ci/next-build-number.js ios --bundle-id "$IOS_BUNDLE_ID" --marketing-version "${{ steps.marketing.outputs.version }}"
-        run: ../scripts/ci/eas-deploy.sh ios "${{ steps.number.outputs.build_number }}"
+          RECHECK_CMD: node ../scripts/ci/next-build-number.js ios --bundle-id "$IOS_BUNDLE_ID" --marketing-version "$MARKETING_VERSION"
+        run: ../scripts/ci/eas-deploy.sh ios "$BUILD_NUMBER"
 
       - name: Record TestFlight link
         id: result

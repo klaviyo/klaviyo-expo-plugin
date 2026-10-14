@@ -174,7 +174,7 @@ The build is already in the store and only its notes are missing. Common causes 
 
 ## Pinned actions
 
-Every `uses:` in the workflows and composite actions is pinned to a full commit SHA, with the version in a comment. `.github/dependabot.yml` opens one grouped PR a month to update them. EAS CLI is pinned to a major version in `.github/actions/setup-eas/action.yml`.
+Every `uses:` in the workflows and composite actions is pinned to a full commit SHA, with the version in a comment. `.github/dependabot.yml` lists the workflows directory and `/.github/actions/*`, so the composite actions are covered too, and opens one grouped PR a month to update them. EAS CLI is pinned to a major version in `.github/actions/setup-eas/action.yml`.
 
 ## Manual trigger
 

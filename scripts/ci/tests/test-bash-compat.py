@@ -74,6 +74,19 @@ for label, (pattern, sample) in PORTABILITY.items():
     ]
     report(not hits, f"no {label} in scripts, workflows or actions", "\n".join(hits))
 
+# Every curl call is bounded. A line that runs curl must carry --max-time (and --connect-timeout).
+CURL = re.compile(r"(?<![\w./-])curl\s")
+unbounded = [
+    f"{os.path.relpath(p, ROOT)}:{n}: {text.strip()}"
+    for p in PORTABILITY_FILES
+    if os.path.abspath(p) != os.path.abspath(__file__)
+    for n, text in code_lines(p)
+    if CURL.search(text) and not ("--max-time" in text and "--connect-timeout" in text)
+]
+report(not unbounded, "every curl call sets --max-time and --connect-timeout", "\n".join(unbounded))
+report(CURL.search("curl -s https://x") is not None and CURL.search("curl --max-time 5 --connect-timeout 5 x") is not None,
+       "the curl rule finds curl calls")
+
 # An array that is initialised empty can still be empty when it is expanded. Flag each unguarded expansion
 # of such an array, unless a length check on the same array precedes it in the file.
 EMPTY_INIT = re.compile(r"^\s*(?:local\s+)?([A-Za-z_][A-Za-z0-9_]*)=\(\)")

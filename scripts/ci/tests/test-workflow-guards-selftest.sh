@@ -28,14 +28,15 @@ report() {
 }
 
 fresh_copy() {
-  rm -rf "$TMP/wf" "$TMP/actions"
+  rm -rf "$TMP/wf" "$TMP/actions" "$TMP/dependabot.yml"
   mkdir -p "$TMP/wf" "$TMP/actions"
   cp "$ROOT"/.github/workflows/publish-example*.yml "$TMP/wf/"
   cp -R "$ROOT"/.github/actions/. "$TMP/actions/"
+  cp "$ROOT"/.github/dependabot.yml "$TMP/dependabot.yml"
 }
 
 run_guard() {
-  WORKFLOW_DIR="$TMP/wf" ACTIONS_DIR="$TMP/actions" bash "$GUARD" > "$TMP/out.log" 2>&1
+  WORKFLOW_DIR="$TMP/wf" ACTIONS_DIR="$TMP/actions" DEPENDABOT_PATH="$TMP/dependabot.yml" bash "$GUARD" > "$TMP/out.log" 2>&1
 }
 
 # expect_fail <name> <expected FAIL text>: the guard must exit non-zero and some FAIL line must contain
@@ -359,6 +360,30 @@ expect_fail "a node syntax check that skips the app formatter is caught" "node -
 fresh_copy
 edit "$CHECKS" 's = s.replace("        run: bash scripts/ci/tests/lint-actions.sh\n", "        run: echo skipped\n", 1)'
 expect_fail "a checks job that stops linting the composite actions is caught" "the checks job runs lint-actions.sh"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("        run: ../scripts/ci/eas-deploy.sh android \"$BUILD_NUMBER\"", "        run: ../scripts/ci/eas-deploy.sh android \"${{ steps.number.outputs.build_number }}\"", 1)'
+expect_fail "a step output written inside a run: script is caught" "no expression is written inside a run: script"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("        run: echo \"install_url=", "        run: echo \"${{ github.head_ref }}\" \"install_url=", 1)'
+expect_fail "github.head_ref inside a single-line run: is caught" "no expression is written inside a run: script"
+
+fresh_copy
+edit "$SLACK" 's = s.replace("        file=\"${RUNNER_TEMP}/slack-payload.json\"", "        file=\"${{ inputs.source }}/slack-payload.json\"", 1)'
+expect_fail "an input written inside a composite action run: block is caught" "no expression is written inside a run: script"
+
+fresh_copy
+edit "$SLACK" 's = s.replace("${{ inputs.commit_sha }}", "${{ SubStr(inputs.commit_sha, 0, 7) }}", 1)'
+expect_fail "a mixed-case SubStr call is caught" "expressions only call functions"
+
+fresh_copy
+edit "$SLACK" 's = s.replace("${{ inputs.commit_sha }}", "${{ CONTAINS(inputs.commit_sha, 0) }}", 1)'
+if run_guard; then report 0 "an allowed function in any case is accepted"; else report 1 "an allowed function in any case is accepted"; fi
+
+fresh_copy
+edit "$TMP/dependabot.yml" 's = s.replace("      - /.github/actions/*\n", "", 1)'
+expect_fail "dependabot that stops covering the composite actions is caught" "dependabot covers the workflows and every composite action"
 
 echo "SUMMARY: $PASSED passed, $FAILED failed"
 ((FAILED == 0))

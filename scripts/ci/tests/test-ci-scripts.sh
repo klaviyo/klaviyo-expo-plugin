@@ -659,6 +659,22 @@ else
   fail "slack-payload: quotes, newlines and backslashes survive in valid JSON" "rc=$rc"
 fi
 
+# --- slack-payload.sh: branch-derived text cannot render Slack control syntax --------
+for field in SOURCE SDKS BUILD FAILED_STEP; do
+  payload="$WORK/slack-escape-$field.json"
+  result=failure
+  [[ "$field" == SDKS ]] && result=success
+  env RESULT="$result" PLATFORM=iOS DESTINATION=TestFlight BUILD="1.0.0 (7)" SDKS="Expo 1.0.0" SOURCE="main (push)" \
+    COMMIT_SHA=abc1234def5678 SERVER_URL=https://github.com REPOSITORY=klaviyo/klaviyo-expo-plugin RUN_ID=123 \
+    FAILED_STEP="a step" "$field=<!channel> & <https://evil.test|click>" bash "$CI_DIR/slack-payload.sh" "$payload" >/dev/null 2>&1 && rc=0 || rc=$?
+  body=$(jq -r '.blocks[0].text.text' "$payload" 2>/dev/null || true)
+  if ((rc == 0)) && [[ "$body" == *"&lt;!channel&gt; &amp; &lt;https://evil.test|click&gt;"* ]] && [[ "$body" != *"<!channel>"* ]] && [[ "$body" != *"<https://evil.test"* ]]; then
+    pass "slack-payload: $field is escaped so <!channel> and <url|text> do not render"
+  else
+    fail "slack-payload: $field is escaped so <!channel> and <url|text> do not render" "rc=$rc body=$body"
+  fi
+done
+
 # --- slack-payload.sh: success, failure and notes-failure layouts --------------
 build_payload() {
   RESULT="$1" PLATFORM=Android DESTINATION="Play internal" BUILD="1.0.0 (7)" SDKS="Expo 1.0.0 | RN 2.5.0 | Android 4.5.1" \

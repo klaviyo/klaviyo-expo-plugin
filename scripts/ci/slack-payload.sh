@@ -33,6 +33,18 @@ RUN_ID="${RUN_ID:-}"
 FAILED_STEP="${FAILED_STEP:-}"
 GET_BUILD="${GET_BUILD:-}"
 
+# Slack mrkdwn treats & < > as control characters, so a value derived from a branch, tag or release name
+# cannot be allowed to render <!channel> or <url|text>.
+escape_mrkdwn() {
+  printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+}
+BUILD=$(escape_mrkdwn "$BUILD")
+SDKS=$(escape_mrkdwn "$SDKS")
+SOURCE=$(escape_mrkdwn "$SOURCE")
+FAILED_STEP=$(escape_mrkdwn "$FAILED_STEP")
+DESTINATION=$(escape_mrkdwn "$DESTINATION")
+PLATFORM=$(escape_mrkdwn "$PLATFORM")
+
 case "$RESULT" in
   success)
     icon="✅"

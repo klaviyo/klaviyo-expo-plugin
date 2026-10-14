@@ -6,6 +6,7 @@ Prints one PASS/FAIL line per case and exits 1 if any case fails.
 Env (used by the self-test):
   WORKFLOW_DIR   directory with publish-example.yml and publish-example-checks.yml
   ACTIONS_DIR    directory with the composite actions
+  DEPENDABOT_PATH  the dependabot.yml to check
 
 The workflows are read as text and sliced by indentation, so the checks do not
 depend on a YAML library or on the awk dialect of the machine.
@@ -21,12 +22,16 @@ WORKFLOW_DIR = os.environ.get("WORKFLOW_DIR", os.path.join(ROOT, ".github", "wor
 ACTIONS_DIR = os.environ.get("ACTIONS_DIR", os.path.join(ROOT, ".github", "actions"))
 DEPLOY_PATH = os.path.join(WORKFLOW_DIR, "publish-example.yml")
 CHECKS_PATH = os.path.join(WORKFLOW_DIR, "publish-example-checks.yml")
+DEPENDABOT_PATH = os.environ.get("DEPENDABOT_PATH", os.path.join(ROOT, ".github", "dependabot.yml"))
 SLACK_PATH = os.path.join(ACTIONS_DIR, "notify-slack-example-publish", "action.yml")
 
 # Functions GitHub Actions expressions provide. Anything else called inside ${{ }} fails when it evaluates.
+# Function names are case-insensitive in expressions, so both sides are compared lowercased.
 ALLOWED_FUNCTIONS = {
-    "contains", "startsWith", "endsWith", "format", "join", "toJSON", "fromJSON",
-    "hashFiles", "case", "success", "always", "cancelled", "failure",
+    name.lower() for name in (
+        "contains", "startsWith", "endsWith", "format", "join", "toJSON", "fromJSON",
+        "hashFiles", "case", "success", "always", "cancelled", "failure",
+    )
 }
 
 failures = 0
@@ -126,10 +131,50 @@ for path in [DEPLOY_PATH, CHECKS_PATH] + sorted(glob.glob(os.path.join(ACTIONS_D
     for expression in expressions(read(path)):
         scanned += 1
         for name in re.findall(r"([A-Za-z_][A-Za-z0-9_]*)\(", expression):
-            if name not in ALLOWED_FUNCTIONS:
+            if name.lower() not in ALLOWED_FUNCTIONS:
                 unsupported.add(name)
 report(not unsupported, f"expressions only call functions that GitHub Actions provides ({scanned} scanned)",
        "unsupported: " + ", ".join(sorted(unsupported)))
+
+def run_scripts(text):
+    """The text of every `run:` value (single-line and block form) in a workflow or action file."""
+    lines = text.split("\n")
+    found = []
+    for index, line in enumerate(lines):
+        match = re.match(r"^(\s*)(?:- )?run:\s*(.*)$", line)
+        if not match:
+            continue
+        indent = len(match.group(1))
+        value = match.group(2)
+        if value.strip() in ("|", ">", "|-", ">-", "|+", ">+"):
+            block = []
+            for following in lines[index + 1:]:
+                if following.strip() and len(following) - len(following.lstrip()) <= indent:
+                    break
+                block.append(following)
+            value = "\n".join(block)
+        found.append((index + 1, value))
+    return found
+
+
+# No expression is written into a run: script. Values from a branch, tag, PR, release or a step output
+# reach the shell as text there, so they go through env: and are read as "$VAR".
+inlined = []
+for path in [DEPLOY_PATH, CHECKS_PATH] + sorted(glob.glob(os.path.join(ACTIONS_DIR, "*", "action.yml"))):
+    for line, value in run_scripts(read(path)):
+        for expression in re.findall(r"\$\{\{.*?\}\}", value, flags=re.S):
+            inlined.append(f"{os.path.basename(path)}:{line}: {expression}")
+report(not inlined, "no expression is written inside a run: script (pass it through env:)", "\n".join(inlined))
+
+# Dependabot watches the workflows directory and every composite action directory.
+dependabot = read(DEPENDABOT_PATH) if os.path.exists(DEPENDABOT_PATH) else ""
+action_dirs = sorted(os.path.basename(path) for path in glob.glob(os.path.join(ACTIONS_DIR, "*")) if os.path.isdir(path))
+listed = re.findall(r"^\s*-\s*[\"']?(/[^\s\"']*)", dependabot, flags=re.M)
+covered = "/" in listed and ("/.github/actions/*" in listed or all(f"/.github/actions/{name}" in listed for name in action_dirs))
+report(covered and "github-actions" in dependabot,
+       f"dependabot covers the workflows and every composite action ({len(action_dirs)} actions)",
+       f"directories listed: {listed}")
+
 
 # Every checkout drops its credentials, in the workflows and in the composite actions.
 total = 0

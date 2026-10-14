@@ -25,6 +25,7 @@ const { marketingVersion: stripToMarketingVersion } = require("./marketing-versi
 const API_BASE = "https://api.appstoreconnect.apple.com";
 // Apple caps tokens at 20 minutes.
 const TOKEN_LIFETIME_SECONDS = 15 * 60;
+const REQUEST_TIMEOUT_MS = 30 * 1000;
 // Apple's limit for the whatsNew attribute.
 const WHAT_TO_TEST_MAX_CHARS = 4000;
 const DEFAULT_LOCALE = "en-US";
@@ -180,6 +181,7 @@ class AscClient {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     const text = await res.text();
     if (!res.ok) {

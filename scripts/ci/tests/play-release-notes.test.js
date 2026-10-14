@@ -82,7 +82,7 @@ function jsonResponse(status, body) {
 function makeFakeFetch(calls, { failPut = false } = {}) {
   return async (url, options = {}) => {
     const method = options.method || "GET";
-    calls.push({ method, url, body: options.body });
+    calls.push({ method, url, body: options.body, signal: options.signal });
     if (url === "https://oauth2.googleapis.com/token") {
       return jsonResponse(200, { access_token: "TOKEN" });
     }
@@ -164,4 +164,13 @@ test("run errors when SERVICE_ACCOUNT_JSON is missing", async (t) => {
     play.run({ argv: ["42", withNotesFile(t)], env: {}, fetchImpl: async () => {} }),
     /SERVICE_ACCOUNT_JSON/,
   );
+});
+
+test("every Google request carries a timeout signal", async (t) => {
+  const calls = [];
+  await play.run({ argv: ["42", withNotesFile(t)], env: ENV, fetchImpl: makeFakeFetch(calls) });
+  assert.ok(calls.length > 0);
+  for (const call of calls) {
+    assert.ok(call.signal instanceof AbortSignal, `${call.method} ${call.url} has no timeout signal`);
+  }
 });
