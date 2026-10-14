@@ -332,5 +332,9 @@ fresh_copy
 edit "$DEPLOY" 's = s.replace("      - name: Render Slack fields\n", "      - name: Record versions\n        run: ../scripts/ci/eas-deploy.sh android 1\n\n      - name: Render Slack fields\n", 1)'
 expect_fail "a pre-build eas-deploy.sh call with no flags is caught" "step running eas-deploy.sh sets COMMIT_SHA, BRANCH, SOURCE_LABEL"
 
+fresh_copy
+edit "$CHECKS" 's = s.replace("        run: python3 -B scripts/ci/tests/test-bash-compat.py\n", "        run: echo skipped\n", 1)'
+expect_fail "a checks job that stops running the bash 3.2 check is caught" "the checks job runs test-bash-compat.py"
+
 echo "SUMMARY: $PASSED passed, $FAILED failed"
 ((FAILED == 0))

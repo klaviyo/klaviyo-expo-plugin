@@ -277,7 +277,7 @@ for job in ("deploy-android", "deploy-ios"):
 
 # The checks job runs every test script, so a script that is written but never run cannot pass unnoticed.
 checks_text = read(CHECKS_PATH)
-for script in ("test-ci-scripts.sh", "test-workflow-guards.sh", "test-workflow-guards-selftest.sh", "test-notes-env.py"):
+for script in ("test-ci-scripts.sh", "test-workflow-guards.sh", "test-workflow-guards-selftest.sh", "test-notes-env.py", "test-bash-compat.py"):
     report(script in checks_text, f"the checks job runs {script}")
 report("scripts/ci/tests/*.test.js" in checks_text, "the checks job runs the node tests")
 

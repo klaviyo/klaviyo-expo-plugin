@@ -236,8 +236,8 @@ run_deploy() {
       COMMIT_SHA=abc1234def5678 \
       BRANCH=main \
       SOURCE_LABEL=main \
-      "${assignments[@]}" \
-      env "${unsets[@]}" \
+      ${assignments[@]+"${assignments[@]}"} \
+      env ${unsets[@]+"${unsets[@]}"} \
       bash "$CI_DIR/eas-deploy.sh" "$platform" "$number"
   )
 }

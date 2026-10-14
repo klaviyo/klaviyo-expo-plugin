@@ -66,6 +66,9 @@ jobs:
         run: |
           jq -e '.cli.appVersionSource == "local" and .build.production.autoIncrement == false' example/eas.json
 
+      - name: Check that the shell scripts also run under bash 3.2
+        run: python3 -B scripts/ci/tests/test-bash-compat.py
+
       - name: Test shell scripts
         run: bash scripts/ci/tests/test-ci-scripts.sh
 
