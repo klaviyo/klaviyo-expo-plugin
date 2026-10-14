@@ -1,3 +1,14 @@
+const pluginPackage = require('../package.json');
+const examplePackage = require('./package.json');
+
+const readInstalledVersion = (name) => {
+  try {
+    return require(`${name}/package.json`).version;
+  } catch {
+    return examplePackage.dependencies[name];
+  }
+};
+
 module.exports = () => {
   return {
     name: 'klaviyo plugin example',
@@ -9,9 +20,8 @@ module.exports = () => {
     userInterfaceStyle: 'automatic',
     newArchEnabled: false,
     ios: {
-      // EAS builds take the build number from EAS's remote counter (eas.json
-      // appVersionSource: remote); this value only applies to local builds.
-      buildNumber: '1',
+      // CI sets IOS_BUILD_NUMBER (scripts/ci/next-build-number.js); local builds use 1.
+      buildNumber: process.env.IOS_BUILD_NUMBER || '1',
       bundleIdentifier: 'com.klaviyo.expoexample',
       infoPlist: {
         UIBackgroundModes: ['remote-notification'],
@@ -23,6 +33,8 @@ module.exports = () => {
         backgroundColor: '#ffffff',
       },
       package: 'com.klaviyo.expoexample',
+      // CI sets ANDROID_VERSION_CODE (scripts/ci/next-build-number.js); local builds use 1.
+      versionCode: parseInt(process.env.ANDROID_VERSION_CODE || '1', 10),
       jsEngine: 'hermes',
       // For EAS builds with secret uploaded
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON || './google-services.json',
@@ -63,6 +75,12 @@ module.exports = () => {
     assetBundlePatterns: ['**/*'],
     extra: {
       router: {},
+      buildInfo: {
+        pluginVersion: pluginPackage.version,
+        reactNativeSdkVersion: readInstalledVersion('klaviyo-react-native-sdk'),
+        // CI sets APP_COMMIT_SHA via eas.json; local builds show 'local'.
+        commitSha: process.env.APP_COMMIT_SHA || 'local',
+      },
       eas: {
         // CI sets KLAVIYO_EAS_PROJECT_ID; replace the placeholder for local builds
         projectId: process.env.KLAVIYO_EAS_PROJECT_ID || 'XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX',

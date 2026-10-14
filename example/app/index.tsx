@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Klaviyo } from 'klaviyo-react-native-sdk';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+
+const buildInfo = Constants.expoConfig?.extra?.buildInfo as
+  | { pluginVersion: string; reactNativeSdkVersion: string; commitSha: string }
+  | undefined;
 
 export default function ProfileScreen() {
   const [apiKey, setApiKey] = useState('');
@@ -104,6 +109,11 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
+      {buildInfo && (
+        <Text style={styles.buildInfo} testID="build-info">
+          Plugin {buildInfo.pluginVersion} | RN SDK {buildInfo.reactNativeSdkVersion} | {buildInfo.commitSha}
+        </Text>
+      )}
       <View style={styles.section}>
         <View style={styles.inputRow}>
           <TextInput
@@ -208,6 +218,11 @@ const styles = StyleSheet.create({
   },
   fullWidthButton: {
     width: '100%',
+  },
+  buildInfo: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 10,
   },
   buttonText: {
     color: '#fff',
