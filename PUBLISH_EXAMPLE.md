@@ -22,7 +22,7 @@ Add a label to a pull request to deploy its head commit before merging:
 - `deploy-example-app:android`: Android only
 - `deploy-example-app:ios`: iOS only
 
-A cleanup job removes the label when the run ends, so adding it again deploys again. Label deploys use the same store tracks as every other deploy, so only internal testers see them. Each deploy uses one EAS build per platform. Expo's free plan limits build credits per month, so keep label deploys for changes that need a store build to verify.
+A cleanup job removes the label when the run ends, so adding it again deploys again. Label deploys use the same store tracks as every other deploy, so only internal testers see them. Each deploy uses one EAS build per platform and counts against the Expo plan's build allowance, so keep label deploys for changes that need a store build to verify.
 
 ### Switching it off
 
