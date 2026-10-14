@@ -72,6 +72,29 @@ else
   pass "SLACK_WEBHOOK_URL is not a required secret"
 fi
 
+# An unrelated label must not start the workflow's first job, or every label costs a runner.
+if awk '/^  plan:/,/^    runs-on/' "$WORKFLOW" | grep -q "startsWith(github.event.label.name, 'deploy-example-app')"; then
+  pass "the plan job only runs for deploy labels on pull requests"
+else
+  fail "the plan job only runs for deploy labels on pull requests"
+fi
+
+# Slack values must never be interpolated into a YAML payload block, where a newline breaks it.
+if grep -q 'payload: |' "$ACTIONS/notify-slack-example-publish/action.yml"; then
+  fail "the Slack payload is built as JSON, not interpolated into YAML"
+else
+  pass "the Slack payload is built as JSON, not interpolated into YAML"
+fi
+
+# Every job that runs a repo script needs a checkout.
+for job in preflight deploy-android android-notes deploy-ios what-to-test; do
+  if awk -v j="  $job:" '$0==j{f=1;next} f&&/^  [a-z-]+:$/{f=0} f' "$WORKFLOW" | grep -q 'actions/checkout'; then
+    pass "the $job job checks out the repository"
+  else
+    fail "the $job job checks out the repository"
+  fi
+done
+
 echo
 if ((FAILURES > 0)); then
   echo "$FAILURES test(s) failed"

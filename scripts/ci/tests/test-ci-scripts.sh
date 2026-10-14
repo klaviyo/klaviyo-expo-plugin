@@ -473,6 +473,51 @@ else
   fail "check-secrets: no names is an error" "rc=$rc"
 fi
 
+# --- slack-payload.sh: hostile values still produce valid JSON that round-trips ---
+hostile_build=$'1.0.0 ("7")\nsecond line'
+hostile_get=$'<https://example.test|Open "App">\nNot a tester? Ask "us" \\ now \U0001F600'
+payload="$WORK/slack-payload.json"
+RESULT=success PLATFORM=iOS DESTINATION=TestFlight BUILD="$hostile_build" SDKS='Expo 1.0.0 | RN 2.5.0' \
+  SOURCE='feat/x (push)' COMMIT_SHA=abc1234def5678 SERVER_URL=https://github.com REPOSITORY=klaviyo/klaviyo-expo-plugin \
+  RUN_ID=123 GET_BUILD="$hostile_get" bash "$CI_DIR/slack-payload.sh" "$payload" 2>&1 && rc=0 || rc=$?
+if ((rc == 0)) && jq -e . "$payload" >/dev/null 2>&1; then
+  body=$(jq -r '.blocks[0].text.text' "$payload")
+  if [[ "$body" == *"$hostile_build"* ]] && [[ "$body" == *"$hostile_get"* ]]; then
+    pass "slack-payload: quotes, newlines and backslashes survive in valid JSON"
+  else
+    fail "slack-payload: quotes, newlines and backslashes survive in valid JSON" "$body"
+  fi
+else
+  fail "slack-payload: quotes, newlines and backslashes survive in valid JSON" "rc=$rc"
+fi
+
+# --- slack-payload.sh: success, failure and notes-failure layouts --------------
+build_payload() {
+  RESULT="$1" PLATFORM=Android DESTINATION="Play internal" BUILD="1.0.0 (7)" SDKS="Expo 1.0.0 | RN 2.5.0 | Android 4.5.1" \
+    SOURCE="main (push)" COMMIT_SHA=abc1234def5678 SERVER_URL=https://github.com REPOSITORY=klaviyo/klaviyo-expo-plugin \
+    RUN_ID=123 FAILED_STEP="EAS build or submit" GET_BUILD="Open the app" bash "$CI_DIR/slack-payload.sh" "$WORK/p-$1.json"
+  jq -r '.blocks[0].text.text' "$WORK/p-$1.json"
+}
+out=$(build_payload success)
+assert_contains "slack-payload: success has the destination" "$out" "✅ *Expo Example (Android)* → Play internal"
+assert_contains "slack-payload: success lists the SDKs" "$out" "*SDKs:* Expo 1.0.0 | RN 2.5.0 | Android 4.5.1"
+assert_contains "slack-payload: success links the commit and the run" "$out" "*Commit:* <https://github.com/klaviyo/klaviyo-expo-plugin/commit/abc1234def5678|abc1234> · <https://github.com/klaviyo/klaviyo-expo-plugin/actions/runs/123|CI run>"
+assert_contains "slack-payload: success has Get the build" "$out" "*Get the build:* Open the app"
+out=$(build_payload failure)
+assert_contains "slack-payload: failure names the step" "$out" "❌ *Expo Example (Android)* deploy failed at EAS build or submit"
+assert_not_contains "slack-payload: failure has no SDKs or install line" "$out" "*SDKs:*"
+out=$(build_payload notes-failure)
+assert_contains "slack-payload: notes failure is a separate warning" "$out" "⚠️ *Expo Example (Android)* build uploaded to Play internal, but its release notes were not set"
+assert_not_contains "slack-payload: notes failure has no install line" "$out" "Get the build"
+
+# --- slack-payload.sh: an unknown result is rejected --------------------------
+log=$(RESULT=maybe PLATFORM=iOS DESTINATION=TestFlight COMMIT_SHA=abc1234 bash "$CI_DIR/slack-payload.sh" "$WORK/p-bad.json" 2>&1) && rc=0 || rc=$?
+if ((rc != 0)) && [[ "$log" == *"Unknown RESULT"* ]]; then
+  pass "slack-payload: rejects an unknown result"
+else
+  fail "slack-payload: rejects an unknown result" "rc=$rc"$'\n'"$log"
+fi
+
 # --- the tracked eas.json is never modified by the tests ---------------------
 if [[ "$(cksum < "$ROOT/example/eas.json")" == "$REAL_EAS_JSON_SUM" ]]; then
   pass "example/eas.json untouched"

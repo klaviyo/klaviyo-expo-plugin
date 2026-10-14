@@ -41,13 +41,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Shorten the commit
-      id: short
-      shell: bash
-      env:
-        SHA: ${{ inputs.commit_sha }}
-      run: echo "sha=${SHA:0:7}" >> "$GITHUB_OUTPUT"
-
     - name: Check for a webhook
       id: webhook
       shell: bash
@@ -61,15 +54,31 @@ runs:
           echo "post=true" >> "$GITHUB_OUTPUT"
         fi
 
+    - name: Build the Slack payload
+      id: payload
+      if: steps.webhook.outputs.post == 'true'
+      shell: bash
+      env:
+        RESULT: ${{ inputs.result }}
+        PLATFORM: ${{ inputs.platform }}
+        DESTINATION: ${{ inputs.destination }}
+        BUILD: ${{ inputs.build }}
+        SDKS: ${{ inputs.sdks }}
+        SOURCE: ${{ inputs.source }}
+        COMMIT_SHA: ${{ inputs.commit_sha }}
+        FAILED_STEP: ${{ inputs.failed_step }}
+        GET_BUILD: ${{ inputs.get_build }}
+        SERVER_URL: ${{ github.server_url }}
+        REPOSITORY: ${{ github.repository }}
+        RUN_ID: ${{ github.run_id }}
+      run: |
+        file="${RUNNER_TEMP}/slack-payload.json"
+        "${GITHUB_WORKSPACE}/scripts/ci/slack-payload.sh" "$file"
+        echo "file=$file" >> "$GITHUB_OUTPUT"
+
     - if: steps.webhook.outputs.post == 'true'
       uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
       with:
         webhook: ${{ inputs.webhook }}
         webhook-type: incoming-webhook
-        payload: |
-          text: "${{ inputs.result == 'success' && '✅' || inputs.result == 'failure' && '❌' || '⚠️' }} Expo Example (${{ inputs.platform }}) ${{ inputs.result == 'success' && format('→ {0}', inputs.destination) || inputs.result == 'failure' && format('deploy failed at {0}', inputs.failed_step || 'an unknown step') || format('build {0} uploaded to {1}, but its release notes were not set', inputs.build, inputs.destination) }}"
-          blocks:
-            - type: "section"
-              text:
-                type: "mrkdwn"
-                text: "${{ inputs.result == 'success' && '✅' || inputs.result == 'failure' && '❌' || '⚠️' }} *Expo Example (${{ inputs.platform }})* ${{ inputs.result == 'success' && format('→ {0}', inputs.destination) || inputs.result == 'failure' && format('deploy failed at {0}', inputs.failed_step || 'an unknown step') || format('build uploaded to {0}, but its release notes were not set. Re-run the failed job or set them by hand in the store console.', inputs.destination) }}\n*Build:* ${{ inputs.build }}${{ inputs.result != 'failure' && format('\n*SDKs:* {0}', inputs.sdks) || '' }}\n*Source:* ${{ inputs.source }}\n*Commit:* <${{ github.server_url }}/${{ github.repository }}/commit/${{ inputs.commit_sha }}|${{ steps.short.outputs.sha }}> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|CI run>${{ inputs.result == 'success' && inputs.get_build != '' && format('\n*Get the build:* {0}', inputs.get_build) || '' }}"
+        payload-file-path: ${{ steps.payload.outputs.file }}
