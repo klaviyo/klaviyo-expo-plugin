@@ -229,6 +229,32 @@ for platform, label in (("android", "Android"), ("ios", "iOS")):
     report(ok, f"the preflight checks {label} secrets only when {label} was requested",
            "gate: " + (gate.group(1) if gate else "none"))
 
+# Build numbers restart per marketing version, so every App Store Connect lookup keys on the stripped
+# marketing version the preflight used: What to Test takes it from the deploy job's output, and the
+# iOS deploy asserts the build reports it.
+wtt = find_step(jobs.get("what-to-test", ""), "Set What to Test")
+report("--marketing-version \"$MARKETING_VERSION\"" in wtt
+       and "MARKETING_VERSION: ${{ needs.deploy-ios.outputs.marketing_version }}" in wtt,
+       "What to Test looks the build up by the stripped marketing version from the deploy job", wtt)
+report("marketing_version: ${{ steps.marketing.outputs.version }}" in jobs.get("deploy-ios", ""),
+       "the iOS deploy job outputs the stripped marketing version")
+ios_deploy = find_step(jobs.get("deploy-ios", ""), "EAS build and submit")
+report("EXPECTED_VERSION: ${{ steps.marketing.outputs.version }}" in ios_deploy,
+       "the iOS deploy step asserts the built marketing version", ios_deploy)
+
+# Every step that runs a composer has the env the composer reads and the build info file does not supply.
+COMPOSER_ENV = {
+    "release-notes.sh": ("RELEASE_NAME", "RELEASE_BODY", "RUN_URL", "BUILD_INFO_FILE"),
+    "render-build-info.js slack": ("BUILD_INFO_FILE",),
+}
+for job in ("deploy-android", "deploy-ios"):
+    for block in split_steps(jobs.get(job, "")):
+        for marker, needed in COMPOSER_ENV.items():
+            if marker in block:
+                absent = [name for name in needed if f"{name}:" not in block]
+                report(not absent, f"the {job} step running {marker} sets {', '.join(needed)}",
+                       "missing: " + ", ".join(absent))
+
 # The commit is the pull request head, not the merge commit.
 report("COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}" in deploy,
        "the commit is the pull request head, not the merge commit")

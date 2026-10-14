@@ -342,3 +342,72 @@ test("no request URL, header, or body leaks key material", async () => {
     // but the PEM body itself must never appear anywhere.
   }
 });
+
+// A fake App Store Connect that holds builds from several marketing versions and applies the
+// preReleaseVersion filter the way the real API does, so results depend on the query.
+function makeVersionedIosFetch(calls, builds) {
+  return async (url, options = {}) => {
+    calls.push({ method: options.method || "GET", url });
+    if (url.startsWith("https://api.appstoreconnect.apple.com/v1/apps")) {
+      return jsonResponse(200, { data: [{ id: "APP1", attributes: { bundleId: "com.example" } }] });
+    }
+    if (url.startsWith("https://api.appstoreconnect.apple.com/v1/builds?")) {
+      const wanted = new URL(url).searchParams.get("filter[preReleaseVersion.version]");
+      const matches = builds.filter((b) => !wanted || b.marketing === wanted);
+      return jsonResponse(200, { data: matches.map((b) => ({ attributes: { version: b.number } })) });
+    }
+    throw new Error(`unexpected fetch: ${url}`);
+  };
+}
+
+const TWO_VERSION_BUILDS = [
+  { marketing: "0.3.1", number: "9" },
+  { marketing: "0.3.1", number: "8" },
+  { marketing: "0.3.2", number: "2" },
+  { marketing: "0.3.2", number: "1" },
+];
+
+function iosArgv(version) {
+  return ["ios", "--bundle-id", "com.example", "--marketing-version", version];
+}
+
+async function nextFor(version, builds = TWO_VERSION_BUILDS) {
+  const calls = [];
+  const lines = [];
+  await nbn.run({
+    argv: iosArgv(version),
+    env: ASC_ENV,
+    fetchImpl: makeVersionedIosFetch(calls, builds),
+    out: (line) => lines.push(line),
+  });
+  return { result: JSON.parse(lines[0]), calls };
+}
+
+test("ios: a new marketing version restarts at 1 even when an older version reached build 9", async () => {
+  const { result } = await nextFor("0.4.0");
+  assert.equal(result.build_number, 1);
+});
+
+test("ios: the sequence follows the requested marketing version, not the highest build of any version", async () => {
+  assert.equal((await nextFor("0.3.2")).result.build_number, 3);
+  assert.equal((await nextFor("0.3.1")).result.build_number, 10);
+});
+
+test("ios: a prerelease and its final release share one sequence", async () => {
+  const alpha = await nextFor("0.3.2-alpha.1");
+  const final = await nextFor("0.3.2");
+  assert.equal(alpha.result.build_number, 3);
+  assert.equal(alpha.result.marketing_version, "0.3.2");
+  assert.equal(final.result.build_number, 3);
+  const sent = new URL(alpha.calls.find((c) => c.url.includes("/v1/builds?")).url).searchParams;
+  assert.equal(sent.get("filter[preReleaseVersion.version]"), "0.3.2");
+});
+
+test("ios: a malformed marketing version is an error, not an unfiltered lookup", async () => {
+  await assert.rejects(() => nextFor("latest"), /Cannot derive an iOS marketing version/);
+  const client = { findApp: async () => ({ id: "APP1" }), request: async () => ({ data: [] }) };
+  await assert.rejects(
+    () => nbn.iosPreflight({ client, bundleId: "com.example", marketingVersion: "" }),
+    /Cannot derive an iOS marketing version/,
+  );
+});

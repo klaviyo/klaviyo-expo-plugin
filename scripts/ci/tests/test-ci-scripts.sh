@@ -88,7 +88,7 @@ if [[ "$cmd" == "build" ]]; then
   if [[ "${FAKE_EAS_STALE_NUMBER:-}" != "" ]]; then
     stamped="$FAKE_EAS_STALE_NUMBER"
   fi
-  printf '[{"id":"build-%s","appVersion":"1.0.0","appBuildVersion":"%s"}]\n' "$n" "$stamped"
+  printf '[{"id":"build-%s","appVersion":"%s","appBuildVersion":"%s"}]\n' "$n" "${FAKE_EAS_VERSION:-1.0.0}" "$stamped"
 elif [[ "$cmd" == "submit" ]]; then
   fails="${FAKE_EAS_SUBMIT_FAILS:-0}"
   s=0
@@ -368,6 +368,41 @@ if ((rc == 0)) && grep -q '^build_number=21$' "$WORK/gh-output.txt" \
   pass "eas-deploy: after a retry the outputs, eas.json and build info carry the final number"
 else
   fail "eas-deploy: after a retry the outputs, eas.json and build info carry the final number" "rc=$rc"$'\n'"$(cat "$info" 2>/dev/null)"$'\n'"$log"
+fi
+
+# --- eas-deploy.sh: the build must report the marketing version the number came from ---
+: > "$WORK/gh-output.txt"
+log=$(run_deploy version ios 10 EXPECTED_VERSION=1.0.0 2>&1) && rc=0 || rc=$?
+if ((rc == 0)); then
+  pass "eas-deploy: a build with the expected version is submitted"
+else
+  fail "eas-deploy: a build with the expected version is submitted" "rc=$rc"$'\n'"$log"
+fi
+
+: > "$WORK/gh-output.txt"
+log=$(run_deploy wrongver ios 10 EXPECTED_VERSION=0.3.2 FAKE_EAS_VERSION=0.3.1 2>&1) && rc=0 || rc=$?
+submits="0"
+[[ -f "$WORK/state-wrongver/submits" ]] && submits=$(cat "$WORK/state-wrongver/submits")
+if ((rc != 0)) && ((submits == 0)) && [[ "$log" == *"reports version '0.3.1', expected 0.3.2"* ]]; then
+  pass "eas-deploy: a build of another marketing version is not submitted"
+else
+  fail "eas-deploy: a build of another marketing version is not submitted" "rc=$rc submits=$submits"$'\n'"$log"
+fi
+
+: > "$WORK/gh-output.txt"
+log=$(run_deploy prerelease ios 10 EXPECTED_VERSION=0.3.2 FAKE_EAS_VERSION=0.3.2-alpha.1 2>&1) && rc=0 || rc=$?
+if ((rc == 0)); then
+  pass "eas-deploy: a prerelease build matches its stripped marketing version"
+else
+  fail "eas-deploy: a prerelease build matches its stripped marketing version" "rc=$rc"$'\n'"$log"
+fi
+
+: > "$WORK/gh-output.txt"
+log=$(run_deploy noexpect android 10 FAKE_EAS_VERSION=3.4.5-rc.1 2>&1) && rc=0 || rc=$?
+if ((rc == 0)); then
+  pass "eas-deploy: without EXPECTED_VERSION the version is not asserted"
+else
+  fail "eas-deploy: without EXPECTED_VERSION the version is not asserted" "rc=$rc"$'\n'"$log"
 fi
 
 # --- eas-deploy.sh: gives up after max attempts -----------------------------

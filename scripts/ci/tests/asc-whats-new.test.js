@@ -256,3 +256,97 @@ test("no request body or header leaks the private key", async (t) => {
     assert.ok(!call.url.includes("PRIVATE KEY"));
   }
 });
+
+// A fake App Store Connect that holds builds from several marketing versions and applies whichever
+// filters the query carries, newest build last, as the real API lists older builds first here.
+function makeVersionedFetch(calls, builds) {
+  return async (url, options = {}) => {
+    const method = options.method || "GET";
+    calls.push({ method, url, body: options.body });
+    if (url.startsWith("https://api.appstoreconnect.apple.com/v1/apps")) {
+      return jsonResponse(200, { data: [{ id: "APP1", attributes: { bundleId: "com.example" } }] });
+    }
+    if (url.startsWith("https://api.appstoreconnect.apple.com/v1/builds?")) {
+      const query = new URL(url).searchParams;
+      const matches = builds.filter(
+        (b) =>
+          (!query.get("filter[app]") || query.get("filter[app]") === "APP1") &&
+          (!query.get("filter[version]") || query.get("filter[version]") === b.number) &&
+          (!query.get("filter[preReleaseVersion.version]") ||
+            query.get("filter[preReleaseVersion.version]") === b.marketing),
+      );
+      const limit = Number(query.get("limit") || matches.length);
+      return jsonResponse(200, {
+        data: matches.slice(0, limit).map((b) => ({ id: b.id, attributes: { processingState: "VALID" } })),
+      });
+    }
+    if (url.includes("/betaBuildLocalizations") && method === "GET") {
+      return jsonResponse(200, { data: [] });
+    }
+    if (method === "PATCH" || method === "POST") {
+      return jsonResponse(200, {});
+    }
+    throw new Error(`unexpected fetch: ${method} ${url}`);
+  };
+}
+
+const SHARED_NUMBER_BUILDS = [
+  { id: "OLD-0.3.1-b7", marketing: "0.3.1", number: "7" },
+  { id: "NEW-0.3.2-b7", marketing: "0.3.2", number: "7" },
+];
+
+test("notes go to the build of the right marketing version when two versions share a build number", async (t) => {
+  const calls = [];
+  const fetchImpl = makeVersionedFetch(calls, SHARED_NUMBER_BUILDS);
+  const notes = withNotesFile(t);
+  const argv = ARGV.map((a) => (a === "NOTES" ? notes : a === "1.2.0" ? "0.3.2" : a));
+  await asc.run({ argv, env: ENV, fetchImpl, sleep: async () => {}, now: () => 1_000_000 });
+  const writes = calls.filter((c) => c.method === "POST" || c.method === "PATCH");
+  assert.equal(writes.length, 1);
+  assert.match(writes[0].body, /NEW-0\.3\.2-b7/);
+  assert.ok(!calls.some((c) => c.url.includes("OLD-0.3.1-b7")));
+});
+
+test("the fake lists the older build first when the version filter is dropped", async () => {
+  const calls = [];
+  const fetchImpl = makeVersionedFetch(calls, SHARED_NUMBER_BUILDS);
+  const resp = await fetchImpl("https://api.appstoreconnect.apple.com/v1/builds?filter[app]=APP1&filter[version]=7&limit=1");
+  const body = JSON.parse(await resp.text());
+  assert.equal(body.data[0].id, "OLD-0.3.1-b7");
+});
+
+test("the build lookup sends the app, the marketing version and the build number", async (t) => {
+  const calls = [];
+  const fetchImpl = makeVersionedFetch(calls, SHARED_NUMBER_BUILDS);
+  const notes = withNotesFile(t);
+  const argv = ARGV.map((a) => (a === "NOTES" ? notes : a === "1.2.0" ? "0.3.2" : a));
+  await asc.run({ argv, env: ENV, fetchImpl, sleep: async () => {}, now: () => 1_000_000 });
+  const lookup = new URL(calls.find((c) => c.url.includes("/v1/builds?")).url).searchParams;
+  assert.equal(lookup.get("filter[app]"), "APP1");
+  assert.equal(lookup.get("filter[preReleaseVersion.version]"), "0.3.2");
+  assert.equal(lookup.get("filter[version]"), "7");
+});
+
+test("a prerelease marketing version is stripped before the lookup", async (t) => {
+  const calls = [];
+  const fetchImpl = makeVersionedFetch(calls, SHARED_NUMBER_BUILDS);
+  const notes = withNotesFile(t);
+  const argv = ARGV.map((a) => (a === "NOTES" ? notes : a === "1.2.0" ? "0.3.2-alpha.1" : a));
+  await asc.run({ argv, env: ENV, fetchImpl, sleep: async () => {}, now: () => 1_000_000 });
+  const lookup = new URL(calls.find((c) => c.url.includes("/v1/builds?")).url).searchParams;
+  assert.equal(lookup.get("filter[preReleaseVersion.version]"), "0.3.2");
+});
+
+test("a missing or malformed marketing version is an error, never a lookup by build number alone", async (t) => {
+  const notes = withNotesFile(t);
+  assert.throws(
+    () => asc.parseArgs(["--bundle-id", "com.example", "--build-number", "7", "--notes-file", notes]),
+    /Usage/,
+  );
+  assert.throws(
+    () => asc.parseArgs(["--bundle-id", "com.example", "--marketing-version", "latest", "--build-number", "7", "--notes-file", notes]),
+    /Cannot derive an iOS marketing version/,
+  );
+  const client = new asc.AscClient("K", "I", "KEY", async () => jsonResponse(200, { data: [] }), () => 0);
+  await assert.rejects(() => client.findBuild("APP1", "", "7"), /needs a marketing version/);
+});

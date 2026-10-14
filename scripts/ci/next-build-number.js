@@ -26,6 +26,8 @@
 
 const fs = require("fs");
 
+const { marketingVersion: stripToMarketingVersion } = require("./marketing-version");
+
 const { AscClient, normalizePrivateKey } = require("./asc-whats-new");
 const { getAccessToken, request } = require("./play-release-notes");
 
@@ -122,20 +124,22 @@ function ascClientFromEnv(env, fetchImpl, now) {
 }
 
 async function recentBuildVersions(client, appId, marketingVersion) {
+  if (!marketingVersion) {
+    throw new Error("recentBuildVersions needs a marketing version");
+  }
   const params = {
     "filter[app]": appId,
+    "filter[preReleaseVersion.version]": marketingVersion,
     sort: "-uploadedDate",
     limit: "200",
     "fields[builds]": "version,uploadedDate",
   };
-  if (marketingVersion) {
-    params["filter[preReleaseVersion.version]"] = marketingVersion;
-  }
   const resp = await client.request("GET", "/v1/builds", params);
   return (resp.data || []).map((b) => (b.attributes || {}).version);
 }
 
-async function iosPreflight({ client, bundleId, marketingVersion, minimum = 1 }) {
+async function iosPreflight({ client, bundleId, marketingVersion: rawVersion, minimum = 1 }) {
+  const marketingVersion = stripToMarketingVersion(rawVersion);
   const app = await client.findApp(bundleId);
   const versions = await recentBuildVersions(client, app.id, marketingVersion);
   const latest = maxBuildNumber(versions);

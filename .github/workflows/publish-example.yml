@@ -368,6 +368,7 @@ jobs:
       url: ${{ steps.result.outputs.testflight_url }}
     outputs:
       app_version: ${{ steps.deploy.outputs.app_version }}
+      marketing_version: ${{ steps.marketing.outputs.version }}
       build_number: ${{ steps.deploy.outputs.build_number }}
       build_date: ${{ steps.deploy.outputs.build_date }}
     env:
@@ -423,6 +424,7 @@ jobs:
         env:
           BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          EXPECTED_VERSION: ${{ steps.marketing.outputs.version }}
           APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
@@ -555,12 +557,12 @@ jobs:
           APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
-          APP_VERSION: ${{ needs.deploy-ios.outputs.app_version }}
+          MARKETING_VERSION: ${{ needs.deploy-ios.outputs.marketing_version }}
           BUILD_NUMBER: ${{ needs.deploy-ios.outputs.build_number }}
         run: |
           node scripts/ci/asc-whats-new.js \
             --bundle-id "$IOS_BUNDLE_ID" \
-            --marketing-version "$APP_VERSION" \
+            --marketing-version "$MARKETING_VERSION" \
             --build-number "$BUILD_NUMBER" \
             --notes-file "${RUNNER_TEMP}/what-to-test.txt"
 

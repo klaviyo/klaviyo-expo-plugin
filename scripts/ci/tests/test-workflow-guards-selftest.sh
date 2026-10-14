@@ -283,5 +283,26 @@ fresh_copy
 edit "$DEPLOY" 's = s.replace("        id: ios\n        if: needs.plan.outputs.ios == \x27true\x27\n", "        id: ios\n        if: needs.plan.outputs.android == \x27true\x27\n", 1)'
 expect_fail "an iOS secret check gated on the Android request is caught" "the preflight checks iOS secrets only when iOS was requested"
 
+fresh_copy
+edit "$DEPLOY" 's = s.replace("          MARKETING_VERSION: ${{ needs.deploy-ios.outputs.marketing_version }}\n", "          MARKETING_VERSION: ${{ needs.deploy-ios.outputs.app_version }}\n", 1)'
+expect_fail "What to Test using the reported version instead of the stripped one is caught" "What to Test looks the build up by the stripped marketing version"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("          EXPECTED_VERSION: ${{ steps.marketing.outputs.version }}\n", "", 1)'
+expect_fail "an iOS deploy that does not assert the built version is caught" "the iOS deploy step asserts the built marketing version"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("      marketing_version: ${{ steps.marketing.outputs.version }}\n", "", 1)'
+expect_fail "an iOS deploy job without the marketing version output is caught" "the iOS deploy job outputs the stripped marketing version"
+
+fresh_copy
+edit "$DEPLOY" '
+i = s.index("      - name: Render release notes")
+j = s.index("          RUN_URL:", i)
+k = s.index("\n", j) + 1
+s = s[:j] + s[k:]
+'
+expect_fail "a notes step without RUN_URL is caught" "step running release-notes.sh sets"
+
 echo "SUMMARY: $PASSED passed, $FAILED failed"
 ((FAILED == 0))

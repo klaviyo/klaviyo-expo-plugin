@@ -20,6 +20,8 @@
 const crypto = require("crypto");
 const fs = require("fs");
 
+const { marketingVersion: stripToMarketingVersion } = require("./marketing-version");
+
 const API_BASE = "https://api.appstoreconnect.apple.com";
 // Apple caps tokens at 20 minutes.
 const TOKEN_LIFETIME_SECONDS = 15 * 60;
@@ -124,12 +126,13 @@ function parseArgs(argv) {
         throw new Error(`Unknown argument: ${flag}`);
     }
   }
-  if (!opts.bundleId || !opts.buildNumber || !opts.notesFile) {
+  if (!opts.bundleId || !opts.marketingVersion || !opts.buildNumber || !opts.notesFile) {
     throw new Error(
       "Usage: node scripts/ci/asc-whats-new.js --bundle-id X --marketing-version V " +
         "--build-number N --notes-file F [--timeout SECONDS] [--poll-interval SECONDS] [--dry-run]",
     );
   }
+  opts.marketingVersion = stripToMarketingVersion(opts.marketingVersion);
   return opts;
 }
 
@@ -203,16 +206,18 @@ class AscClient {
     throw new Error(`No App Store Connect app found for bundle ID ${bundleId}`);
   }
 
+  // marketingVersion is required: the lookup is by app, marketing version and build number.
   async findBuild(appId, marketingVersion, buildNumber) {
+    if (!marketingVersion) {
+      throw new Error("findBuild needs a marketing version; a build number alone can match an older version");
+    }
     const params = {
       "filter[app]": appId,
       "filter[version]": buildNumber,
       "fields[builds]": "version,processingState,uploadedDate",
+      "filter[preReleaseVersion.version]": marketingVersion,
       limit: "1",
     };
-    if (marketingVersion) {
-      params["filter[preReleaseVersion.version]"] = marketingVersion;
-    }
     const resp = await this.request("GET", "/v1/builds", params);
     const data = resp.data || [];
     return data.length ? data[0] : null;

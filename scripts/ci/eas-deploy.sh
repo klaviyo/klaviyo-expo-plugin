@@ -22,7 +22,9 @@
 #
 # After every build the version the build reports (appBuildVersion, appVersion)
 # is checked against what was asked for. A mismatch fails the deploy before the
-# submit, since the binary does not carry the number the store would see.
+# submit, since the binary does not carry the number the store would see. When
+# EXPECTED_VERSION is set, the reported appVersion must match it after any
+# -prerelease or +metadata suffix is dropped.
 #
 # Writes build_id, app_version, build_number, build_url and build_date to
 # $GITHUB_OUTPUT (and echoes them) after every successful build. build_number
@@ -96,6 +98,13 @@ while true; do
   if [[ "$reported_number" != "$BUILD_NUMBER" ]]; then
     echo "::error::EAS build $build_id reports build number '${reported_number:-none}', expected $BUILD_NUMBER. The number did not reach the build; not submitting."
     exit 1
+  fi
+  if [[ -n "${EXPECTED_VERSION:-}" ]]; then
+    reported_numeric=$(node "$(dirname "$0")/marketing-version.js" "${reported_version:-}" 2>/dev/null || true)
+    if [[ "$reported_numeric" != "$EXPECTED_VERSION" ]]; then
+      echo "::error::EAS build $build_id reports version '${reported_version:-none}', expected $EXPECTED_VERSION. The build number came from another version's sequence; not submitting."
+      exit 1
+    fi
   fi
   set_output build_id "$build_id"
   set_output app_version "${reported_version:-?}"
