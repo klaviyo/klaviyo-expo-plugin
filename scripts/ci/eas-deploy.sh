@@ -36,7 +36,6 @@ PLATFORM="${1:?usage: eas-deploy.sh <android|ios> <build-number>}"
 BUILD_NUMBER="${2:?usage: eas-deploy.sh <android|ios> <build-number>}"
 PROFILE="${EAS_PROFILE:-production}"
 MAX_ATTEMPTS="${EAS_DEPLOY_MAX_ATTEMPTS:-3}"
-SET_BUILD_ENV="$(cd "$(dirname "$0")" && pwd)/set-build-env.sh"
 # Duplicate-build-number rejections from App Store Connect and Google Play as
 # surfaced in `eas submit` output.
 DUPLICATE_PATTERN='VERSION_DUPLICATE|has already been used|already been uploaded|bundle version must be higher|version code [0-9]+ has already|versionCode .*already|previousBundleVersion'
@@ -63,10 +62,11 @@ set_output() {
   fi
 }
 
-# shellcheck source=scripts/ci/require-inputs.sh
-source "$(dirname "$0")/require-inputs.sh"
-require_ci_inputs eas-deploy.sh COMMIT_SHA BRANCH SOURCE_LABEL || exit 1
-require_tools eas-deploy.sh eas jq node sed tee mv || exit 1
+if [[ -n "${CI:-}" ]]; then
+  : "${COMMIT_SHA:?COMMIT_SHA must come from the workflow; GITHUB_SHA is the merge commit on a pull request}"
+  : "${BRANCH:?BRANCH must come from the workflow}"
+  : "${SOURCE_LABEL:?SOURCE_LABEL must come from the workflow}"
+fi
 
 DASHBOARD_URL=$(node -p "const c = require('./app.config.js')(); 'https://expo.dev/accounts/' + c.owner + '/projects/' + c.slug + '/builds/'")
 
@@ -78,11 +78,26 @@ SOURCE_LABEL="${SOURCE_LABEL:-local}"
 export APP_SOURCE_LABEL="$SOURCE_LABEL"
 export APP_EVENT="${GITHUB_EVENT_NAME:-manual}"
 
+# Writes the build number and build info into the profile's env in eas.json, so the
+# EAS build server's app.config.js sees them.
+set_build_env() {
+  local var=ANDROID_VERSION_CODE
+  [[ "$PLATFORM" == ios ]] && var=IOS_BUILD_NUMBER
+  local pair
+  for pair in "$var:$BUILD_NUMBER" "APP_COMMIT_SHA:$APP_COMMIT_SHA" "APP_BRANCH:$APP_BRANCH" "APP_BUILT_AT:$APP_BUILT_AT" \
+    "APP_RELEASE_TAG:$APP_RELEASE_TAG" "APP_SOURCE_LABEL:$APP_SOURCE_LABEL" "APP_EVENT:$APP_EVENT"; do
+    [[ -n "${pair#*:}" ]] || continue
+    jq --arg profile "$PROFILE" --arg name "${pair%%:*}" --arg value "${pair#*:}" \
+      '.build[$profile].env[$name] = $value' eas.json > eas.json.tmp
+    mv eas.json.tmp eas.json
+  done
+}
+
 attempt=1
 while true; do
   export APP_BUILT_AT
   APP_BUILT_AT="$(date -u '+%Y-%m-%d %H:%M UTC')"
-  "$SET_BUILD_ENV" "$PLATFORM" "$BUILD_NUMBER"
+  set_build_env
   set_output build_number "$BUILD_NUMBER"
 
   echo "::group::EAS build ($PLATFORM, number $BUILD_NUMBER, attempt $attempt of $MAX_ATTEMPTS)"
@@ -105,7 +120,7 @@ while true; do
     exit 1
   fi
   if [[ -n "${EXPECTED_VERSION:-}" ]]; then
-    reported_numeric=$(node "$(dirname "$0")/marketing-version.js" "${reported_version:-}" 2>/dev/null || true)
+    reported_numeric="${reported_version%%[-+]*}"
     if [[ "$reported_numeric" != "$EXPECTED_VERSION" ]]; then
       echo "::error::EAS build $build_id reports version '${reported_version:-none}', expected $EXPECTED_VERSION. The build number came from another version's sequence; not submitting."
       exit 1

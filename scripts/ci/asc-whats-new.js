@@ -20,7 +20,18 @@
 const crypto = require("crypto");
 const fs = require("fs");
 
-const { marketingVersion: stripToMarketingVersion } = require("./marketing-version");
+
+// App Store Connect accepts only numeric versions, so `1.2.3-rc.1+meta` becomes `1.2.3`. A prerelease
+// and its final release share one marketing version, and with it one build number sequence.
+function stripToMarketingVersion(version) {
+  const numeric = String(version).trim().split(/[-+]/)[0];
+  if (!/^\d+(\.\d+){0,2}$/.test(numeric)) {
+    throw new Error(
+      `Cannot derive an iOS marketing version from '${version}': expected X, X.Y or X.Y.Z, optionally followed by -prerelease or +metadata`,
+    );
+  }
+  return numeric;
+}
 
 const API_BASE = "https://api.appstoreconnect.apple.com";
 // Apple caps tokens at 20 minutes.
@@ -346,6 +357,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  stripToMarketingVersion,
   normalizePrivateKey,
   makeToken,
   truncate,

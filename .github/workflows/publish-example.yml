@@ -411,7 +411,7 @@ jobs:
         run: |
           full=$(node -p "require('./app.config.js')().version")
           echo "full=${full}" >> "$GITHUB_OUTPUT"
-          echo "version=$(node ../scripts/ci/marketing-version.js "${full}")" >> "$GITHUB_OUTPUT"
+          echo "version=${full%%[-+]*}" >> "$GITHUB_OUTPUT"
 
       - name: Resolve next build number from App Store Connect
         id: number

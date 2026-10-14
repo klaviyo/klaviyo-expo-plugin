@@ -26,9 +26,7 @@
 
 const fs = require("fs");
 
-const { marketingVersion: stripToMarketingVersion } = require("./marketing-version");
-
-const { AscClient, normalizePrivateKey } = require("./asc-whats-new");
+const { AscClient, normalizePrivateKey, stripToMarketingVersion } = require("./asc-whats-new");
 const { getAccessToken, request } = require("./play-release-notes");
 
 const PLAY_API =

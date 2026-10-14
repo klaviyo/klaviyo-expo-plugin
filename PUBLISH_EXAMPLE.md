@@ -12,7 +12,7 @@ Each platform deploys in its own job, in a GitHub environment (`android-internal
 
 After each deploy, a second job sets the store release notes: `what-to-test` for TestFlight and `android-notes` for Play. A failure there leaves the build on the store without notes and posts a separate Slack warning.
 
-`.github/workflows/publish-example-checks.yml` holds the checks: actionlint and shellcheck, the script tests, the plugin's type check and jest suite, and the example app's type check. It runs on pull requests that touch the publish files or `example/`, and `publish-example.yml` calls it as its `checks` job. Both deploy jobs `need` that job, so a failing check means nothing reaches a store, label deploys included. It uses no secrets and makes no store or EAS calls.
+`.github/workflows/publish-example-checks.yml` holds the checks: the plugin's type check and jest suite, and the example app's type check. It runs on pull requests that touch the publish files or `example/`, and `publish-example.yml` calls it as its `checks` job. Both deploy jobs `need` that job, so a failing check means nothing reaches a store, label deploys included. It uses no secrets and makes no store or EAS calls.
 
 ### Deploying a pull request
 
@@ -74,10 +74,10 @@ Credentials are EAS-hosted. Signing keys, provisioning profiles and the store su
 
 `example/eas.json` sets `cli.appVersionSource` to `local` and turns `autoIncrement` off. CI picks the numbers from the stores and passes them to the build, because EAS's remote counter is keyed by app and bundle ID only and cannot restart per marketing version.
 
-- iOS: `scripts/ci/next-build-number.js ios` asks App Store Connect for the highest build number uploaded for the current marketing version and uses one above it, or 1 if that version has no builds. Numbering restarts at 1 for each new marketing version and increases within it. The marketing version is the numeric `X.Y.Z` of `version` in `example/app.config.js`: `scripts/ci/marketing-version.js` drops any `-prerelease` or `+metadata` suffix, so `0.3.2-alpha.1` and `0.3.2` share one build number sequence, and it fails the deploy if what is left is not numeric.
+- iOS: `scripts/ci/next-build-number.js ios` asks App Store Connect for the highest build number uploaded for the current marketing version and uses one above it, or 1 if that version has no builds. Numbering restarts at 1 for each new marketing version and increases within it. The marketing version is the numeric `X.Y.Z` of `version` in `example/app.config.js`: the deploy drops any `-prerelease` or `+metadata` suffix, so `0.3.2-alpha.1` and `0.3.2` share one build number sequence.
 - Android: `scripts/ci/next-build-number.js android` asks the Play Developer API for the highest versionCode across all bundles and tracks and uses one above it. The versionCode is global and never restarts.
 
-`scripts/ci/set-build-env.sh` writes the number into the `production` profile's `env` in `example/eas.json` as `IOS_BUILD_NUMBER` or `ANDROID_VERSION_CODE`, and `app.config.js` reads it. EAS build servers cannot see GitHub environment variables, but they do build the checked-out working tree, so the edit reaches them. The edit exists only on the runner and is never committed. For local builds both numbers default to 1.
+`scripts/ci/eas-deploy.sh` writes the number into the `production` profile's `env` in `example/eas.json` as `IOS_BUILD_NUMBER` or `ANDROID_VERSION_CODE`, and `app.config.js` reads it. EAS build servers cannot see GitHub environment variables, but they do build the checked-out working tree, so the edit reaches them. The edit exists only on the runner and is never committed. For local builds both numbers default to 1.
 
 `scripts/ci/eas-deploy.sh` guards against two runs taking the same number:
 
