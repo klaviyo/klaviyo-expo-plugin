@@ -12,11 +12,11 @@ const readInstalledVersion = (name) => {
   }
 };
 
-// Native SDK versions that klaviyo-react-native-sdk pins. Returns undefined when
-// the installed package does not carry the expected file or key.
+// Native SDK versions that klaviyo-react-native-sdk pins, read from SDK_DIR or the
+// installed package. Returns undefined when it does not carry the expected file or key.
 const readNativeSdkVersion = (file, pattern) => {
   try {
-    const dir = path.dirname(require.resolve('klaviyo-react-native-sdk/package.json'));
+    const dir = process.env.SDK_DIR || path.dirname(require.resolve('klaviyo-react-native-sdk/package.json'));
     const match = fs.readFileSync(path.join(dir, file), 'utf8').match(pattern);
     return match ? match[1] : undefined;
   } catch {
@@ -119,6 +119,8 @@ module.exports = () => {
         commitSha: process.env.APP_COMMIT_SHA || git(['rev-parse', '--short=7', 'HEAD']),
         branch: process.env.APP_BRANCH || git(['rev-parse', '--abbrev-ref', 'HEAD']),
         builtAt: process.env.APP_BUILT_AT,
+        sourceLabel: process.env.APP_SOURCE_LABEL,
+        event: process.env.APP_EVENT,
         sdks: [
           { key: 'expo-plugin', version: pluginPackage.version, ref: pluginRef(pluginPackage.version) },
           { key: 'rn', version: readInstalledVersion('klaviyo-react-native-sdk') },

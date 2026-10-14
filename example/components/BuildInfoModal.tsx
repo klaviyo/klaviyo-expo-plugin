@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const buildInfoFormat = require('../lib/build-info.js') as {
   buildInfoRows: (input: BuildInfoInput) => { label: string; value: string }[];
-  notesHeader: (input: BuildInfoInput) => string;
+  copyText: (input: BuildInfoInput) => string;
 };
 
 interface BuildInfoInput {
@@ -64,7 +64,7 @@ export function BuildInfoModal({ visible, onClose }: { visible: boolean; onClose
   const rows = buildInfoFormat.buildInfoRows(filtered);
 
   const copy = async () => {
-    await Clipboard.setStringAsync(buildInfoFormat.notesHeader(filtered));
+    await Clipboard.setStringAsync(buildInfoFormat.copyText(filtered));
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };

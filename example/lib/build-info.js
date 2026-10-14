@@ -135,6 +135,12 @@ function notesHeader(input) {
   return lines.join('\n');
 }
 
+// Text for the in-app "Copy build info" button: the notes header without the CI
+// run line, since the app cannot know which run built it.
+function copyText(input) {
+  return notesHeader({ ...(input || {}), runUrl: undefined });
+}
+
 function len(text) {
   return Array.from(text).length;
 }
@@ -212,6 +218,7 @@ module.exports = {
   sdkLine,
   buildInfoRows,
   notesHeader,
+  copyText,
   notesText,
   slackFields,
   sha7,

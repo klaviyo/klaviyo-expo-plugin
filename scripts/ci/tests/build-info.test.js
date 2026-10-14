@@ -371,3 +371,92 @@ test("notesText drops the CI run line before any other header line", () => {
   assert.ok(text.includes("Built:"));
   assert.ok(text.includes("…[truncated]"));
 });
+
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { run: renderRun, withBuildInfo } = require("../render-build-info.js");
+
+function writeInfo(info) {
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "build-info-")), "build-info.json");
+  fs.writeFileSync(file, JSON.stringify(info));
+  return file;
+}
+
+const renderEnv = {
+  SDK_DIR: "/nonexistent",
+  APP_VERSION: "9.9.9",
+  BUILD_NUMBER: "1",
+  BUILD_DATE: "1999-01-01 00:00 UTC",
+  COMMIT_SHA: "0000000aaaa",
+  BRANCH: "wrong-branch",
+  SOURCE_LABEL: "feat/x",
+  GITHUB_EVENT_NAME: "push",
+  RUN_URL: "https://example.test/run/1",
+};
+
+test("notes read the stamped values from the build info file, not the environment", () => {
+  const file = writeInfo({
+    commitSha: "abc1234",
+    branch: "feat/x",
+    builtAt: "2026-01-02 03:04 UTC",
+    releaseTag: "",
+    buildNumber: "21",
+    appVersion: "1.0.0",
+  });
+  const text = renderRun(["notes", "--platform", "ios", "--max-chars", "4000"], {
+    ...renderEnv,
+    BUILD_INFO_FILE: file,
+  });
+  assert.match(text, /^Expo Example 1\.0\.0 \(21\)\n/);
+  assert.ok(text.includes("Commit: abc1234 on feat/x (push)"));
+  assert.ok(text.includes("Built: 2026-01-02 03:04 UTC"));
+  assert.ok(text.includes("Klaviyo Expo Plugin 1.0.0 · feat/x@abc1234"));
+  assert.ok(!text.includes("9.9.9") && !text.includes("1999") && !text.includes("wrong-branch"));
+});
+
+test("a retry that changes the number shows the new number in the notes and Slack fields", () => {
+  const first = writeInfo({ commitSha: "abc1234", branch: "main", builtAt: "2026-01-02 03:04 UTC", buildNumber: "10", appVersion: "1.0.0" });
+  const final = writeInfo({ commitSha: "abc1234", branch: "main", builtAt: "2026-01-02 03:09 UTC", buildNumber: "21", appVersion: "1.0.0" });
+  const args = ["notes", "--platform", "ios", "--max-chars", "4000"];
+  assert.match(renderRun(args, { ...renderEnv, BUILD_INFO_FILE: first }), /\(10\)/);
+  const notes = renderRun(args, { ...renderEnv, BUILD_INFO_FILE: final });
+  assert.match(notes, /\(21\)/);
+  assert.ok(!notes.includes("(10)"));
+  const slack = JSON.parse(renderRun(["slack", "--platform", "ios"], { ...renderEnv, BUILD_INFO_FILE: final }));
+  assert.equal(slack.build, "1.0.0 (21)");
+});
+
+test("without a build info file the environment is used", () => {
+  const env = { ...renderEnv };
+  assert.equal(withBuildInfo(env), env);
+});
+
+test("a release tag in the build info makes the plugin ref the bare version", () => {
+  const file = writeInfo({ commitSha: "abc1234", branch: "main", builtAt: "2026-01-02 03:04 UTC", releaseTag: "v1.0.0", buildNumber: "3", appVersion: "1.0.0" });
+  const text = renderRun(["notes", "--platform", "android", "--max-chars", "500"], { ...renderEnv, BUILD_INFO_FILE: file });
+  assert.ok(text.includes("Klaviyo Expo Plugin 1.0.0\n"));
+});
+
+test("the in-app Copy text is the notes header without the CI run line", () => {
+  const lib = require("../../../example/lib/build-info.js");
+  const input = {
+    appName: "Expo Example",
+    appVersion: "1.0.0",
+    buildNumber: "21",
+    builtAt: "2026-01-02 03:04 UTC",
+    commitSha: "abc1234def",
+    sourceLabel: "feat/x",
+    event: "push",
+    runUrl: "https://example.test/run/1",
+    sdks: [
+      { key: "expo-plugin", version: "1.0.0", ref: "feat/x@abc1234" },
+      { key: "rn", version: "2.5.0" },
+      { key: "ios", version: "5.4.0" },
+    ],
+  };
+  const notes = lib.notesHeader(input);
+  const copied = lib.copyText({ ...input, runUrl: undefined });
+  assert.equal(copied, notes.split("\n").filter((line) => !line.startsWith("CI run: ")).join("\n"));
+  assert.ok(!copied.includes("CI run:"));
+});
