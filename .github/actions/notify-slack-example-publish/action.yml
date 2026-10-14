@@ -2,8 +2,10 @@ name: Notify Slack of example app publish result
 description: Posts the deploy result for the Expo example app. A failed deploy posts one failure message; a failure to set the store notes posts a separate warning.
 inputs:
   webhook:
-    description: Slack incoming webhook URL
-    required: true
+    description: Slack incoming webhook URL. When empty, nothing is posted.
+    required: false
+    default: ''
+
   result:
     description: "'success', 'failure' or 'notes-failure'"
     required: true
@@ -39,7 +41,21 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+    - name: Check for a webhook
+      id: webhook
+      shell: bash
+      env:
+        WEBHOOK: ${{ inputs.webhook }}
+      run: |
+        if [ -z "$WEBHOOK" ]; then
+          echo "::notice::SLACK_WEBHOOK_URL is not set; skipping the Slack message."
+          echo "post=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "post=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - if: steps.webhook.outputs.post == 'true'
+      uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
       with:
         webhook: ${{ inputs.webhook }}
         webhook-type: incoming-webhook

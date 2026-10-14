@@ -96,15 +96,15 @@ jobs:
           echo "android=$android" >> "$GITHUB_OUTPUT"
           echo "ios=$ios" >> "$GITHUB_OUTPUT"
 
-  preflight-android:
-    name: Check Android secrets
+  preflight:
+    name: Check required secrets
     needs: plan
-    if: needs.plan.outputs.android == 'true'
+    if: needs.plan.outputs.android == 'true' || needs.plan.outputs.ios == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    environment: android-internal-track
     outputs:
-      ready: ${{ steps.check.outputs.ready }}
+      android: ${{ steps.android.outputs.ready }}
+      ios: ${{ steps.ios.outputs.ready }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -112,42 +112,26 @@ jobs:
           ref: ${{ env.COMMIT_SHA }}
           persist-credentials: false
 
-      - name: Check required secrets
-        id: check
+      - name: Check Android secrets
+        id: android
+        if: needs.plan.outputs.android == 'true'
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           ./scripts/ci/check-secrets.sh Android "$EVENT_NAME" \
-            EXPO_TOKEN SERVICE_ACCOUNT_JSON SLACK_WEBHOOK_URL KLAVIYO_EAS_PROJECT_ID
+            EXPO_TOKEN SERVICE_ACCOUNT_JSON KLAVIYO_EAS_PROJECT_ID
 
-  preflight-ios:
-    name: Check iOS secrets
-    needs: plan
-    if: needs.plan.outputs.ios == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    environment: testflight
-    outputs:
-      ready: ${{ steps.check.outputs.ready }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: ${{ env.COMMIT_SHA }}
-          persist-credentials: false
-
-      - name: Check required secrets
-        id: check
+      - name: Check iOS secrets
+        id: ios
+        if: needs.plan.outputs.ios == 'true'
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           ASC_APP_ID: ${{ vars.ASC_APP_ID }}
@@ -155,15 +139,14 @@ jobs:
         run: |
           ./scripts/ci/check-secrets.sh iOS "$EVENT_NAME" \
             EXPO_TOKEN APP_STORE_CONNECT_API_KEY_KEY_ID APP_STORE_CONNECT_API_KEY_ISSUER_ID \
-            APP_STORE_CONNECT_API_KEY_KEY SLACK_WEBHOOK_URL KLAVIYO_EAS_PROJECT_ID \
-            APPLE_TEAM_ID ASC_APP_ID
+            APP_STORE_CONNECT_API_KEY_KEY KLAVIYO_EAS_PROJECT_ID APPLE_TEAM_ID ASC_APP_ID
 
   checks:
     name: Checks
-    needs: [preflight-android, preflight-ios]
+    needs: preflight
     if: |
       !cancelled() && !failure()
-      && (needs.preflight-android.outputs.ready == 'true' || needs.preflight-ios.outputs.ready == 'true')
+      && (needs.preflight.outputs.android == 'true' || needs.preflight.outputs.ios == 'true')
     uses: ./.github/workflows/publish-example-checks.yml
     with:
       ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -172,10 +155,10 @@ jobs:
 
   deploy-android:
     name: Publish to Play Store internal track
-    needs: [checks, preflight-android]
+    needs: [checks, preflight]
     if: |
       !cancelled() && !failure()
-      && needs.preflight-android.outputs.ready == 'true'
+      && needs.preflight.outputs.android == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     environment:
@@ -214,6 +197,7 @@ jobs:
         id: deploy
         working-directory: example
         env:
+          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           RECHECK_CMD: node ../scripts/ci/next-build-number.js android --package "$ANDROID_PACKAGE"
         run: ../scripts/ci/eas-deploy.sh android "${{ steps.number.outputs.build_number }}"
@@ -229,9 +213,7 @@ jobs:
         env:
           RELEASE_NAME: ${{ github.event.release.name }}
           RELEASE_BODY: ${{ github.event.release.body }}
-          APP_VERSION: ${{ steps.deploy.outputs.app_version }}
-          BUILD_NUMBER: ${{ steps.deploy.outputs.build_number }}
-          BUILD_DATE: ${{ steps.deploy.outputs.build_date }}
+          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
           BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           COMMIT_SHA: ${{ env.COMMIT_SHA }}
@@ -252,8 +234,7 @@ jobs:
         id: slack
         if: success()
         env:
-          APP_VERSION: ${{ steps.deploy.outputs.app_version }}
-          BUILD_NUMBER: ${{ steps.deploy.outputs.build_number }}
+          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
           BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           COMMIT_SHA: ${{ env.COMMIT_SHA }}
@@ -362,10 +343,10 @@ jobs:
 
   deploy-ios:
     name: Publish to TestFlight
-    needs: [checks, preflight-ios]
+    needs: [checks, preflight]
     if: |
       !cancelled() && !failure()
-      && needs.preflight-ios.outputs.ready == 'true'
+      && needs.preflight.outputs.ios == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     environment:
@@ -426,6 +407,7 @@ jobs:
         id: deploy
         working-directory: example
         env:
+          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
           APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
@@ -441,9 +423,7 @@ jobs:
         env:
           RELEASE_NAME: ${{ github.event.release.name }}
           RELEASE_BODY: ${{ github.event.release.body }}
-          APP_VERSION: ${{ steps.deploy.outputs.app_version }}
-          BUILD_NUMBER: ${{ steps.deploy.outputs.build_number }}
-          BUILD_DATE: ${{ steps.deploy.outputs.build_date }}
+          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
           BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           COMMIT_SHA: ${{ env.COMMIT_SHA }}
@@ -464,8 +444,7 @@ jobs:
         id: slack
         if: success()
         env:
-          APP_VERSION: ${{ steps.deploy.outputs.app_version }}
-          BUILD_NUMBER: ${{ steps.deploy.outputs.build_number }}
+          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
           BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           COMMIT_SHA: ${{ env.COMMIT_SHA }}

@@ -3,7 +3,8 @@
 # so the EAS build server's app.config.js sees them.
 #
 # Usage: set-build-env.sh <android|ios> <build-number>
-# Run from example/. APP_COMMIT_SHA, APP_BRANCH, APP_BUILT_AT and APP_RELEASE_TAG
+# Run from example/. APP_COMMIT_SHA, APP_BRANCH, APP_BUILT_AT, APP_RELEASE_TAG,
+# APP_SOURCE_LABEL and APP_EVENT
 # are written to the same env block when set, where app.config.js exposes them to
 # the app's build info.
 set -euo pipefail
@@ -31,7 +32,7 @@ jq --arg profile "$PROFILE" --arg var "$VAR" --arg n "$NUMBER" \
 mv eas.json.tmp eas.json
 echo "$VAR=$NUMBER"
 
-for name in APP_COMMIT_SHA APP_BRANCH APP_BUILT_AT APP_RELEASE_TAG; do
+for name in APP_COMMIT_SHA APP_BRANCH APP_BUILT_AT APP_RELEASE_TAG APP_SOURCE_LABEL APP_EVENT; do
   value="${!name:-}"
   if [[ -n "$value" ]]; then
     jq --arg profile "$PROFILE" --arg name "$name" --arg value "$value" \

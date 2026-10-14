@@ -84,7 +84,11 @@ if [[ "$cmd" == "build" ]]; then
   echo "$n" > "$state/count"
   echo "Artifact: https://expo.dev/artifacts/eas/abc.aab" >&2
   echo "Signed URL: https://s3.amazonaws.com/bucket/abc.aab?X-Amz-Signature=deadbeef" >&2
-  printf '[{"id":"build-%s","appVersion":"1.0.0","appBuildVersion":"%s"}]\n' "$n" "$n"
+  stamped=$(jq -r '.build.production.env.ANDROID_VERSION_CODE // .build.production.env.IOS_BUILD_NUMBER' eas.json)
+  if [[ "${FAKE_EAS_STALE_NUMBER:-}" != "" ]]; then
+    stamped="$FAKE_EAS_STALE_NUMBER"
+  fi
+  printf '[{"id":"build-%s","appVersion":"1.0.0","appBuildVersion":"%s"}]\n' "$n" "$stamped"
 elif [[ "$cmd" == "submit" ]]; then
   fails="${FAKE_EAS_SUBMIT_FAILS:-0}"
   s=0
@@ -312,6 +316,58 @@ if ((rc == 0)) && ((builds == 1)) && [[ "$log" == *"re-check failed"* ]]; then
   pass "eas-deploy: failing re-check falls through to submit"
 else
   fail "eas-deploy: failing re-check falls through to submit" "rc=$rc builds=$builds"$'\n'"$log"
+fi
+
+# --- the in-app copy text equals the notes header without the CI run line ------
+: > "$WORK/gh-output.txt"
+info="$WORK/build-info-copy.json"
+log=$(run_deploy copy ios 21 BRANCH=feat/x SOURCE_LABEL=feat/x GITHUB_EVENT_NAME=push BUILD_INFO_FILE="$info" 2>&1) && rc=0 || rc=$?
+app_copy=$(
+  cd "$WORK/repo-copy/example" || exit 1
+  # Load the stamped APP_* values from eas.json into the environment as the build server does.
+  while IFS= read -r -d '' pair; do export "${pair?}"; done < <(
+    jq -j '.build.production.env | to_entries[] | select(.key | startswith("APP_")) | "\(.key)=\(.value)\u0000"' eas.json
+  )
+  IOS_BUILD_NUMBER=21 SDK_DIR="$WORK/fake-sdk" node -e '
+    const lib = require(process.argv[1]);
+    const c = require("./app.config.js")().extra.buildInfo;
+    const sdks = c.sdks.filter((s) => ["expo-plugin", "rn", "ios"].includes(s.key));
+    process.stdout.write(lib.copyText({ ...c, appName: "Expo Example", buildNumber: "21", sdks }));
+  ' "$ROOT/example/lib/build-info.js"
+)
+notes_header=$(
+  env SDK_DIR="$WORK/fake-sdk" BUILD_INFO_FILE="$info" RUN_URL="https://example.test/run/1" \
+    node "$CI_DIR/render-build-info.js" notes --platform ios --max-chars 4000 | grep -v '^CI run: '
+)
+# The RN SDK line reads the lockfile in both; the native line reads the fake SDK in both.
+if ((rc == 0)) && [[ "$app_copy" == "$notes_header" ]]; then
+  pass "app copy text equals the notes header without the CI run line"
+else
+  fail "app copy text equals the notes header without the CI run line" "rc=$rc"$'\n'"--- app:"$'\n'"$app_copy"$'\n'"--- notes:"$'\n'"$notes_header"
+fi
+
+# --- eas-deploy.sh: the build must report the number that was asked for ------
+: > "$WORK/gh-output.txt"
+log=$(run_deploy stale android 10 FAKE_EAS_STALE_NUMBER=4 2>&1) && rc=0 || rc=$?
+submits="0"
+[[ -f "$WORK/state-stale/submits" ]] && submits=$(cat "$WORK/state-stale/submits")
+if ((rc != 0)) && ((submits == 0)) && [[ "$log" == *"reports build number '4', expected 10"* ]]; then
+  pass "eas-deploy: a build with a stale number is not submitted"
+else
+  fail "eas-deploy: a build with a stale number is not submitted" "rc=$rc submits=$submits"$'\n'"$log"
+fi
+
+# --- eas-deploy.sh: after a retry the outputs and build info carry the final number
+: > "$WORK/gh-output.txt"
+info="$WORK/build-info-retry.json"
+log=$(run_deploy final ios 10 FAKE_EAS_SUBMIT_FAILS=1 FAKE_EAS_PREVIOUS=20 BUILD_INFO_FILE="$info" 2>&1) && rc=0 || rc=$?
+if ((rc == 0)) && grep -q '^build_number=21$' "$WORK/gh-output.txt" \
+  && [[ "$(jq -r .buildNumber "$info")" == "21" ]] \
+  && [[ "$(jq -r '.build.production.env.IOS_BUILD_NUMBER' "$WORK/repo-final/example/eas.json")" == "21" ]] \
+  && [[ "$(tail -1 "$WORK/gh-output.txt")" != "build_number=10" ]]; then
+  pass "eas-deploy: after a retry the outputs, eas.json and build info carry the final number"
+else
+  fail "eas-deploy: after a retry the outputs, eas.json and build info carry the final number" "rc=$rc"$'\n'"$(cat "$info" 2>/dev/null)"$'\n'"$log"
 fi
 
 # --- eas-deploy.sh: gives up after max attempts -----------------------------

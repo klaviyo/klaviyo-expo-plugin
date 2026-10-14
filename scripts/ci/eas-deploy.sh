@@ -20,8 +20,14 @@
 # All EAS output is filtered through `redact`, which masks signed artifact
 # download URLs.
 #
+# After every build the version the build reports (appBuildVersion, appVersion)
+# is checked against what was asked for. A mismatch fails the deploy before the
+# submit, since the binary does not carry the number the store would see.
+#
 # Writes build_id, app_version, build_number, build_url and build_date to
-# $GITHUB_OUTPUT (and echoes them) after every successful build.
+# $GITHUB_OUTPUT (and echoes them) after every successful build. build_number
+# is the number the build reports, and BUILD_INFO_FILE (when set) receives the
+# build info the app was stamped with, for the notes to read.
 set -euo pipefail
 
 PLATFORM="${1:?usage: eas-deploy.sh <android|ios> <build-number>}"
@@ -62,6 +68,8 @@ export APP_COMMIT_SHA="${SHA:0:7}"
 export APP_BRANCH="${BRANCH:-${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-}}}"
 export APP_RELEASE_TAG="${RELEASE_TAG:-}"
 SOURCE_LABEL="${SOURCE_LABEL:-${GITHUB_REF_NAME:-local}}"
+export APP_SOURCE_LABEL="$SOURCE_LABEL"
+export APP_EVENT="${GITHUB_EVENT_NAME:-manual}"
 
 attempt=1
 while true; do
@@ -83,10 +91,24 @@ while true; do
   echo "::endgroup::"
 
   build_id=$(jq -r '.[0].id' <<< "$build_json")
+  reported_number=$(jq -r '.[0].appBuildVersion // empty' <<< "$build_json")
+  reported_version=$(jq -r '.[0].appVersion // empty' <<< "$build_json")
+  if [[ "$reported_number" != "$BUILD_NUMBER" ]]; then
+    echo "::error::EAS build $build_id reports build number '${reported_number:-none}', expected $BUILD_NUMBER. The number did not reach the build; not submitting."
+    exit 1
+  fi
   set_output build_id "$build_id"
-  set_output app_version "$(jq -r '.[0].appVersion // "?"' <<< "$build_json")"
+  set_output app_version "${reported_version:-?}"
+  set_output build_number "$reported_number"
   set_output build_url "${DASHBOARD_URL}${build_id}"
   set_output build_date "$APP_BUILT_AT"
+  if [[ -n "${BUILD_INFO_FILE:-}" ]]; then
+    jq -n --arg sha "$APP_COMMIT_SHA" --arg branch "$APP_BRANCH" --arg builtAt "$APP_BUILT_AT" \
+      --arg tag "$APP_RELEASE_TAG" --arg number "$reported_number" --arg version "$reported_version" \
+      --arg source "$APP_SOURCE_LABEL" --arg event "$APP_EVENT" \
+      '{commitSha: $sha, branch: $branch, builtAt: $builtAt, releaseTag: $tag, buildNumber: $number, appVersion: $version, sourceLabel: $source, event: $event}' \
+      > "$BUILD_INFO_FILE"
+  fi
 
   if [[ -n "${RECHECK_CMD:-}" ]] && ((attempt < MAX_ATTEMPTS)); then
     if recheck_json=$(env -u GITHUB_OUTPUT bash -c "$RECHECK_CMD --minimum $BUILD_NUMBER"); then

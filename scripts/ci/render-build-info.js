@@ -17,6 +17,9 @@
  *   RELEASE_NAME, RELEASE_BODY
  *   RELEASE_TAG          set on `release: published`; the plugin ref is then the bare version
  *   SDK_DIR              klaviyo-react-native-sdk location (defaults to the example's install)
+ *   BUILD_INFO_FILE      JSON the build was stamped with (see eas-deploy.sh). When it exists its
+ *                        commitSha, branch, builtAt, releaseTag, buildNumber and appVersion win over
+ *                        the matching variables above, so the notes match the app.
  *
  * The SDKs listed are the ones compiled into that platform's binary: the
  * plugin, the React Native SDK, and the native SDK for the platform.
@@ -106,6 +109,26 @@ function sdkEntries(platform, env) {
   ];
 }
 
+// Overlays the values the build was stamped with, so notes cannot drift from the app.
+function withBuildInfo(env) {
+  const file = env.BUILD_INFO_FILE;
+  const text = file ? readFileOrUndefined(file) : undefined;
+  if (text === undefined) return env;
+  const info = JSON.parse(text);
+  const pick = (value, fallback) => (value === undefined || value === "" ? fallback : value);
+  return {
+    ...env,
+    COMMIT_SHA: pick(info.commitSha, env.COMMIT_SHA),
+    BRANCH: pick(info.branch, env.BRANCH),
+    BUILD_DATE: pick(info.builtAt, env.BUILD_DATE),
+    RELEASE_TAG: pick(info.releaseTag, env.RELEASE_TAG),
+    BUILD_NUMBER: pick(info.buildNumber, env.BUILD_NUMBER),
+    APP_VERSION: pick(info.appVersion, env.APP_VERSION),
+    SOURCE_LABEL: pick(info.sourceLabel, env.SOURCE_LABEL),
+    GITHUB_EVENT_NAME: pick(info.event, env.GITHUB_EVENT_NAME),
+  };
+}
+
 function buildInput(platform, env) {
   return {
     appName: env.APP_NAME || "Expo Example",
@@ -123,8 +146,9 @@ function buildInput(platform, env) {
   };
 }
 
-function run(argv, env) {
+function run(argv, rawEnv) {
   const opts = parseArgs(argv);
+  const env = withBuildInfo(rawEnv);
   const input = buildInput(opts.platform, env);
   if (opts.command === "notes") {
     return format.notesText(input, opts.maxChars);
@@ -132,7 +156,7 @@ function run(argv, env) {
   return JSON.stringify(format.slackFields(input, { platform: opts.platform }));
 }
 
-module.exports = { parseArgs, buildInput, sdkEntries, run };
+module.exports = { parseArgs, buildInput, sdkEntries, withBuildInfo, run };
 
 if (require.main === module) {
   try {
