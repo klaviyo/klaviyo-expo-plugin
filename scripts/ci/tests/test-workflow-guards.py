@@ -102,6 +102,11 @@ checks = read(CHECKS_PATH)
 slack = read(SLACK_PATH)
 jobs = split_jobs(deploy)
 
+# A YAML block scalar header: | or >, with optional chomping (+ -) and indentation (1-9) indicators in
+# either order, and an optional trailing comment.
+BLOCK_HEADER = re.compile(r"^[|>](?:[+-][1-9]?|[1-9][+-]?)?\s*(?:#.*)?$")
+
+
 def expressions(text):
     """Every expression in a file: the text inside ${{ }}, and the value of each `if:` key, which
     GitHub evaluates as an expression even without braces (single-line and block form)."""
@@ -113,7 +118,7 @@ def expressions(text):
             continue
         indent = len(match.group(1))
         value = match.group(2)
-        if value.strip() in ("|", ">", "|-", ">-"):
+        if BLOCK_HEADER.match(value.strip()):
             block = []
             for following in lines[index + 1:]:
                 if following.strip() and len(following) - len(following.lstrip()) <= indent:
@@ -146,7 +151,7 @@ def run_scripts(text):
             continue
         indent = len(match.group(1))
         value = match.group(2)
-        if value.strip() in ("|", ">", "|-", ">-", "|+", ">+"):
+        if BLOCK_HEADER.match(value.strip()):
             block = []
             for following in lines[index + 1:]:
                 if following.strip() and len(following) - len(following.lstrip()) <= indent:
@@ -166,15 +171,17 @@ for path in [DEPLOY_PATH, CHECKS_PATH] + sorted(glob.glob(os.path.join(ACTIONS_D
             inlined.append(f"{os.path.basename(path)}:{line}: {expression}")
 report(not inlined, "no expression is written inside a run: script (pass it through env:)", "\n".join(inlined))
 
-# Dependabot watches the workflows directory and every composite action directory.
+# Dependabot watches the workflows directory and every composite action directory, through the
+# github-actions update entry itself.
 dependabot = read(DEPENDABOT_PATH) if os.path.exists(DEPENDABOT_PATH) else ""
 action_dirs = sorted(os.path.basename(path) for path in glob.glob(os.path.join(ACTIONS_DIR, "*")) if os.path.isdir(path))
-listed = re.findall(r"^\s*-\s*[\"']?(/[^\s\"']*)", dependabot, flags=re.M)
+entries = re.split(r"(?m)^(?=\s*-\s*package-ecosystem:)", dependabot)
+actions_entry = next((e for e in entries if re.match(r"\s*-\s*package-ecosystem:\s*[\"']?github-actions[\"']?\s*$", e.split("\n", 1)[0])), "")
+listed = re.findall(r"(?m)^\s*(?:-\s*|directory:\s*)[\"']?(/[^\s\"']*)", actions_entry)
 covered = "/" in listed and ("/.github/actions/*" in listed or all(f"/.github/actions/{name}" in listed for name in action_dirs))
-report(covered and "github-actions" in dependabot,
-       f"dependabot covers the workflows and every composite action ({len(action_dirs)} actions)",
-       f"directories listed: {listed}")
-
+report(covered,
+       f"the github-actions dependabot entry covers the workflows and every composite action ({len(action_dirs)} actions)",
+       f"directories listed in the github-actions entry: {listed}")
 
 # Every checkout drops its credentials, in the workflows and in the composite actions.
 total = 0

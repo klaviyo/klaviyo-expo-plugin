@@ -383,7 +383,42 @@ if run_guard; then report 0 "an allowed function in any case is accepted"; else 
 
 fresh_copy
 edit "$TMP/dependabot.yml" 's = s.replace("      - /.github/actions/*\n", "", 1)'
-expect_fail "dependabot that stops covering the composite actions is caught" "dependabot covers the workflows and every composite action"
+expect_fail "dependabot that stops covering the composite actions is caught" "the github-actions dependabot entry covers the workflows and every composite action"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("        run: ../scripts/ci/eas-deploy.sh android \"$BUILD_NUMBER\"", "        run: |2\n            ../scripts/ci/eas-deploy.sh android \"${{ github.head_ref }}\"", 1)'
+expect_fail "an expression in a run: |2 block (indentation indicator) is caught" "no expression is written inside a run: script"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("        run: ../scripts/ci/eas-deploy.sh android \"$BUILD_NUMBER\"", "        run: | # deploy\n          ../scripts/ci/eas-deploy.sh android \"${{ github.head_ref }}\"", 1)'
+expect_fail "an expression in a run: | block with a trailing comment is caught" "no expression is written inside a run: script"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("  plan:\n    name: Choose platforms\n    if: |\n", "  plan:\n    name: Choose platforms\n    if: |2 # why\n      substr(github.event_name, 0, 1) == \x27x\x27 ||\n", 1)'
+expect_fail "an unsupported function in an if: |2 # comment block is caught" "expressions only call functions"
+
+fresh_copy
+python3 - "$TMP/dependabot.yml" <<'PY'
+import sys
+path = sys.argv[1]
+open(path, "w").write("""version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+  - package-ecosystem: npm
+    directories:
+      - /.github/actions/*
+    schedule:
+      interval: monthly
+""")
+PY
+expect_fail "action directories under another ecosystem do not count for github-actions" "the github-actions dependabot entry covers"
 
 echo "SUMMARY: $PASSED passed, $FAILED failed"
 ((FAILED == 0))
