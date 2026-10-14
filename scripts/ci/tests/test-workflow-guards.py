@@ -164,10 +164,17 @@ report(set(kinds) == {"android", "ios"} and not missing_kinds,
        "each platform posts a success, a failure and a notes warning through a checked step",
        "missing: " + "; ".join(missing_kinds or ["a platform"]))
 
-# The Slack action tolerates a failure of its own payload step.
-payload_step = find_step("\n" + slack.split("steps:\n", 1)[1].replace("\n    - ", "\n      - ") if "steps:\n" in slack else "", "Build the Slack payload")
-report(bool(payload_step) and "continue-on-error: true" in payload_step, "the Slack action tolerates a payload failure",
-       "the 'Build the Slack payload' step is missing or has no continue-on-error")
+# The composite's own steps are found by what they run or use, so renaming one cannot skip the rule.
+composite_steps = re.split(r"(?m)^    - ", slack.split("\nruns:\n", 1)[1])[1:] if "\nruns:\n" in slack else []
+payload_builders = [step for step in composite_steps if "slack-payload.sh" in step]
+senders = [step for step in composite_steps if "uses: slackapi/slack-github-action@" in step]
+report(len(payload_builders) == 1 and len(senders) == 1,
+       "the Slack action has one payload builder and one send step",
+       f"payload builders={len(payload_builders)} send steps={len(senders)}")
+untolerant = [name for name, group in (("payload builder", payload_builders), ("send step", senders))
+              if any("continue-on-error: true" not in step for step in group)]
+report(bool(payload_builders and senders) and not untolerant, "the Slack action tolerates a payload or send failure",
+       "no continue-on-error on: " + ", ".join(untolerant or ["(steps not found)"]))
 
 # Slack values are never interpolated into a YAML payload block, where a newline breaks it.
 yaml_payload = [path for path in [DEPLOY_PATH, CHECKS_PATH] + sorted(glob.glob(os.path.join(ACTIONS_DIR, "*", "action.yml")))

@@ -61,6 +61,7 @@ exec(body, scope)
 if scope["s"] == before:
     sys.exit("mutation did not change the file: " + body[:80])
 open(path, "w").write(scope["s"])
+print("mutated %d -> %d characters" % (len(before), len(scope["s"])), file=sys.stderr)
 PY
 }
 
@@ -105,11 +106,37 @@ expect_fail "a Slack step without continue-on-error is caught" "every Slack step
 
 fresh_copy
 edit "$SLACK" '
-i = s.index("    - name: Build the Slack payload")
-j = s.index("      continue-on-error: true\n", i)
+i = s.index("slack-payload.sh")
+j = s.index("      continue-on-error: true\n", s.rindex("    - name:", 0, i))
 s = s[:j] + s[j + len("      continue-on-error: true\n"):]
 '
-expect_fail "a Slack payload step that can fail the job is caught" "the Slack action tolerates a payload failure"
+expect_fail "a Slack payload step that can fail the job is caught" "the Slack action tolerates a payload or send failure"
+
+fresh_copy
+edit "$SLACK" '
+i = s.index("uses: slackapi/slack-github-action@")
+j = s.rindex("      continue-on-error: true\n", 0, i)
+s = s[:j] + s[j + len("      continue-on-error: true\n"):]
+'
+expect_fail "a Slack send step that can fail the job is caught" "the Slack action tolerates a payload or send failure"
+
+fresh_copy
+edit "$SLACK" 's = s.replace("    - name: Build the Slack payload\n", "    - name: Compose the message\n", 1)'
+edit "$SLACK" '
+i = s.index("slack-payload.sh")
+j = s.index("      continue-on-error: true\n", s.rindex("    - name:", 0, i))
+s = s[:j] + s[j + len("      continue-on-error: true\n"):]
+'
+expect_fail "a renamed Slack payload step is still checked" "the Slack action tolerates a payload or send failure"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("      - name: Notify Slack on success\n", "      - name: Tell the team it worked\n", 1)'
+edit "$DEPLOY" '
+i = s.index("      - name: Tell the team it worked")
+j = s.index("        continue-on-error: true\n", i)
+s = s[:j] + s[j + len("        continue-on-error: true\n"):]
+'
+expect_fail "a renamed workflow Slack step is still checked" "every Slack step has continue-on-error"
 
 fresh_copy
 edit "$SLACK" 's = s.replace("payload-file-path: ${{ steps.payload.outputs.file }}", "payload: |\n          text: \"x ${{ inputs.build }}\"", 1)'
