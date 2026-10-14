@@ -38,11 +38,12 @@ run_guard() {
   WORKFLOW_DIR="$TMP/wf" ACTIONS_DIR="$TMP/actions" bash "$GUARD" > "$TMP/out.log" 2>&1
 }
 
-# expect_fail <name> <expected FAIL text>: the guard must exit non-zero and name the broken check
+# expect_fail <name> <expected FAIL text>: the guard must exit non-zero and some FAIL line must contain
+# the rule text anywhere, so a rule name with a job or file prefix still matches. Only FAIL lines count.
 expect_fail() {
   if run_guard; then
     report 1 "$1 (guard passed on a broken workflow)"
-  elif grep -q "FAIL: $2" "$TMP/out.log"; then
+  elif grep -E '^FAIL: ' "$TMP/out.log" | grep -qF -- "$2"; then
     report 0 "$1"
   else
     report 1 "$1 (guard failed, but not on '$2')"
@@ -257,6 +258,30 @@ i = s.index("  android-notes:")
 s = s[:i] + s[i:].replace("      - name: Set up Node.js", "      - name: Post to Slack directly\n        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1\n        with:\n          webhook: x\n\n      - name: Set up Node.js", 1)
 '
 expect_fail "a step that posts to Slack without the composite is caught" "Slack is only posted through the composite action"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("      (needs.plan.outputs.android == \x27true\x27 ||", "      substr(needs.plan.outputs.android, 0, 4) == \x27true\x27 || (needs.plan.outputs.android == \x27true\x27 ||", 1)'
+expect_fail "substr in a job-level if without braces is caught" "expressions only call functions"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("        if: success()\n        env:\n          RELEASE_NAME", "        if: substr(job.status, 0, 1) == \x27s\x27\n        env:\n          RELEASE_NAME", 1)'
+expect_fail "substr in a step-level if without braces is caught" "expressions only call functions"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("  plan:\n    name: Choose platforms\n    if: |\n", "  plan:\n    name: Choose platforms\n    if: |\n      substr(github.event_name, 0, 1) == \x27x\x27 ||\n", 1)'
+expect_fail "substr in a block-form if is caught" "expressions only call functions"
+
+fresh_copy
+edit "$SLACK" 's = s.replace("    - if: steps.webhook.outputs.post == \x27true\x27 && steps.payload.outcome == \x27success\x27", "    - if: substr(steps.webhook.outputs.post, 0, 4) == \x27true\x27", 1)'
+expect_fail "substr in a composite action step if is caught" "expressions only call functions"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("        id: android\n        if: needs.plan.outputs.android == \x27true\x27\n", "        id: android\n", 1)'
+expect_fail "an Android secret check that runs for every request is caught" "the preflight checks Android secrets only when Android was requested"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("        id: ios\n        if: needs.plan.outputs.ios == \x27true\x27\n", "        id: ios\n        if: needs.plan.outputs.android == \x27true\x27\n", 1)'
+expect_fail "an iOS secret check gated on the Android request is caught" "the preflight checks iOS secrets only when iOS was requested"
 
 echo "SUMMARY: $PASSED passed, $FAILED failed"
 ((FAILED == 0))

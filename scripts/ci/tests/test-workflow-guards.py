@@ -97,14 +97,38 @@ checks = read(CHECKS_PATH)
 slack = read(SLACK_PATH)
 jobs = split_jobs(deploy)
 
-# Expressions only call functions that GitHub Actions provides.
+def expressions(text):
+    """Every expression in a file: the text inside ${{ }}, and the value of each `if:` key, which
+    GitHub evaluates as an expression even without braces (single-line and block form)."""
+    found = re.findall(r"\$\{\{.*?\}\}", text, flags=re.S)
+    lines = text.split("\n")
+    for index, line in enumerate(lines):
+        match = re.match(r"^(\s*)(?:- )?if:\s*(.*)$", line)
+        if not match:
+            continue
+        indent = len(match.group(1))
+        value = match.group(2)
+        if value.strip() in ("|", ">", "|-", ">-"):
+            block = []
+            for following in lines[index + 1:]:
+                if following.strip() and len(following) - len(following.lstrip()) <= indent:
+                    break
+                block.append(following)
+            value = "\n".join(block)
+        found.append(value)
+    return found
+
+
+# Expressions only call functions that GitHub Actions provides, inside braces or in a bare if: value.
 unsupported = set()
+scanned = 0
 for path in [DEPLOY_PATH, CHECKS_PATH] + sorted(glob.glob(os.path.join(ACTIONS_DIR, "*", "action.yml"))):
-    for expression in re.findall(r"\$\{\{.*?\}\}", read(path), flags=re.S):
+    for expression in expressions(read(path)):
+        scanned += 1
         for name in re.findall(r"([A-Za-z_][A-Za-z0-9_]*)\(", expression):
             if name not in ALLOWED_FUNCTIONS:
                 unsupported.add(name)
-report(not unsupported, "expressions only call functions that GitHub Actions provides",
+report(not unsupported, f"expressions only call functions that GitHub Actions provides ({scanned} scanned)",
        "unsupported: " + ", ".join(sorted(unsupported)))
 
 # Every checkout drops its credentials, in the workflows and in the composite actions.
@@ -194,6 +218,16 @@ for job in ("preflight", "deploy-android", "android-notes", "deploy-ios", "what-
 preflight = jobs.get("preflight", "")
 report(not re.search(r"(?m)^    environment:", preflight), "the preflight job declares no environment")
 report("SLACK_WEBHOOK_URL" not in preflight, "SLACK_WEBHOOK_URL is not a required secret")
+
+# The preflight checks only the platforms that were asked for: each platform's secret check is gated on
+# its own plan output, so an iOS-only run never fails on Android's secrets and the reverse.
+for platform, label in (("android", "Android"), ("ios", "iOS")):
+    step = find_step(preflight, f"Check {label} secrets")
+    gate = re.search(r"(?m)^        if: (.+)$", step)
+    other = "ios" if platform == "android" else "android"
+    ok = bool(gate) and f"needs.plan.outputs.{platform} == 'true'" in gate.group(1) and f"needs.plan.outputs.{other}" not in gate.group(1)
+    report(ok, f"the preflight checks {label} secrets only when {label} was requested",
+           "gate: " + (gate.group(1) if gate else "none"))
 
 # The commit is the pull request head, not the merge commit.
 report("COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}" in deploy,
