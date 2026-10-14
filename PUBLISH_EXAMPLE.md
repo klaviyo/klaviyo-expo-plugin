@@ -12,7 +12,7 @@ Each platform deploys in its own job, in a GitHub environment (`android-internal
 
 After each deploy, a second job sets the store release notes: `what-to-test` for TestFlight and `android-notes` for Play. A failure there leaves the build on the store without notes and posts a separate Slack warning.
 
-`.github/workflows/publish-example-checks.yml` runs on pull requests that touch the workflow, the composite actions or `scripts/ci/`. It runs actionlint and shellcheck, checks `example/eas.json`, and unit-tests the scripts. It uses no secrets and makes no store or EAS calls.
+`.github/workflows/publish-example-checks.yml` holds the checks: actionlint and shellcheck, the script tests, the plugin's type check and jest suite, and the example app's type check. It runs on pull requests that touch the publish files or `example/`, and `publish-example.yml` calls it as its `checks` job. Both deploy jobs `need` that job, so a failing check means nothing reaches a store, label deploys included. It uses no secrets and makes no store or EAS calls.
 
 ### Deploying a pull request
 
@@ -72,7 +72,7 @@ Credentials are EAS-hosted. Signing keys, provisioning profiles and the store su
 
 `example/eas.json` sets `cli.appVersionSource` to `local` and turns `autoIncrement` off. CI picks the numbers from the stores and passes them to the build, because EAS's remote counter is keyed by app and bundle ID only and cannot restart per marketing version.
 
-- iOS: `scripts/ci/next-build-number.js ios` asks App Store Connect for the highest build number uploaded for the current marketing version (`version` in `example/app.config.js`) and uses one above it, or 1 if that version has no builds. Numbering restarts at 1 for each new marketing version and increases within it.
+- iOS: `scripts/ci/next-build-number.js ios` asks App Store Connect for the highest build number uploaded for the current marketing version and uses one above it, or 1 if that version has no builds. Numbering restarts at 1 for each new marketing version and increases within it. The marketing version is the numeric `X.Y.Z` of `version` in `example/app.config.js`: `scripts/ci/marketing-version.js` drops any `-prerelease` or `+metadata` suffix, so `0.3.2-alpha.1` and `0.3.2` share one build number sequence, and it fails the deploy if what is left is not numeric.
 - Android: `scripts/ci/next-build-number.js android` asks the Play Developer API for the highest versionCode across all bundles and tracks and uses one above it. The versionCode is global and never restarts.
 
 `scripts/ci/set-build-env.sh` writes the number into the `production` profile's `env` in `example/eas.json` as `IOS_BUILD_NUMBER` or `ANDROID_VERSION_CODE`, and `app.config.js` reads it. EAS build servers cannot see GitHub environment variables, but they do build the checked-out working tree, so the edit reaches them. The edit exists only on the runner and is never committed. For local builds both numbers default to 1.
@@ -84,13 +84,13 @@ Credentials are EAS-hosted. Signing keys, provisioning profiles and the store su
 
 If the first store query fails, the deploy stops before building, so a guessed number cannot burn several EAS builds on conflicts.
 
-The marketing version is bumped by `scripts/bump-version.js`, which also updates `example/app.config.js`.
+The version is bumped by `scripts/bump-version.js`, which also updates `example/app.config.js`. That script accepts only `X.Y.Z`, so a prerelease version has to be set by hand. Android keeps the full version string, and everything a person reads (release notes, What to Test, Slack, the in-app info) shows it in full.
 
 ---
 
 ## Release notes
 
-`scripts/ci/release-notes.sh` writes the same text for both stores: app version and build number, the plugin and `klaviyo-react-native-sdk` versions, the commit SHA and subject, the ref and trigger, the build date, and a link to the CI run. On `release: published` the release name and body follow.
+`scripts/ci/release-notes.sh` writes the same text for both stores: app version and build number, the plugin, `klaviyo-react-native-sdk`, native iOS SDK and native Android SDK versions, the commit SHA and subject, the ref and trigger, the build date, and a link to the CI run. On `release: published` the release name and body follow.
 
 - TestFlight: the `what-to-test` job waits for Apple to finish processing the build, then sets What to Test through the App Store Connect `betaBuildLocalizations` API (`scripts/ci/asc-whats-new.js`). The text is capped at 4000 characters.
 - Play: `eas submit` has no Android release notes option, so the `android-notes` job calls the Play Developer API (`scripts/ci/play-release-notes.js`) to set en-US notes and the release name on the internal track. The text is capped at 500 characters.
@@ -99,11 +99,11 @@ The marketing version is bumped by `scripts/bump-version.js`, which also updates
 
 ## Slack message
 
-Each deploy posts the version and build number, the plugin and `klaviyo-react-native-sdk` versions, the source (branch or release tag, reduced to Slack-safe characters), the commit, the author, the CI run, and a "Get the build" line with a store link that needs a login (the TestFlight app page or the Play testers URL). It also links the EAS build page, which only members of the Expo account can open. A separate warning posts when the store notes could not be set.
+Each deploy posts the version and build number, the plugin and SDK versions, the source (branch or release tag, reduced to Slack-safe characters), the commit, the author, the CI run, and a "Get the build" line with a store link that needs a login (the TestFlight app page or the Play testers URL). It also links the EAS build page, which only members of the Expo account can open. A separate warning posts when the store notes could not be set.
 
 ## Build info in the app
 
-The main screen of the example app shows the plugin version, the `klaviyo-react-native-sdk` version and the commit SHA. `example/app.config.js` reads the versions from `package.json` and the installed package, and the commit from `APP_COMMIT_SHA`, which CI writes into the build env. Local builds show `local`.
+The main screen of the example app shows the plugin version, the `klaviyo-react-native-sdk` version, the native iOS and Android SDK versions it pins, and the commit SHA. `example/app.config.js` reads the plugin version from `package.json`, the SDK versions from the installed `klaviyo-react-native-sdk` (its podspec and `gradle.properties`), and the commit from `APP_COMMIT_SHA`, which CI writes into the build env. Local builds show `local`. A native version shows `unknown` when the package does not carry it.
 
 ---
 

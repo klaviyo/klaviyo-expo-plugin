@@ -1,11 +1,26 @@
 const pluginPackage = require('../package.json');
 const examplePackage = require('./package.json');
 
+const fs = require('fs');
+const path = require('path');
+
 const readInstalledVersion = (name) => {
   try {
     return require(`${name}/package.json`).version;
   } catch {
     return examplePackage.dependencies[name];
+  }
+};
+
+// Native SDK versions that klaviyo-react-native-sdk pins. Returns 'unknown' when
+// the installed package does not carry the expected file or key.
+const readNativeSdkVersion = (file, pattern) => {
+  try {
+    const dir = path.dirname(require.resolve('klaviyo-react-native-sdk/package.json'));
+    const match = fs.readFileSync(path.join(dir, file), 'utf8').match(pattern);
+    return match ? match[1] : 'unknown';
+  } catch {
+    return 'unknown';
   }
 };
 
@@ -78,6 +93,8 @@ module.exports = () => {
       buildInfo: {
         pluginVersion: pluginPackage.version,
         reactNativeSdkVersion: readInstalledVersion('klaviyo-react-native-sdk'),
+        iosSdkVersion: readNativeSdkVersion('klaviyo-react-native-sdk.podspec', /s\.dependency\s+"KlaviyoSwift",\s*"([^"]+)"/),
+        androidSdkVersion: readNativeSdkVersion('android/gradle.properties', /klaviyoAndroidSdkVersion=(\S+)/),
         // CI sets APP_COMMIT_SHA via eas.json; local builds show 'local'.
         commitSha: process.env.APP_COMMIT_SHA || 'local',
       },

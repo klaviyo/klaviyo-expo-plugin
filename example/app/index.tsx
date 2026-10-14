@@ -5,7 +5,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 const buildInfo = Constants.expoConfig?.extra?.buildInfo as
-  | { pluginVersion: string; reactNativeSdkVersion: string; commitSha: string }
+  | {
+      pluginVersion: string;
+      reactNativeSdkVersion: string;
+      iosSdkVersion: string;
+      androidSdkVersion: string;
+      commitSha: string;
+    }
   | undefined;
 
 export default function ProfileScreen() {
@@ -111,7 +117,8 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       {buildInfo && (
         <Text style={styles.buildInfo} testID="build-info">
-          Plugin {buildInfo.pluginVersion} | RN SDK {buildInfo.reactNativeSdkVersion} | {buildInfo.commitSha}
+          Plugin {buildInfo.pluginVersion} | RN SDK {buildInfo.reactNativeSdkVersion} | iOS SDK{' '}
+          {buildInfo.iosSdkVersion} | Android SDK {buildInfo.androidSdkVersion} | {buildInfo.commitSha}
         </Text>
       )}
       <View style={styles.section}>
