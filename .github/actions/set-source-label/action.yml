@@ -8,9 +8,12 @@ runs:
       shell: bash
       env:
         RELEASE_TAG: ${{ github.event.release.tag_name }}
+        PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
       run: |
         if [ -n "$RELEASE_TAG" ]; then
           source_label="release $RELEASE_TAG"
+        elif [ -n "$PR_HEAD_REF" ]; then
+          source_label="$PR_HEAD_REF"
         else
           source_label="$GITHUB_REF_NAME"
         fi
