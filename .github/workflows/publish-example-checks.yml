@@ -1,0 +1,62 @@
+# Validates the example app publish workflow and its scripts on pull requests.
+# Builds and uploads nothing, and uses no secrets.
+
+name: Publish Example Checks
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/publish-example*.yml"
+      - ".github/actions/**"
+      - ".github/dependabot.yml"
+      - "scripts/ci/**"
+      - "example/eas.json"
+      - "example/app.config.js"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: Lint workflows and test scripts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install actionlint
+        run: python -m pip install --quiet actionlint-py==1.7.7.23
+
+      - name: Lint workflows
+        run: actionlint .github/workflows/publish-example.yml .github/workflows/publish-example-checks.yml
+
+      - name: Lint shell scripts
+        run: shellcheck scripts/ci/*.sh scripts/ci/tests/*.sh
+
+      - name: Check script syntax
+        run: |
+          for f in scripts/ci/*.js; do node --check "$f"; done
+
+      - name: Validate eas.json
+        run: |
+          jq -e '.cli.appVersionSource == "local" and .build.production.autoIncrement == false' example/eas.json
+
+      - name: Test shell scripts
+        run: bash scripts/ci/tests/test-ci-scripts.sh
+
+      - name: Test Node scripts
+        run: node --test scripts/ci/tests/*.test.js

@@ -1,11 +1,11 @@
 name: Notify Slack of example app publish result
-description: Posts a Slack message summarizing an EAS build + submit job (success or failure) for the Expo plugin example app.
+description: Posts a Slack message for an EAS build and submit job of the Expo plugin example app. A success or failure message covers the deploy; notes-failure warns that the build shipped without its store release notes.
 inputs:
   webhook:
     description: Slack incoming webhook URL
     required: true
   result:
-    description: "'success' or 'failure' — drives icon and headline"
+    description: "'success', 'failure' or 'notes-failure'"
     required: true
   platform:
     description: "Human-readable platform label (e.g. 'Play Store', 'TestFlight')"
@@ -13,35 +13,41 @@ inputs:
   version_label:
     description: Version string to show in the message (e.g. 'X.Y.Z (build)')
     required: false
-    default: "?"
-  build_url:
-    description: EAS dashboard page for the build. Only viewable by members of the Expo account that owns the project.
+    default: '?'
+  sdk_ref:
+    description: Plugin and React Native SDK versions the app was built with
     required: false
-    default: ""
+    default: ''
+  source_label:
+    description: Sanitized release tag or branch name (SOURCE_LABEL)
+    required: true
+  commit_sha:
+    description: Commit that was deployed. Label deploys build the PR head, not the merge commit.
+    required: true
+  get_build:
+    description: Slack mrkdwn telling testers how to install the build. Must not contain public or unauthenticated links, since this repo's logs are public.
+    required: false
+    default: ''
+  build_url:
+    description: EAS dashboard page for the build. Only members of the Expo account can open it.
+    required: false
+    default: ''
 
 runs:
   using: composite
   steps:
-    # Install access goes through the store testing programs (Play internal
-    # testing / TestFlight), which only admit testers added in the consoles.
-    # No direct binary or EAS internal-distribution link is posted: this repo
-    # is public and those links are not confirmed to require sign-in.
-    - uses: slackapi/slack-github-action@v2.1.1
+    - uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
       with:
         webhook: ${{ inputs.webhook }}
         webhook-type: incoming-webhook
         payload: |
-          text: "${{ inputs.result == 'success' && '✅' || '🚨' }} Expo Plugin Example App: ${{ inputs.platform }} ${{ inputs.result == 'success' && 'publish succeeded' || 'publish failed' }}"
+          text: "${{ inputs.result == 'success' && '✅' || inputs.result == 'failure' && '🚨' || '⚠️' }} Expo Plugin Example App: ${{ inputs.platform }} ${{ inputs.result == 'success' && 'publish succeeded' || inputs.result == 'failure' && 'publish failed' || format('build {0} uploaded, but its release notes were not set', inputs.version_label) }}"
           blocks:
-            - type: "header"
-              text:
-                type: "plain_text"
-                text: "${{ inputs.result == 'success' && '✅' || '🚨' }} Expo Plugin Example App: ${{ inputs.platform }} ${{ inputs.result == 'success' && 'publish succeeded' || 'publish failed' }}"
             - type: "section"
               text:
                 type: "mrkdwn"
-                text: "*Repository:* ${{ github.repository }}\n*Workflow:* ${{ github.workflow }}\n*Ref:* `${{ github.ref_name }}`\n*Version:* `${{ inputs.version_label }}`\n*Commit:* `${{ github.sha }}`\n*Author:* ${{ github.actor }}${{ inputs.result == 'success' && format('\n*Install:* {0} (testers added in the store console only)', inputs.platform == 'TestFlight' && 'TestFlight app' || 'Play Store internal testing') || '' }}${{ inputs.build_url != '' && format('\n*EAS build:* <{0}|View on expo.dev> (Expo account members only)', inputs.build_url) || '' }}"
+                text: "*Repository:* ${{ github.repository }}\n*Workflow:* ${{ github.workflow }}\n*Version:* `${{ inputs.version_label }}`${{ inputs.sdk_ref != '' && format('\n*SDK:* `{0}`', inputs.sdk_ref) || '' }}\n*Source:* `${{ inputs.source_label }}`\n*Commit:* `${{ inputs.commit_sha }}`\n*Author:* ${{ github.actor }}${{ inputs.build_url != '' && format('\n*EAS build:* <{0}|View on expo.dev> (Expo account members only)', inputs.build_url) || '' }}"
             - type: "section"
               text:
                 type: "mrkdwn"
-                text: "*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+                text: "${{ inputs.result == 'notes-failure' && format('The build is on {0}, but its release notes could not be set. Re-run the failed job from the Actions UI, or set the notes by hand in the store console.\n', inputs.platform) || '' }}*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>${{ inputs.result == 'success' && inputs.get_build != '' && format('\n*Get the build:* {0}', inputs.get_build) || '' }}"
