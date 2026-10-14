@@ -65,6 +65,7 @@ jobs:
     outputs:
       android: ${{ steps.plan.outputs.android }}
       ios: ${{ steps.plan.outputs.ios }}
+      deploy: ${{ steps.plan.outputs.deploy }}
     steps:
       - name: Plan the deploy
         id: plan
@@ -101,10 +102,25 @@ jobs:
           if [ "$wanted" = both ] || [ "$wanted" = ios ]; then ios=true; fi
           echo "android=$android" >> "$GITHUB_OUTPUT"
           echo "ios=$ios" >> "$GITHUB_OUTPUT"
+          if [ "$android" = true ] || [ "$ios" = true ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  checks:
+    name: Checks
+    needs: preflight
+    if: needs.preflight.outputs.deploy == 'true'
+    uses: ./.github/workflows/publish-example-checks.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha || github.sha }}
+    permissions:
+      contents: read
 
   deploy-android:
     name: Publish to Play Store internal track
-    needs: preflight
+    needs: [checks, preflight]
     if: needs.preflight.outputs.android == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -238,7 +254,7 @@ jobs:
 
   deploy-ios:
     name: Publish to TestFlight
-    needs: preflight
+    needs: [checks, preflight]
     if: needs.preflight.outputs.ios == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -285,7 +301,10 @@ jobs:
       - name: Read marketing version
         id: marketing
         working-directory: example
-        run: echo "version=$(node -p "require('./app.config.js')().version")" >> "$GITHUB_OUTPUT"
+        run: |
+          full=$(node -p "require('./app.config.js')().version")
+          echo "full=${full}" >> "$GITHUB_OUTPUT"
+          echo "version=$(node ../scripts/ci/marketing-version.js "${full}")" >> "$GITHUB_OUTPUT"
 
       - name: Resolve next build number from App Store Connect
         id: number

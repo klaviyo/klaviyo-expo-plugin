@@ -1,5 +1,9 @@
-# Validates the example app publish workflow and its scripts on pull requests.
+# Checks for the example app publish: the workflow and its scripts, the
+# plugin's unit tests and type check, and the example app's type check.
 # Builds and uploads nothing, and uses no secrets.
+#
+# Runs on pull requests that touch the publish files, and is called by
+# publish-example.yml, whose deploy jobs wait for every job here.
 
 name: Publish Example Checks
 
@@ -10,15 +14,21 @@ on:
       - ".github/actions/**"
       - ".github/dependabot.yml"
       - "scripts/ci/**"
-      - "example/eas.json"
-      - "example/app.config.js"
+      - "example/**"
+  workflow_call:
+    inputs:
+      ref:
+        description: "Commit to check"
+        required: false
+        type: string
+        default: ""
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  lint-and-test:
+  scripts:
     name: Lint workflows and test scripts
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -26,6 +36,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ inputs.ref }}
           persist-credentials: false
 
       - name: Set up Node.js
@@ -60,3 +71,60 @@ jobs:
 
       - name: Test Node scripts
         run: node --test scripts/ci/tests/*.test.js
+
+  plugin:
+    name: Plugin type check and unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Run unit tests
+        run: npm test
+
+  example:
+    name: Example app type check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            example/package-lock.json
+
+      - name: Install plugin dependencies
+        run: npm ci
+
+      - name: Install example dependencies
+        working-directory: example
+        run: npm ci
+
+      - name: Type check
+        working-directory: example
+        run: npx tsc --noEmit
