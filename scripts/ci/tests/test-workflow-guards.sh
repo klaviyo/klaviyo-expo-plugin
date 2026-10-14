@@ -18,6 +18,16 @@ fail() {
   FAILURES=$((FAILURES + 1))
 }
 
+# Prints the text of one job from the workflow. Done in Python so the result does not depend on the awk dialect.
+job_text() {
+  python3 - "$WORKFLOW" "$1" <<'PY'
+import re, sys
+text = open(sys.argv[1]).read()
+parts = re.split(r"^  ([a-z][a-z0-9-]*):\n", text.split("\njobs:\n", 1)[1], flags=re.M)
+print(dict(zip(parts[1::2], parts[2::2])).get(sys.argv[2], ""))
+PY
+}
+
 # Functions GitHub Actions expressions provide. Anything else called inside ${{ }} fails when it evaluates.
 ALLOWED='contains|startsWith|endsWith|format|join|toJSON|fromJSON|hashFiles|case|success|always|cancelled|failure'
 
@@ -35,17 +45,18 @@ else
 fi
 
 # The deploy steps run eas-deploy.sh, which stamps APP_RELEASE_TAG from RELEASE_TAG.
-for platform in android ios; do
-  step=$(awk -v p="$platform" '
-    /run: \.\.\/scripts\/ci\/eas-deploy\.sh/ && index($0, p) { found = 1 }
-    { lines[NR] = $0 }
-    found && !done { done = 1; stop = NR }
-    END { for (i = stop; i > 0 && lines[i] !~ /- name:/; i--) out = lines[i] "\n" out; printf "%s", out }
-  ' "$WORKFLOW")
+for job in deploy-android deploy-ios; do
+  step=$(job_text "$job" | python3 -c '
+import re, sys
+text = sys.stdin.read()
+for block in re.split(r"(?m)^      - ", text):
+    if "eas-deploy.sh" in block:
+        print(block)
+')
   if [[ "$step" == *"RELEASE_TAG: \${{ github.event.release.tag_name }}"* ]]; then
-    pass "the $platform deploy step sets RELEASE_TAG"
+    pass "the $job step sets RELEASE_TAG"
   else
-    fail "the $platform deploy step sets RELEASE_TAG" "$step"
+    fail "the $job step sets RELEASE_TAG" "$step"
   fi
 done
 
@@ -59,21 +70,21 @@ else
 fi
 
 # Secrets live at repository level, so the preflight must not declare an environment.
-if awk '/^  preflight:/,/^  checks:/' "$WORKFLOW" | grep -q '^    environment:'; then
+if job_text preflight | grep -q '^    environment:'; then
   fail "the preflight job declares no environment"
 else
   pass "the preflight job declares no environment"
 fi
 
 # SLACK_WEBHOOK_URL is optional, so it must not be in a required list.
-if awk '/^  preflight:/,/^  checks:/' "$WORKFLOW" | grep -q 'SLACK_WEBHOOK_URL'; then
+if job_text preflight | grep -q 'SLACK_WEBHOOK_URL'; then
   fail "SLACK_WEBHOOK_URL is not a required secret"
 else
   pass "SLACK_WEBHOOK_URL is not a required secret"
 fi
 
 # An unrelated label must not start the workflow's first job, or every label costs a runner.
-if awk '/^  plan:/,/^    runs-on/' "$WORKFLOW" | grep -q "startsWith(github.event.label.name, 'deploy-example-app')"; then
+if job_text plan | grep -q "startsWith(github.event.label.name, 'deploy-example-app')"; then
   pass "the plan job only runs for deploy labels on pull requests"
 else
   fail "the plan job only runs for deploy labels on pull requests"
@@ -87,11 +98,21 @@ else
 fi
 
 # Every job that runs a repo script needs a checkout.
+jobs_without_checkout=$(python3 - "$WORKFLOW" <<'PY'
+import re, sys
+text = open(sys.argv[1]).read()
+jobs = re.split(r"^  ([a-z][a-z0-9-]*):\n", text.split("\njobs:\n", 1)[1], flags=re.M)
+bodies = dict(zip(jobs[1::2], jobs[2::2]))
+for name in ("preflight", "deploy-android", "android-notes", "deploy-ios", "what-to-test"):
+    if "actions/checkout" not in bodies.get(name, ""):
+        print(name)
+PY
+)
 for job in preflight deploy-android android-notes deploy-ios what-to-test; do
-  if awk -v j="  $job:" '$0==j{f=1;next} f&&/^  [a-z-]+:$/{f=0} f' "$WORKFLOW" | grep -q 'actions/checkout'; then
-    pass "the $job job checks out the repository"
-  else
+  if grep -qx "$job" <<< "$jobs_without_checkout"; then
     fail "the $job job checks out the repository"
+  else
+    pass "the $job job checks out the repository"
   fi
 done
 
