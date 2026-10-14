@@ -12,20 +12,43 @@ const readInstalledVersion = (name) => {
   }
 };
 
-// Native SDK versions that klaviyo-react-native-sdk pins. Returns 'unknown' when
+// Native SDK versions that klaviyo-react-native-sdk pins. Returns undefined when
 // the installed package does not carry the expected file or key.
 const readNativeSdkVersion = (file, pattern) => {
   try {
     const dir = path.dirname(require.resolve('klaviyo-react-native-sdk/package.json'));
     const match = fs.readFileSync(path.join(dir, file), 'utf8').match(pattern);
-    return match ? match[1] : 'unknown';
+    return match ? match[1] : undefined;
   } catch {
-    return 'unknown';
+    return undefined;
   }
 };
 
+const { execFileSync } = require('child_process');
+
+const git = (args) => {
+  try {
+    return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+// Plugin ref: the release version when CI builds a release tag, otherwise
+// branch@sha7. A build outside CI reads local:branch@sha7, plus -dirty when the
+// working tree has uncommitted changes.
+const pluginRef = (version) => {
+  const sha = (process.env.APP_COMMIT_SHA || git(['rev-parse', '--short=7', 'HEAD']) || '').slice(0, 7) || undefined;
+  if (process.env.APP_RELEASE_TAG) return version;
+  const branch = process.env.APP_BRANCH || git(['rev-parse', '--abbrev-ref', 'HEAD']);
+  if (!sha) return undefined;
+  const ref = `${branch && branch !== 'HEAD' ? branch : '—'}@${sha}`;
+  if (process.env.APP_COMMIT_SHA) return ref;
+  return `local:${ref}${git(['status', '--porcelain']) ? '-dirty' : ''}`;
+};
+
 module.exports = () => {
-  return {
+  const config = {
     name: 'klaviyo plugin example',
     slug: 'klaviyo-plugin-example',
     version: '1.0.0',
@@ -90,13 +113,24 @@ module.exports = () => {
     assetBundlePatterns: ['**/*'],
     extra: {
       router: {},
+      // CI sets APP_COMMIT_SHA, APP_BRANCH, APP_BUILT_AT and APP_RELEASE_TAG through eas.json.
       buildInfo: {
-        pluginVersion: pluginPackage.version,
-        reactNativeSdkVersion: readInstalledVersion('klaviyo-react-native-sdk'),
-        iosSdkVersion: readNativeSdkVersion('klaviyo-react-native-sdk.podspec', /s\.dependency\s+"KlaviyoSwift",\s*"([^"]+)"/),
-        androidSdkVersion: readNativeSdkVersion('android/gradle.properties', /klaviyoAndroidSdkVersion=(\S+)/),
-        // CI sets APP_COMMIT_SHA via eas.json; local builds show 'local'.
-        commitSha: process.env.APP_COMMIT_SHA || 'local',
+        appVersion: undefined,
+        commitSha: process.env.APP_COMMIT_SHA || git(['rev-parse', '--short=7', 'HEAD']),
+        branch: process.env.APP_BRANCH || git(['rev-parse', '--abbrev-ref', 'HEAD']),
+        builtAt: process.env.APP_BUILT_AT,
+        sdks: [
+          { key: 'expo-plugin', version: pluginPackage.version, ref: pluginRef(pluginPackage.version) },
+          { key: 'rn', version: readInstalledVersion('klaviyo-react-native-sdk') },
+          {
+            key: 'ios',
+            version: readNativeSdkVersion('klaviyo-react-native-sdk.podspec', /s\.dependency\s+"KlaviyoSwift",\s*"([^"]+)"/),
+          },
+          {
+            key: 'android',
+            version: readNativeSdkVersion('android/gradle.properties', /klaviyoAndroidSdkVersion=(\S+)/),
+          },
+        ],
       },
       eas: {
         // CI sets KLAVIYO_EAS_PROJECT_ID; replace the placeholder for local builds
@@ -122,4 +156,6 @@ module.exports = () => {
     },
     owner: 'klaviyo',
   };
+  config.extra.buildInfo.appVersion = config.version;
+  return config;
 };
