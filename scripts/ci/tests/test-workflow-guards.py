@@ -171,6 +171,21 @@ for path in [DEPLOY_PATH, CHECKS_PATH] + sorted(glob.glob(os.path.join(ACTIONS_D
             inlined.append(f"{os.path.basename(path)}:{line}: {expression}")
 report(not inlined, "no expression is written inside a run: script (pass it through env:)", "\n".join(inlined))
 
+# Every job is bounded. The default job timeout is 6 hours. A job that calls a reusable workflow cannot set
+# timeout-minutes itself, so the jobs of the workflow it calls must.
+missing = []
+for path in [DEPLOY_PATH, CHECKS_PATH]:
+    for job, text in split_jobs(read(path)).items():
+        if re.search(r"(?m)^    timeout-minutes:\s*\d+", text):
+            continue
+        call = re.search(r"(?m)^    uses:\s*\./\.github/workflows/([\w.-]+)", text)
+        if call:
+            callee = os.path.join(WORKFLOW_DIR, call.group(1))
+            if os.path.exists(callee) and all(re.search(r"(?m)^    timeout-minutes:\s*\d+", t) for t in split_jobs(read(callee)).values()):
+                continue
+        missing.append(f"{os.path.basename(path)}: {job}")
+report(not missing, "every job sets timeout-minutes, or calls a workflow whose jobs all do", "\n".join(missing))
+
 # Dependabot watches the workflows directory and every composite action directory, through the
 # github-actions update entry itself.
 dependabot = read(DEPENDABOT_PATH) if os.path.exists(DEPENDABOT_PATH) else ""

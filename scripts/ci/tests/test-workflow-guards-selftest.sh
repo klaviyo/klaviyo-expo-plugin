@@ -420,5 +420,13 @@ updates:
 PY
 expect_fail "action directories under another ecosystem do not count for github-actions" "the github-actions dependabot entry covers"
 
+fresh_copy
+edit "$CHECKS" 's = s.replace("    timeout-minutes: 15\n", "", 1)'
+expect_fail "a job without timeout-minutes is caught" "every job sets timeout-minutes"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("    timeout-minutes: 90\n", "", 1)'
+expect_fail "a deploy job without timeout-minutes is caught" "every job sets timeout-minutes"
+
 echo "SUMMARY: $PASSED passed, $FAILED failed"
 ((FAILED == 0))
