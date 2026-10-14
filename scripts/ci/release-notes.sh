@@ -8,7 +8,8 @@
 # GITHUB_REF_NAME, then the current git branch), COMMIT_SHA (falls back to
 # GITHUB_SHA, then git HEAD), RELEASE_NAME, RELEASE_BODY, APP_VERSION (falls back to the
 # plugin version), BUILD_NUMBER (defaults to "?"), RUN_URL, BUILD_DATE
-# (defaults to the current UTC time).
+# (defaults to the current UTC time), SDK_REF (defaults to the output of
+# sdk-ref.sh, which needs the example dependencies installed).
 set -euo pipefail
 export LC_ALL=C.UTF-8
 
@@ -23,7 +24,7 @@ APP_VERSION="${APP_VERSION:-$(node -p "require('${ROOT}/package.json').version")
 BUILD_NUMBER="${BUILD_NUMBER:-?}"
 BUILD_DATE="${BUILD_DATE:-$(date -u '+%Y-%m-%d %H:%M UTC')}"
 EVENT="${GITHUB_EVENT_NAME:-manual}"
-SDK_REF=$("$ROOT/scripts/ci/sdk-ref.sh")
+SDK_REF="${SDK_REF:-$("$ROOT/scripts/ci/sdk-ref.sh")}"
 
 COMMIT_LINE="Commit: ${SHA:0:7}"
 if [[ -n "$SUBJECT" ]]; then

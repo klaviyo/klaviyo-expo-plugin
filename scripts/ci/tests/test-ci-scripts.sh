@@ -187,6 +187,18 @@ else
   fail "release-notes: empty subject has no trailing space" "$out"
 fi
 
+# --- release-notes.sh: SDK_REF from the environment is used as given ---------
+out=$(env "${NOTES_ENV[@]}" \
+  GITHUB_EVENT_NAME=push \
+  SOURCE_LABEL=main \
+  SDK_REF="klaviyo-expo-plugin 1.0.0 | klaviyo-react-native-sdk 2.5.0 | iOS SDK 5.4.0 | Android SDK 4.5.1" \
+  bash "$CI_DIR/release-notes.sh" 4000 "$WORK/notes-sdkref.txt" 2>&1)
+if [[ "$out" == *$'SDK: klaviyo-expo-plugin 1.0.0 | klaviyo-react-native-sdk 2.5.0 | iOS SDK 5.4.0 | Android SDK 4.5.1\n'* ]]; then
+  pass "release-notes: SDK_REF from the environment wins over sdk-ref.sh"
+else
+  fail "release-notes: SDK_REF from the environment wins over sdk-ref.sh" "$out"
+fi
+
 # --- sdk-ref.sh: output shape ----------------------------------------------
 out=$(bash "$CI_DIR/sdk-ref.sh")
 if [[ "$out" =~ ^klaviyo-expo-plugin\ [0-9.]+\ \|\ klaviyo-react-native-sdk\ [0-9.]+\ \|\ iOS\ SDK\ [^\ ]+\ \|\ Android\ SDK\ [^\ ]+$ ]]; then

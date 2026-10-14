@@ -226,6 +226,7 @@ jobs:
           APP_VERSION: ${{ needs.deploy-android.outputs.app_version }}
           BUILD_NUMBER: ${{ needs.deploy-android.outputs.build_number }}
           BUILD_DATE: ${{ needs.deploy-android.outputs.build_date }}
+          SDK_REF: ${{ needs.deploy-android.outputs.sdk_ref }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: ./scripts/ci/release-notes.sh 500 "${RUNNER_TEMP}/play-notes.txt"
@@ -382,6 +383,7 @@ jobs:
           APP_VERSION: ${{ needs.deploy-ios.outputs.app_version }}
           BUILD_NUMBER: ${{ needs.deploy-ios.outputs.build_number }}
           BUILD_DATE: ${{ needs.deploy-ios.outputs.build_date }}
+          SDK_REF: ${{ needs.deploy-ios.outputs.sdk_ref }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: ./scripts/ci/release-notes.sh 4000 "${RUNNER_TEMP}/what-to-test.txt"
