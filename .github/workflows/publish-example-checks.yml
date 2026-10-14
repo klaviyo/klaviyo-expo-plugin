@@ -72,6 +72,9 @@ jobs:
       - name: Check the publish workflow for mistakes actionlint misses
         run: bash scripts/ci/tests/test-workflow-guards.sh
 
+      - name: Check that the workflow checks fail on the mistakes they guard
+        run: bash scripts/ci/tests/test-workflow-guards-selftest.sh
+
       - name: Test Node scripts
         run: node --test scripts/ci/tests/*.test.js
 

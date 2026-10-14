@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+# Self-test for test-workflow-guards.sh. Each case breaks a copy of the workflows
+# and actions in one way and expects the guard to fail on the matching check. A
+# guard that passes on a broken workflow proves nothing.
+#
+# Prints one PASS/FAIL line per case and exits non-zero if any case fails.
+# The mutations contain ${{ }} expressions inside single quotes on purpose.
+# shellcheck disable=SC2016
+set -uo pipefail
+
+
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+GUARD="$ROOT/scripts/ci/tests/test-workflow-guards.sh"
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+PASSED=0
+FAILED=0
+
+report() {
+  if (($1 == 0)); then
+    echo "PASS: $2"
+    PASSED=$((PASSED + 1))
+  else
+    echo "FAIL: $2"
+    FAILED=$((FAILED + 1))
+  fi
+}
+
+fresh_copy() {
+  rm -rf "$TMP/wf" "$TMP/actions"
+  mkdir -p "$TMP/wf" "$TMP/actions"
+  cp "$ROOT"/.github/workflows/publish-example*.yml "$TMP/wf/"
+  cp -R "$ROOT"/.github/actions/. "$TMP/actions/"
+}
+
+run_guard() {
+  WORKFLOW_DIR="$TMP/wf" ACTIONS_DIR="$TMP/actions" bash "$GUARD" > "$TMP/out.log" 2>&1
+}
+
+# expect_fail <name> <expected FAIL text>: the guard must exit non-zero and name the broken check
+expect_fail() {
+  if run_guard; then
+    report 1 "$1 (guard passed on a broken workflow)"
+  elif grep -q "FAIL: $2" "$TMP/out.log"; then
+    report 0 "$1"
+  else
+    report 1 "$1 (guard failed, but not on '$2')"
+  fi
+}
+
+# edit <file> <python expression body>: rewrites a file; the body gets `s` and must assign `s`
+edit() {
+  python3 - "$1" "$2" <<'PY'
+import sys
+path, body = sys.argv[1], sys.argv[2]
+s = open(path).read()
+before = s
+scope = {"s": s}
+exec(body, scope)
+if scope["s"] == before:
+    sys.exit("mutation did not change the file: " + body[:80])
+open(path, "w").write(scope["s"])
+PY
+}
+
+DEPLOY="$TMP/wf/publish-example.yml"
+CHECKS="$TMP/wf/publish-example-checks.yml"
+SLACK="$TMP/actions/notify-slack-example-publish/action.yml"
+
+fresh_copy
+if run_guard; then report 0 "the guard passes on the real workflows"; else report 1 "the guard passes on the real workflows"; fi
+
+fresh_copy
+edit "$SLACK" 's = s.replace("${{ inputs.commit_sha }}", "${{ substr(inputs.commit_sha, 0, 7) }}", 1)'
+expect_fail "substr in an expression is caught" "expressions only call functions"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("${{ github.event.release.tag_name }}", "${{ github.event.release.tag_name }}".replace("tag_name", "tag_name || foo()"), 1)'
+expect_fail "an unknown function in the workflow is caught" "expressions only call functions"
+
+fresh_copy
+edit "$DEPLOY" '
+i = s.index("  deploy-ios:")
+j = s.index("          RELEASE_TAG: ${{ github.event.release.tag_name }}\n", i)
+s = s[:j] + s[j + len("          RELEASE_TAG: ${{ github.event.release.tag_name }}\n"):]
+'
+expect_fail "a deploy step without RELEASE_TAG is caught" "the deploy-ios step sets RELEASE_TAG"
+
+fresh_copy
+edit "$DEPLOY" '
+i = s.index("  deploy-android:")
+j = s.index("          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json\n          BRANCH:", i)
+s = s[:j] + s[j + len("          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json\n"):]
+'
+expect_fail "a notes step that does not read the stamped build info is caught" "the deploy-android notes step sets the stamped fields"
+
+fresh_copy
+edit "$DEPLOY" '
+i = s.index("      - name: Notify Slack on success")
+j = s.index("        continue-on-error: true\n", i)
+s = s[:j] + s[j + len("        continue-on-error: true\n"):]
+'
+expect_fail "a Slack step without continue-on-error is caught" "every Slack step has continue-on-error"
+
+fresh_copy
+edit "$SLACK" '
+i = s.index("    - name: Build the Slack payload")
+j = s.index("      continue-on-error: true\n", i)
+s = s[:j] + s[j + len("      continue-on-error: true\n"):]
+'
+expect_fail "a Slack payload step that can fail the job is caught" "the Slack action tolerates a payload failure"
+
+fresh_copy
+edit "$SLACK" 's = s.replace("payload-file-path: ${{ steps.payload.outputs.file }}", "payload: |\n          text: \"x ${{ inputs.build }}\"", 1)'
+expect_fail "a YAML payload block is caught" "the Slack payload is sent from a JSON file"
+
+fresh_copy
+edit "$DEPLOY" '
+i = s.index("  what-to-test:")
+j = s.index("      - name: Checkout repository", i)
+k = s.index("      - name: Set source label", j)
+s = s[:j] + s[k:]
+'
+expect_fail "a job that runs a repo script without a checkout is caught" "the what-to-test job checks out the repository"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("          ref: ${{ env.COMMIT_SHA }}\n          persist-credentials: false\n", "          ref: ${{ env.COMMIT_SHA }}\n", 1)'
+expect_fail "a checkout that persists credentials is caught" "every checkout sets persist-credentials"
+
+fresh_copy
+edit "$CHECKS" 's = s.replace("          ref: ${{ inputs.ref }}\n          persist-credentials: false\n", "          ref: ${{ inputs.ref }}\n", 1)'
+expect_fail "an unsafe checkout in the reusable checks workflow is caught" "every checkout sets persist-credentials"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("          ref: ${{ env.COMMIT_SHA }}\n          persist-credentials: false\n", "          persist-credentials: false\n          ref: ${{ env.COMMIT_SHA }}\n", 1)'
+if run_guard; then
+  report 0 "persist-credentials is found wherever it sits in the with block"
+else
+  report 1 "persist-credentials is found wherever it sits in the with block (guard failed on a safe checkout)"
+fi
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("          ref: ${{ env.COMMIT_SHA }}\n          persist-credentials: false\n", "          ref: ${{ env.COMMIT_SHA }}\n          fetch-depth: 1\n          submodules: false\n          lfs: false\n          clean: true\n          persist-credentials: false\n", 1)'
+if run_guard; then
+  report 0 "persist-credentials is found five lines below uses"
+else
+  report 1 "persist-credentials is found five lines below uses (guard failed on a safe checkout)"
+fi
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("          ref: ${{ env.COMMIT_SHA }}\n          persist-credentials: false\n", "          ref: ${{ env.COMMIT_SHA }}\n          fetch-depth: 1\n          submodules: false\n          lfs: false\n          clean: true\n          persist-credentials: true\n", 1)'
+expect_fail "persist-credentials: true far below uses is caught" "every checkout sets persist-credentials"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("  preflight:\n    name: Check required secrets\n", "  preflight:\n    name: Check required secrets\n    environment: testflight\n", 1)'
+expect_fail "a preflight that declares an environment is caught" "the preflight job declares no environment"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}\n          SERVICE_ACCOUNT_JSON", "          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}\n          SERVICE_ACCOUNT_JSON", 1)'
+expect_fail "SLACK_WEBHOOK_URL in the preflight is caught" "SLACK_WEBHOOK_URL is not a required secret"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}", "COMMIT_SHA: ${{ github.sha }}", 1)'
+expect_fail "using the merge commit is caught" "the commit is the pull request head"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("    needs: [checks, preflight]\n    if: |\n      !cancelled() && !failure()\n      && needs.preflight.outputs.ios", "    needs: [preflight]\n    if: |\n      !cancelled() && !failure()\n      && needs.preflight.outputs.ios", 1)'
+expect_fail "a deploy that does not wait for the checks is caught" "the deploy-ios job needs the checks job"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("\n      || (startsWith(github.event.label.name, \x27deploy-example-app\x27)\n          && github.event.pull_request.head.repo.full_name == github.repository)", "\n      || startsWith(github.event.label.name, \x27deploy-example-app\x27)", 1)'
+expect_fail "a label deploy for fork pull requests is caught" "the plan job only runs for deploy labels on same-repo pull requests"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("    types: [labeled]", "    types: [labeled, synchronize]", 1)'
+expect_fail "a trigger that also fires on synchronize is caught" "the pull_request trigger is labeled only"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("      always()\n      && github.event_name == \x27pull_request\x27", "      github.event_name == \x27pull_request\x27", 1)'
+expect_fail "a label cleanup that skips on failure is caught" "the label cleanup runs with always()"
+
+echo "SUMMARY: $PASSED passed, $FAILED failed"
+((FAILED == 0))

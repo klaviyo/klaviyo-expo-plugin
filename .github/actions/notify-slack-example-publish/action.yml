@@ -57,6 +57,7 @@ runs:
     - name: Build the Slack payload
       id: payload
       if: steps.webhook.outputs.post == 'true'
+      continue-on-error: true
       shell: bash
       env:
         RESULT: ${{ inputs.result }}
@@ -76,7 +77,8 @@ runs:
         "${GITHUB_WORKSPACE}/scripts/ci/slack-payload.sh" "$file"
         echo "file=$file" >> "$GITHUB_OUTPUT"
 
-    - if: steps.webhook.outputs.post == 'true'
+    - if: steps.webhook.outputs.post == 'true' && steps.payload.outcome == 'success'
+      continue-on-error: true
       uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
       with:
         webhook: ${{ inputs.webhook }}

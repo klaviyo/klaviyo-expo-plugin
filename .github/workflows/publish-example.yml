@@ -62,7 +62,8 @@ jobs:
     name: Choose platforms
     if: |
       github.event_name != 'pull_request'
-      || startsWith(github.event.label.name, 'deploy-example-app')
+      || (startsWith(github.event.label.name, 'deploy-example-app')
+          && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -576,6 +577,7 @@ jobs:
       always()
       && github.event_name == 'pull_request'
       && startsWith(github.event.label.name, 'deploy-example-app')
+      && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
