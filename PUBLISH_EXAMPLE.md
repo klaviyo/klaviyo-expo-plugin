@@ -26,11 +26,13 @@ A cleanup job removes the label when the run ends, so adding it again deploys ag
 
 ### Switching it off
 
-The workflow skips with a warning until the `EXPO_TOKEN` secret and the `KLAVIYO_EAS_PROJECT_ID` variable exist. Removing either one switches publishing off again without a code change.
+Deploys are skipped, not failed, until the required secrets exist. Each platform has a preflight job in the same GitHub environment as its deploy job (`android-internal-track`, `testflight`), because environment secrets are visible only to jobs that declare the environment. The preflight checks the platform's required secrets and variables and prints their names, never their values. A push or a published release with something missing skips that platform with a notice naming the missing names. A `workflow_dispatch` or a label deploy with something missing fails, because a person asked for the deploy and a green skip would read as success. The notes jobs skip along with the deploy, and the label cleanup still runs. Each preflight job also records a deployment in its environment, so the Deployments page lists two entries per platform per run.
 
 ---
 
 ## Required GitHub secrets
+
+The Android preflight checks `EXPO_TOKEN`, `SERVICE_ACCOUNT_JSON`, `SLACK_WEBHOOK_URL` and `KLAVIYO_EAS_PROJECT_ID`. The iOS preflight checks `EXPO_TOKEN`, the three `APP_STORE_CONNECT_API_KEY_*` secrets, `SLACK_WEBHOOK_URL`, `KLAVIYO_EAS_PROJECT_ID`, `APPLE_TEAM_ID` and `ASC_APP_ID`.
 
 | Secret | Description |
 |--------|-------------|
@@ -90,20 +92,43 @@ The version is bumped by `scripts/bump-version.js`, which also updates `example/
 
 ## Release notes
 
-`scripts/ci/release-notes.sh` writes the same text for both stores: app version and build number, the plugin, `klaviyo-react-native-sdk`, native iOS SDK and native Android SDK versions, the commit SHA and subject, the ref and trigger, the build date, and a link to the CI run. On `release: published` the release name and body follow.
+`scripts/ci/release-notes.sh` renders the same header for both stores from the formatter in `example/lib/build-info.js`, which the app also uses, so the in-app "Copy build info" text matches the notes:
 
-- TestFlight: the `what-to-test` job waits for Apple to finish processing the build, then sets What to Test through the App Store Connect `betaBuildLocalizations` API (`scripts/ci/asc-whats-new.js`). The text is capped at 4000 characters.
-- Play: `eas submit` has no Android release notes option, so the `android-notes` job calls the Play Developer API (`scripts/ci/play-release-notes.js`) to set en-US notes and the release name on the internal track. The text is capped at 500 characters.
+```
+Expo Example <full version> (<build>)
+Klaviyo Expo Plugin <version> · <ref>
+Klaviyo RN SDK <version>
+Klaviyo <iOS|Android> SDK <version>
+Commit: <sha7> on <source> (<event>)
+Built: <YYYY-MM-DD HH:MM UTC>
+CI run: <url>
+```
+
+The SDK lines cover what is compiled into that platform's binary: the plugin, the React Native SDK, and the native SDK for that platform. A line shows ` · <ref>` only when the ref differs from the version. The plugin ref is the bare version for a release and `<branch>@<sha7>` otherwise. A missing value renders as a dash. On `release: published` the release name and body follow the header.
+
+- TestFlight: the `what-to-test` job waits for Apple to finish processing the build, then sets What to Test through the App Store Connect API (`scripts/ci/asc-whats-new.js`). The cap is 4000 characters.
+- Play: `eas submit` has no Android release notes option, so the `android-notes` job calls the Play Developer API (`scripts/ci/play-release-notes.js`) to set en-US notes and the release name on the internal track. The cap is 500 characters.
+
+When the text is over the cap, the release body is cut first, then the CI run line. The other header lines are never cut, and every cut ends with `…[truncated]`. Characters are counted as code points. The deploy jobs render the notes once, after the dependencies are installed, and the notes jobs download the file.
 
 ---
 
 ## Slack message
 
-Each deploy posts the version and build number, the plugin and SDK versions, the source (branch or release tag, reduced to Slack-safe characters), the commit, the author, the CI run, and a "Get the build" line with a store link that needs a login (the TestFlight app page or the Play testers URL). It also links the EAS build page, which only members of the Expo account can open. A separate warning posts when the store notes could not be set.
+```
+✅ Expo Example (iOS) → TestFlight
+Build: <full version> (<build>)
+SDKs: Expo <version> · <ref> | RN <version> | iOS <version>
+Source: <source label> (<event>)
+Commit: <sha7, linked> · <CI run, linked>
+Get the build: <login-gated store link and how to become a tester>
+```
+
+A failed deploy posts `❌ Expo Example (<platform>) deploy failed at <step>` with the commit and CI run. A failure to set the store notes posts a separate ⚠️ message and does not fail the run. The source label is reduced to characters that are safe in a Slack payload. The commit is the pull request head for label deploys.
 
 ## Build info in the app
 
-The main screen of the example app shows the plugin version, the `klaviyo-react-native-sdk` version, the native iOS and Android SDK versions it pins, and the commit SHA. `example/app.config.js` reads the plugin version from `package.json`, the SDK versions from the installed `klaviyo-react-native-sdk` (its podspec and `gradle.properties`), and the commit from `APP_COMMIT_SHA`, which CI writes into the build env. Local builds show `local`. A native version shows `unknown` when the package does not carry it.
+The Profile tab (the home tab) has an ⓘ button in its header. It opens the Build info modal: the app version and build number, one row for each SDK compiled into the running binary (the plugin, the React Native SDK, and the native SDK for the platform), the commit and branch, and the build time. "Copy build info" copies the same header the store notes use. `example/app.config.js` collects the values, reading the SDK versions from the installed `klaviyo-react-native-sdk`, and CI stamps the commit, branch, build time and release tag through the build env. A value that is not available shows a dash.
 
 ---
 
@@ -111,7 +136,7 @@ The main screen of the example app shows the plugin version, the `klaviyo-react-
 
 TestFlight has no public install link without Beta App Review, and the Play internal track admits only listed testers, so builds go to internal testers. To get access, ask in `#mobile-push-team` to be added to the internal TestFlight group (with your Apple ID email) or the Play internal testers list (with your Google account email). The Slack deploy message links to the app in the store and names the version and build number to install. The links only open for people who are already testers.
 
-Slack also links the EAS build page on expo.dev, which only members of the Expo account can open. It never posts EAS internal-distribution or artifact download links.
+Slack never posts EAS internal-distribution, build page or artifact download links.
 
 ---
 
@@ -121,7 +146,7 @@ This repo is public, so anyone can read the Actions logs.
 
 - Secrets reach steps only through `env`, and no step runs with `set -x` or prints the environment.
 - `scripts/ci/eas-deploy.sh` redacts EAS artifact URLs from everything EAS writes to the log.
-- Slack only gets links that need a store or Expo login.
+- Slack only gets links that need a store login.
 
 Do not add steps that print environment variables, upload signed artifacts, or post public TestFlight links.
 
@@ -171,3 +196,5 @@ EAS builds and signs on Expo's servers, so some pieces of the native workflows d
 - No keystore or signing key cleanup steps: signing material lives on EAS and never reaches the runner. CI holds only `EXPO_TOKEN` and the store API keys, and they are passed through `env` for the steps that need them. No step writes them to disk.
 - Concurrency never cancels a started run. See [Overview](#overview).
 - Android release notes are set after the submit through the Play Developer API, since `eas submit` has no notes option. iOS notes go through the App Store Connect API in their own job, as in the iOS test app.
+- The Slack message has no EAS build page link. The layout is shared across the example apps and has no slot for it, so the build page URL stays in the job log, where only the job output reaches it.
+- Each preflight job runs in its platform's GitHub environment so it can see that environment's secrets, which records a deployment entry for the preflight as well as for the deploy.
