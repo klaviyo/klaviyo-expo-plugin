@@ -26,7 +26,9 @@ const readNativeSdkVersion = (file, pattern) => {
 
 const { execFileSync } = require('child_process');
 
+// On an EAS build (EAS_BUILD is set) git is not consulted; the commit and branch come from APP_COMMIT_SHA and APP_BRANCH.
 const git = (args) => {
+  if (process.env.EAS_BUILD) return undefined;
   try {
     return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || undefined;
   } catch {

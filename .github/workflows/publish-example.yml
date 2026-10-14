@@ -207,6 +207,7 @@ jobs:
         env:
           BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
           COMMIT_SHA: ${{ env.COMMIT_SHA }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
@@ -426,6 +427,7 @@ jobs:
         env:
           BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
           COMMIT_SHA: ${{ env.COMMIT_SHA }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           EXPECTED_VERSION: ${{ steps.marketing.outputs.version }}

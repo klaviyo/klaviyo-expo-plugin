@@ -151,6 +151,13 @@ for job in ("deploy-android", "deploy-ios"):
     else:
         report(RELEASE_TAG_LINE in step, f"the {job} step sets RELEASE_TAG", step)
 
+# In CI the stamper refuses a missing commit, branch or source label, so each deploy step must set all three.
+for job in ("deploy-android", "deploy-ios"):
+    step = find_step(jobs.get(job, ""), "EAS build and submit")
+    absent = [name for name in ("COMMIT_SHA", "BRANCH", "SOURCE_LABEL") if f"{name}:" not in step]
+    report(bool(step) and not absent, f"the {job} step sets COMMIT_SHA, BRANCH and SOURCE_LABEL for the stamper",
+           "missing: " + ", ".join(absent))
+
 # The notes and the app are stamped from the same event fields.
 for job in ("deploy-android", "deploy-ios"):
     step = find_step(jobs.get(job, ""), "Render release notes")

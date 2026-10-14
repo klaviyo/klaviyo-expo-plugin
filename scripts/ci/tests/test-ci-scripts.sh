@@ -10,6 +10,8 @@ ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CI_DIR="$ROOT/scripts/ci"
 
 export LC_ALL=C.UTF-8
+# The runner sets CI=true. Tests that depend on it set it themselves, so the suite behaves the same everywhere.
+unset CI
 
 FAILURES=0
 
@@ -113,6 +115,7 @@ fi
 EOF
 chmod +x "$FAKES/eas"
 
+REAL_GIT=$(command -v git)
 export PATH="$FAKES:$PATH"
 
 # Shared environment for release-notes.sh cases: fixed values so output is
@@ -178,7 +181,7 @@ assert_contains "release-notes: a missing build number is a dash" "$out" "(—)"
 assert_not_contains "release-notes: no unknown placeholder" "$out" "unknown"
 
 # --- release-notes.sh: bad arguments ---------------------------------------
-log=$(bash "$CI_DIR/release-notes.sh" windows 500 "$WORK/x.txt" 2>&1) && rc=0 || rc=$?
+log=$(env "${NOTES_ENV[@]}" bash "$CI_DIR/release-notes.sh" windows 500 "$WORK/x.txt" 2>&1) && rc=0 || rc=$?
 if ((rc != 0)) && [[ "$log" == *"--platform must be ios or android"* ]]; then
   pass "release-notes: rejects an unknown platform"
 else
@@ -195,14 +198,26 @@ run_deploy() {
   mkdir -p "$state" "$proj"
   cp "$ROOT/package.json" "$root/"
   cp "$ROOT/example/app.config.js" "$ROOT/example/eas.json" "$ROOT/example/package.json" "$proj/"
+  # Arguments are VAR=value assignments, or UNSET:VAR to remove a variable the helper sets by default.
+  local assignments=() unsets=() arg
+  for arg in "$@"; do
+    if [[ "$arg" == UNSET:* ]]; then
+      unsets+=(-u "${arg#UNSET:}")
+    else
+      assignments+=("$arg")
+    fi
+  done
   (
     cd "$proj" || exit 1
     env \
       PATH="$FAKES:$PATH" \
       FAKE_EAS_STATE="$state" \
       GITHUB_OUTPUT="$WORK/gh-output.txt" \
-      GITHUB_SHA=abc1234def5678 \
-      "$@" \
+      COMMIT_SHA=abc1234def5678 \
+      BRANCH=main \
+      SOURCE_LABEL=main \
+      "${assignments[@]}" \
+      env "${unsets[@]}" \
       bash "$CI_DIR/eas-deploy.sh" "$platform" "$number"
   )
 }
@@ -345,6 +360,61 @@ if ((rc == 0)) && [[ "$app_copy" == "$notes_header" ]]; then
 else
   fail "app copy text equals the notes header without the CI run line" "rc=$rc"$'\n'"--- app:"$'\n'"$app_copy"$'\n'"--- notes:"$'\n'"$notes_header"
 fi
+
+# --- eas-deploy.sh in CI: an empty or missing commit, branch or source label fails and names the field ---
+for field in COMMIT_SHA BRANCH SOURCE_LABEL; do
+  for how in empty unset; do
+    state="ci-$field-$how"
+    if [[ "$how" == "empty" ]]; then
+      log=$(run_deploy "$state" android 10 CI=true "$field=" GITHUB_SHA=deadbee0000merge GITHUB_REF_NAME=17/merge GITHUB_HEAD_REF=feat/x 2>&1) && rc=0 || rc=$?
+    else
+      log=$(run_deploy "$state" android 10 CI=true "UNSET:$field" GITHUB_SHA=deadbee0000merge GITHUB_REF_NAME=17/merge GITHUB_HEAD_REF=feat/x 2>&1) && rc=0 || rc=$?
+    fi
+    builds="0"
+    [[ -f "$WORK/state-$state/count" ]] && builds=$(cat "$WORK/state-$state/count")
+    if ((rc != 0)) && ((builds == 0)) && [[ "$log" == *"needs "*"$field"*"from the workflow in CI"* ]]; then
+      pass "eas-deploy in CI: $how $field fails, names it and starts no build"
+    else
+      fail "eas-deploy in CI: $how $field fails, names it and starts no build" "rc=$rc builds=$builds"$'\n'"$log"
+    fi
+  done
+done
+
+# --- eas-deploy.sh in CI: the runner's own variables are never a substitute -------------------------
+log=$(run_deploy cifall android 10 CI=true COMMIT_SHA= BRANCH= SOURCE_LABEL= GITHUB_SHA=deadbee0000merge GITHUB_REF_NAME=17/merge GITHUB_HEAD_REF=feat/x 2>&1) && rc=0 || rc=$?
+assert_not_contains "eas-deploy in CI: the merge commit is never stamped" "$log" "deadbee"
+assert_not_contains "eas-deploy in CI: the merge ref is never stamped" "$log" "17/merge"
+if ((rc != 0)); then
+  pass "eas-deploy in CI: nothing from the workflow means no deploy"
+else
+  fail "eas-deploy in CI: nothing from the workflow means no deploy" "rc=$rc"
+fi
+
+# --- eas-deploy.sh in CI: all three set is accepted ------------------------------------------------
+log=$(run_deploy ciok android 10 CI=true 2>&1) && rc=0 || rc=$?
+if ((rc == 0)); then
+  pass "eas-deploy in CI: all three from the workflow is accepted"
+else
+  fail "eas-deploy in CI: all three from the workflow is accepted" "rc=$rc"$'\n'"$log"
+fi
+
+# --- eas-deploy.sh outside CI keeps its local fallbacks ---------------------------------------------
+log=$(run_deploy local android 10 UNSET:COMMIT_SHA UNSET:BRANCH UNSET:SOURCE_LABEL 2>&1) && rc=0 || rc=$?
+if ((rc == 0)); then
+  pass "eas-deploy outside CI: a local run without the workflow's values still works"
+else
+  fail "eas-deploy outside CI: a local run without the workflow's values still works" "rc=$rc"$'\n'"$log"
+fi
+
+# --- release-notes.sh in CI without a build info file needs the same three fields --------------------
+for field in COMMIT_SHA BRANCH SOURCE_LABEL; do
+  log=$(env "${NOTES_ENV[@]}" CI=true "$field=" bash "$CI_DIR/release-notes.sh" ios 4000 "$WORK/notes-ci.txt" 2>&1) && rc=0 || rc=$?
+  if ((rc != 0)) && [[ "$log" == *"needs "*"$field"*"from the workflow in CI"* ]]; then
+    pass "release-notes in CI: an empty $field fails and names it"
+  else
+    fail "release-notes in CI: an empty $field fails and names it" "rc=$rc"$'\n'"$log"
+  fi
+done
 
 # --- eas-deploy.sh: the build must report the number that was asked for ------
 : > "$WORK/gh-output.txt"
@@ -551,6 +621,40 @@ if ((rc != 0)) && [[ "$log" == *"Unknown RESULT"* ]]; then
   pass "slack-payload: rejects an unknown result"
 else
   fail "slack-payload: rejects an unknown result" "rc=$rc"$'\n'"$log"
+fi
+
+# --- app.config.js: git is not asked for a commit or branch on an EAS build ----------------------
+cfg_repo="$WORK/cfg-repo"
+mkdir -p "$cfg_repo/example"
+cp "$ROOT/package.json" "$cfg_repo/"
+cp "$ROOT/example/app.config.js" "$ROOT/example/package.json" "$cfg_repo/example/"
+git_real="$REAL_GIT"
+(
+  cd "$cfg_repo" || exit 1
+  "$git_real" init -q . && "$git_real" -c user.name=t -c user.email=t@t checkout -q -b local-branch \
+    && "$git_real" add . && "$git_real" -c user.name=t -c user.email=t@t commit -q -m init
+) >/dev/null 2>&1
+read_cfg() {
+  (cd "$cfg_repo/example" && env PATH="$(dirname "$git_real"):$(dirname "$(command -v node)")" "$@" \
+    node -e 'const b = require("./app.config.js")().extra.buildInfo; console.log([b.commitSha || "-", b.branch || "-"].join(" "))')
+}
+out=$(read_cfg HOME="$WORK")
+if [[ "$out" == *" local-branch" && "$out" != "- "* ]]; then
+  pass "app.config.js: a local build reads the commit and branch from git"
+else
+  fail "app.config.js: a local build reads the commit and branch from git" "$out"
+fi
+out=$(read_cfg HOME="$WORK" EAS_BUILD=true)
+if [[ "$out" == "- -" ]]; then
+  pass "app.config.js: an EAS build without stamped values has none, and git is not asked"
+else
+  fail "app.config.js: an EAS build without stamped values has none, and git is not asked" "$out"
+fi
+out=$(read_cfg HOME="$WORK" EAS_BUILD=true APP_COMMIT_SHA=fedcba9 APP_BRANCH=feat/x)
+if [[ "$out" == "fedcba9 feat/x" ]]; then
+  pass "app.config.js: an EAS build uses the values CI stamped"
+else
+  fail "app.config.js: an EAS build uses the values CI stamped" "$out"
 fi
 
 # --- the tracked eas.json is never modified by the tests ---------------------

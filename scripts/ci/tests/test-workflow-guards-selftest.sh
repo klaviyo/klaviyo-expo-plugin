@@ -312,5 +312,17 @@ fresh_copy
 edit "$CHECKS" 's = s.replace("        run: node --test scripts/ci/tests/*.test.js\n", "        run: echo skipped\n", 1)'
 expect_fail "a checks job that stops running the node tests is caught" "the checks job runs the node tests"
 
+for var in COMMIT_SHA BRANCH SOURCE_LABEL; do
+  fresh_copy
+  edit "$DEPLOY" "
+i = s.index('  deploy-ios:')
+i = s.index('      - name: EAS build and submit', i)
+j = s.index('          $var:', i)
+k = s.index(chr(10), j) + 1
+s = s[:j] + s[k:]
+"
+  expect_fail "an iOS deploy step without $var is caught" "the deploy-ios step sets COMMIT_SHA, BRANCH and SOURCE_LABEL"
+done
+
 echo "SUMMARY: $PASSED passed, $FAILED failed"
 ((FAILED == 0))

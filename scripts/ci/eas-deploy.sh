@@ -65,11 +65,15 @@ set_output() {
 
 DASHBOARD_URL=$(node -p "const c = require('./app.config.js')(); 'https://expo.dev/accounts/' + c.owner + '/projects/' + c.slug + '/builds/'")
 
-SHA="${COMMIT_SHA:-${GITHUB_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}}"
+# shellcheck source=scripts/ci/require-inputs.sh
+source "$(dirname "$0")/require-inputs.sh"
+require_ci_inputs eas-deploy.sh COMMIT_SHA BRANCH SOURCE_LABEL || exit 1
+
+SHA="${COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
 export APP_COMMIT_SHA="${SHA:0:7}"
-export APP_BRANCH="${BRANCH:-${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-}}}"
+export APP_BRANCH="${BRANCH:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo local)}"
 export APP_RELEASE_TAG="${RELEASE_TAG:-}"
-SOURCE_LABEL="${SOURCE_LABEL:-${GITHUB_REF_NAME:-local}}"
+SOURCE_LABEL="${SOURCE_LABEL:-local}"
 export APP_SOURCE_LABEL="$SOURCE_LABEL"
 export APP_EVENT="${GITHUB_EVENT_NAME:-manual}"
 
