@@ -3,8 +3,9 @@
 # so the EAS build server's app.config.js sees them.
 #
 # Usage: set-build-env.sh <android|ios> <build-number>
-# Run from example/. When APP_COMMIT_SHA is set it is written to the same env
-# block, where app.config.js exposes it to the app's build info.
+# Run from example/. APP_COMMIT_SHA, APP_BRANCH, APP_BUILT_AT and APP_RELEASE_TAG
+# are written to the same env block when set, where app.config.js exposes them to
+# the app's build info.
 set -euo pipefail
 
 PLATFORM="${1:?usage: set-build-env.sh <android|ios> <build-number>}"
@@ -30,9 +31,12 @@ jq --arg profile "$PROFILE" --arg var "$VAR" --arg n "$NUMBER" \
 mv eas.json.tmp eas.json
 echo "$VAR=$NUMBER"
 
-if [[ -n "${APP_COMMIT_SHA:-}" ]]; then
-  jq --arg profile "$PROFILE" --arg sha "$APP_COMMIT_SHA" \
-    '.build[$profile].env.APP_COMMIT_SHA = $sha' eas.json > eas.json.tmp
-  mv eas.json.tmp eas.json
-  echo "APP_COMMIT_SHA=$APP_COMMIT_SHA"
-fi
+for name in APP_COMMIT_SHA APP_BRANCH APP_BUILT_AT APP_RELEASE_TAG; do
+  value="${!name:-}"
+  if [[ -n "$value" ]]; then
+    jq --arg profile "$PROFILE" --arg name "$name" --arg value "$value" \
+      '.build[$profile].env[$name] = $value' eas.json > eas.json.tmp
+    mv eas.json.tmp eas.json
+    echo "$name=$value"
+  fi
+done

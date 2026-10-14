@@ -59,10 +59,14 @@ DASHBOARD_URL=$(node -p "const c = require('./app.config.js')(); 'https://expo.d
 
 SHA="${COMMIT_SHA:-${GITHUB_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}}"
 export APP_COMMIT_SHA="${SHA:0:7}"
+export APP_BRANCH="${BRANCH:-${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-}}}"
+export APP_RELEASE_TAG="${RELEASE_TAG:-}"
 SOURCE_LABEL="${SOURCE_LABEL:-${GITHUB_REF_NAME:-local}}"
 
 attempt=1
 while true; do
+  export APP_BUILT_AT
+  APP_BUILT_AT="$(date -u '+%Y-%m-%d %H:%M UTC')"
   "$SET_BUILD_ENV" "$PLATFORM" "$BUILD_NUMBER"
   set_output build_number "$BUILD_NUMBER"
 
@@ -82,7 +86,7 @@ while true; do
   set_output build_id "$build_id"
   set_output app_version "$(jq -r '.[0].appVersion // "?"' <<< "$build_json")"
   set_output build_url "${DASHBOARD_URL}${build_id}"
-  set_output build_date "$(date -u '+%Y-%m-%d %H:%M UTC')"
+  set_output build_date "$APP_BUILT_AT"
 
   if [[ -n "${RECHECK_CMD:-}" ]] && ((attempt < MAX_ATTEMPTS)); then
     if recheck_json=$(env -u GITHUB_OUTPUT bash -c "$RECHECK_CMD --minimum $BUILD_NUMBER"); then

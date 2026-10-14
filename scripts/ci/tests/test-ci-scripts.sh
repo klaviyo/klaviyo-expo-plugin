@@ -112,120 +112,73 @@ chmod +x "$FAKES/eas"
 export PATH="$FAKES:$PATH"
 
 # Shared environment for release-notes.sh cases: fixed values so output is
-# predictable, and git is never consulted.
-NOTES_ENV=(
-  "SDK_DIR=$WORK/no-sdk"
-  "GITHUB_SHA=abc1234def5678"
-  "BUILD_DATE=2026-01-02 03:04 UTC"
-  "BUILD_NUMBER=7"
-)
-
-# --- release-notes.sh: push event, no release body -------------------------
-out=$(env "${NOTES_ENV[@]}" \
-  GITHUB_EVENT_NAME=push \
-  SOURCE_LABEL=main \
-  bash "$CI_DIR/release-notes.sh" 4000 "$WORK/notes-push.txt" 2>&1)
-expected="Version 1.0.0 (build 7)
-SDK: klaviyo-expo-plugin 1.0.0 | klaviyo-react-native-sdk 2.5.0 | iOS SDK unknown | Android SDK unknown
-Commit: abc1234 test commit
-Ref: main (push)
-Built: 2026-01-02 03:04 UTC"
-if [[ "$out" == "$expected" ]] && [[ "$(cat "$WORK/notes-push.txt")" == "$expected" ]]; then
-  pass "release-notes: push event format"
-else
-  fail "release-notes: push event format" "$out"
-fi
-
-# --- release-notes.sh: release event with body and name --------------------
-base_expected="Version 1.0.0 (build 7)
-SDK: klaviyo-expo-plugin 1.0.0 | klaviyo-react-native-sdk 2.5.0 | iOS SDK unknown | Android SDK unknown
-Commit: abc1234 test commit
-Ref: main (push)
-Built: 2026-01-02 03:04 UTC"
-out=$(env "${NOTES_ENV[@]}" \
-  GITHUB_EVENT_NAME=release \
-  SOURCE_LABEL=v1.0.0 \
-  RELEASE_NAME="v1.0.0" \
-  RELEASE_BODY="  First line
-Second line  " \
-  RUN_URL="https://github.com/klaviyo/klaviyo-expo-plugin/actions/runs/1" \
-  bash "$CI_DIR/release-notes.sh" 4000 "$WORK/notes-release.txt" 2>&1)
-expected="${base_expected/Ref: main (push)/Ref: v1.0.0 (release)}
-CI run: https://github.com/klaviyo/klaviyo-expo-plugin/actions/runs/1
-
-Release notes (v1.0.0):
-First line
-Second line"
-if [[ "$out" == "$expected" ]]; then
-  pass "release-notes: release event with body and name"
-else
-  fail "release-notes: release event with body and name" "$out"
-fi
-
-# --- release-notes.sh: truncation lands exactly on max-chars ---------------
-LONG_BODY=$(printf 'x%.0s' $(seq 1 500))
-out=$(env "${NOTES_ENV[@]}" \
-  GITHUB_EVENT_NAME=release \
-  RELEASE_BODY="$LONG_BODY" \
-  bash "$CI_DIR/release-notes.sh" 200 "$WORK/notes-trunc.txt" 2>&1)
-len=${#out}
-if ((len == 200)) && [[ "$out" == *$'\n[truncated]' ]]; then
-  pass "release-notes: truncation is exactly max-chars"
-else
-  fail "release-notes: truncation is exactly max-chars" "length=$len, tail=${out: -20}"
-fi
-
-# --- release-notes.sh: empty subject leaves no trailing space --------------
-out=$(env "${NOTES_ENV[@]}" \
-  GITHUB_EVENT_NAME=push \
-  SOURCE_LABEL=main \
-  FAKE_GIT_SUBJECT=0 \
-  bash "$CI_DIR/release-notes.sh" 4000 "$WORK/notes-empty.txt" 2>&1)
-if [[ "$out" == *$'Commit: abc1234\n'* ]]; then
-  pass "release-notes: empty subject has no trailing space"
-else
-  fail "release-notes: empty subject has no trailing space" "$out"
-fi
-
-# --- release-notes.sh: SDK_REF from the environment is used as given ---------
-out=$(env "${NOTES_ENV[@]}" \
-  GITHUB_EVENT_NAME=push \
-  SOURCE_LABEL=main \
-  SDK_REF="klaviyo-expo-plugin 1.0.0 | klaviyo-react-native-sdk 2.5.0 | iOS SDK 5.4.0 | Android SDK 4.5.1" \
-  bash "$CI_DIR/release-notes.sh" 4000 "$WORK/notes-sdkref.txt" 2>&1)
-if [[ "$out" == *$'SDK: klaviyo-expo-plugin 1.0.0 | klaviyo-react-native-sdk 2.5.0 | iOS SDK 5.4.0 | Android SDK 4.5.1\n'* ]]; then
-  pass "release-notes: SDK_REF from the environment wins over sdk-ref.sh"
-else
-  fail "release-notes: SDK_REF from the environment wins over sdk-ref.sh" "$out"
-fi
-
-# --- sdk-ref.sh: output shape ----------------------------------------------
-out=$(bash "$CI_DIR/sdk-ref.sh")
-if [[ "$out" =~ ^klaviyo-expo-plugin\ [0-9.]+\ \|\ klaviyo-react-native-sdk\ [0-9.]+\ \|\ iOS\ SDK\ [^\ ]+\ \|\ Android\ SDK\ [^\ ]+$ ]]; then
-  pass "sdk-ref: output shape"
-else
-  fail "sdk-ref: output shape" "$out"
-fi
-
-# --- sdk-ref.sh: reads the native SDK versions from an installed package -----
+# predictable. SDK_DIR points at a fake klaviyo-react-native-sdk install.
 mkdir -p "$WORK/fake-sdk/android"
 cat > "$WORK/fake-sdk/klaviyo-react-native-sdk.podspec" <<'EOF'
   s.dependency "KlaviyoSwift", "9.8.7"
 EOF
 echo "KlaviyoReactNativeSdk_klaviyoAndroidSdkVersion=6.5.4" > "$WORK/fake-sdk/android/gradle.properties"
-out=$(SDK_DIR="$WORK/fake-sdk" bash "$CI_DIR/sdk-ref.sh")
-if [[ "$out" == *"| iOS SDK 9.8.7 | Android SDK 6.5.4" ]]; then
-  pass "sdk-ref: native versions come from the installed package"
+NOTES_ENV=(
+  "SDK_DIR=$WORK/fake-sdk"
+  "COMMIT_SHA=abc1234def5678"
+  "BRANCH=feat/x"
+  "SOURCE_LABEL=feat/x"
+  "BUILD_DATE=2026-01-02 03:04 UTC"
+  "APP_VERSION=1.0.0"
+  "BUILD_NUMBER=7"
+  "GITHUB_EVENT_NAME=push"
+  "RUN_URL=https://github.com/klaviyo/klaviyo-expo-plugin/actions/runs/1"
+)
+
+# --- release-notes.sh: iOS notes list the native iOS SDK only ----------------
+out=$(env "${NOTES_ENV[@]}" bash "$CI_DIR/release-notes.sh" ios 4000 "$WORK/notes-ios.txt" 2>&1)
+assert_contains "release-notes: ios app line" "$out" "Expo Example 1.0.0 (7)"
+assert_contains "release-notes: ios lists the iOS SDK" "$out" "Klaviyo iOS SDK 9.8.7"
+assert_not_contains "release-notes: ios omits the Android SDK" "$out" "Klaviyo Android SDK"
+assert_contains "release-notes: plugin ref is branch@sha7" "$out" "Klaviyo Expo Plugin 1.0.0 · feat/x@abc1234"
+assert_contains "release-notes: commit line" "$out" "Commit: abc1234 on feat/x (push)"
+assert_contains "release-notes: build date" "$out" "Built: 2026-01-02 03:04 UTC"
+assert_contains "release-notes: CI run" "$out" "CI run: https://github.com/klaviyo/klaviyo-expo-plugin/actions/runs/1"
+if [[ "$out" == "$(cat "$WORK/notes-ios.txt")" ]]; then
+  pass "release-notes: output equals the file"
 else
-  fail "sdk-ref: native versions come from the installed package" "$out"
+  fail "release-notes: output equals the file" "$out"
 fi
 
-# --- sdk-ref.sh: reports unknown when the package is missing -----------------
-out=$(SDK_DIR="$WORK/no-sdk" bash "$CI_DIR/sdk-ref.sh")
-if [[ "$out" == *"| iOS SDK unknown | Android SDK unknown" ]]; then
-  pass "sdk-ref: unknown when the package is not installed"
+# --- release-notes.sh: Android notes list the native Android SDK only --------
+out=$(env "${NOTES_ENV[@]}" bash "$CI_DIR/release-notes.sh" android 500 "$WORK/notes-android.txt" 2>&1)
+assert_contains "release-notes: android lists the Android SDK" "$out" "Klaviyo Android SDK 6.5.4"
+assert_not_contains "release-notes: android omits the iOS SDK" "$out" "Klaviyo iOS SDK"
+
+# --- release-notes.sh: a release uses the bare version as the plugin ref ----
+out=$(env "${NOTES_ENV[@]}" GITHUB_EVENT_NAME=release RELEASE_TAG=v1.0.0 RELEASE_NAME=v1.0.0 \
+  RELEASE_BODY="  First line
+Second line  " bash "$CI_DIR/release-notes.sh" ios 4000 "$WORK/notes-release.txt" 2>&1)
+assert_contains "release-notes: release plugin ref is the bare version" "$out" "Klaviyo Expo Plugin 1.0.0"$'\n'
+assert_contains "release-notes: release body follows the header" "$out" $'\n\nRelease notes (v1.0.0):\nFirst line\nSecond line'
+
+# --- release-notes.sh: the body is cut first, to the cap, with a marker -----
+LONG_BODY=$(printf 'x%.0s' $(seq 1 600))
+out=$(env "${NOTES_ENV[@]}" GITHUB_EVENT_NAME=release RELEASE_BODY="$LONG_BODY" \
+  bash "$CI_DIR/release-notes.sh" android 500 "$WORK/notes-cut.txt" 2>&1)
+if ((${#out} <= 500)) && [[ "$out" == *"…[truncated]" ]] && [[ "$out" == *"Built: 2026-01-02 03:04 UTC"* ]]; then
+  pass "release-notes: the body is cut to the cap and the header survives"
 else
-  fail "sdk-ref: unknown when the package is not installed" "$out"
+  fail "release-notes: the body is cut to the cap and the header survives" "length=${#out}"
+fi
+
+# --- release-notes.sh: missing values render as a dash ----------------------
+out=$(env -i PATH="$PATH" LC_ALL=C.UTF-8 SDK_DIR="$WORK/no-sdk" BUILD_DATE="2026-01-02 03:04 UTC" \
+  GIT_DIR=/nonexistent bash "$CI_DIR/release-notes.sh" ios 4000 "$WORK/notes-missing.txt" 2>&1)
+assert_contains "release-notes: a missing build number is a dash" "$out" "(—)"
+assert_not_contains "release-notes: no unknown placeholder" "$out" "unknown"
+
+# --- release-notes.sh: bad arguments ---------------------------------------
+log=$(bash "$CI_DIR/release-notes.sh" windows 500 "$WORK/x.txt" 2>&1) && rc=0 || rc=$?
+if ((rc != 0)) && [[ "$log" == *"--platform must be ios or android"* ]]; then
+  pass "release-notes: rejects an unknown platform"
+else
+  fail "release-notes: rejects an unknown platform" "rc=$rc"$'\n'"$log"
 fi
 
 # Helper: run eas-deploy.sh <platform> <number> from a scratch copy of the repo
@@ -269,6 +222,21 @@ if ((rc == 0)) && [[ "$(jq -r '.build.production.env.APP_COMMIT_SHA' "$WORK/repo
   pass "eas-deploy: COMMIT_SHA overrides GITHUB_SHA"
 else
   fail "eas-deploy: COMMIT_SHA overrides GITHUB_SHA" "rc=$rc"$'\n'"$log"
+fi
+
+# --- eas-deploy.sh: branch, built-at and release tag reach eas.json -----------
+: > "$WORK/gh-output.txt"
+log=$(run_deploy stamp android 10 BRANCH=feat/x RELEASE_TAG=v1.0.0 2>&1) && rc=0 || rc=$?
+stamp_json="$WORK/repo-stamp/example/eas.json"
+built_at=$(jq -r '.build.production.env.APP_BUILT_AT' "$stamp_json")
+if ((rc == 0)) \
+  && [[ "$(jq -r '.build.production.env.APP_BRANCH' "$stamp_json")" == "feat/x" ]] \
+  && [[ "$(jq -r '.build.production.env.APP_RELEASE_TAG' "$stamp_json")" == "v1.0.0" ]] \
+  && [[ "$built_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}\ UTC$ ]] \
+  && grep -q "^build_date=$built_at$" "$WORK/gh-output.txt"; then
+  pass "eas-deploy: branch, built-at and release tag reach eas.json and match build_date"
+else
+  fail "eas-deploy: branch, built-at and release tag reach eas.json and match build_date" "rc=$rc built_at=$built_at"$'\n'"$log"
 fi
 
 # --- eas-deploy.sh: iOS number goes to IOS_BUILD_NUMBER ----------------------
@@ -401,6 +369,52 @@ if ((rc != 0)) && [[ "$log" == *"Unknown platform"* ]]; then
   pass "set-build-env: rejects an unknown platform"
 else
   fail "set-build-env: rejects an unknown platform" "rc=$rc"$'\n'"$log"
+fi
+
+# --- check-secrets.sh: all names set -> ready ---------------------------------
+: > "$WORK/gh-output.txt"
+log=$(A=1 B=2 GITHUB_OUTPUT="$WORK/gh-output.txt" bash "$CI_DIR/check-secrets.sh" Android push A B 2>&1) && rc=0 || rc=$?
+if ((rc == 0)) && grep -q '^ready=true$' "$WORK/gh-output.txt"; then
+  pass "check-secrets: all set is ready"
+else
+  fail "check-secrets: all set is ready" "rc=$rc"$'\n'"$log"
+fi
+
+# --- check-secrets.sh: missing on push or release skips, green ----------------
+for event in push release; do
+  : > "$WORK/gh-output.txt"
+  log=$(A=1 B='' C='' GITHUB_OUTPUT="$WORK/gh-output.txt" bash "$CI_DIR/check-secrets.sh" Android "$event" A B C 2>&1) && rc=0 || rc=$?
+  if ((rc == 0)) && grep -q '^ready=false$' "$WORK/gh-output.txt" \
+    && [[ "$log" == *"::notice::"*"B, C"* ]]; then
+    pass "check-secrets: $event with missing secrets skips green and names them"
+  else
+    fail "check-secrets: $event with missing secrets skips green and names them" "rc=$rc"$'\n'"$log"
+  fi
+done
+
+# --- check-secrets.sh: missing on dispatch or label fails loudly --------------
+for event in workflow_dispatch pull_request; do
+  : > "$WORK/gh-output.txt"
+  log=$(A=1 B='' GITHUB_OUTPUT="$WORK/gh-output.txt" bash "$CI_DIR/check-secrets.sh" iOS "$event" A B 2>&1) && rc=0 || rc=$?
+  if ((rc != 0)) && grep -q '^ready=false$' "$WORK/gh-output.txt" \
+    && [[ "$log" == *"::error::"*"B"* ]]; then
+    pass "check-secrets: $event with missing secrets fails and names them"
+  else
+    fail "check-secrets: $event with missing secrets fails and names them" "rc=$rc"$'\n'"$log"
+  fi
+done
+
+# --- check-secrets.sh: values never reach the log -----------------------------
+log=$(SECRET_ONE="super-secret-value-123" SECRET_TWO='' bash "$CI_DIR/check-secrets.sh" Android push SECRET_ONE SECRET_TWO 2>&1) && rc=0 || rc=$?
+assert_not_contains "check-secrets: set values are never printed" "$log" "super-secret-value-123"
+assert_contains "check-secrets: missing name is printed" "$log" "SECRET_TWO"
+
+# --- check-secrets.sh: needs at least one name --------------------------------
+log=$(bash "$CI_DIR/check-secrets.sh" Android push 2>&1) && rc=0 || rc=$?
+if ((rc != 0)); then
+  pass "check-secrets: no names is an error"
+else
+  fail "check-secrets: no names is an error" "rc=$rc"
 fi
 
 # --- the tracked eas.json is never modified by the tests ---------------------
