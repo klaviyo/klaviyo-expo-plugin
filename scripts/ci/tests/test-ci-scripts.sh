@@ -114,6 +114,7 @@ export PATH="$FAKES:$PATH"
 # Shared environment for release-notes.sh cases: fixed values so output is
 # predictable, and git is never consulted.
 NOTES_ENV=(
+  "SDK_DIR=$WORK/no-sdk"
   "GITHUB_SHA=abc1234def5678"
   "BUILD_DATE=2026-01-02 03:04 UTC"
   "BUILD_NUMBER=7"
@@ -125,7 +126,7 @@ out=$(env "${NOTES_ENV[@]}" \
   SOURCE_LABEL=main \
   bash "$CI_DIR/release-notes.sh" 4000 "$WORK/notes-push.txt" 2>&1)
 expected="Version 1.0.0 (build 7)
-SDK: klaviyo-expo-plugin 1.0.0 | klaviyo-react-native-sdk 2.5.0
+SDK: klaviyo-expo-plugin 1.0.0 | klaviyo-react-native-sdk 2.5.0 | iOS SDK unknown | Android SDK unknown
 Commit: abc1234 test commit
 Ref: main (push)
 Built: 2026-01-02 03:04 UTC"
@@ -137,7 +138,7 @@ fi
 
 # --- release-notes.sh: release event with body and name --------------------
 base_expected="Version 1.0.0 (build 7)
-SDK: klaviyo-expo-plugin 1.0.0 | klaviyo-react-native-sdk 2.5.0
+SDK: klaviyo-expo-plugin 1.0.0 | klaviyo-react-native-sdk 2.5.0 | iOS SDK unknown | Android SDK unknown
 Commit: abc1234 test commit
 Ref: main (push)
 Built: 2026-01-02 03:04 UTC"
@@ -188,10 +189,31 @@ fi
 
 # --- sdk-ref.sh: output shape ----------------------------------------------
 out=$(bash "$CI_DIR/sdk-ref.sh")
-if [[ "$out" =~ ^klaviyo-expo-plugin\ [0-9.]+\ \|\ klaviyo-react-native-sdk\ [0-9.] ]]; then
+if [[ "$out" =~ ^klaviyo-expo-plugin\ [0-9.]+\ \|\ klaviyo-react-native-sdk\ [0-9.]+\ \|\ iOS\ SDK\ [^\ ]+\ \|\ Android\ SDK\ [^\ ]+$ ]]; then
   pass "sdk-ref: output shape"
 else
   fail "sdk-ref: output shape" "$out"
+fi
+
+# --- sdk-ref.sh: reads the native SDK versions from an installed package -----
+mkdir -p "$WORK/fake-sdk/android"
+cat > "$WORK/fake-sdk/klaviyo-react-native-sdk.podspec" <<'EOF'
+  s.dependency "KlaviyoSwift", "9.8.7"
+EOF
+echo "KlaviyoReactNativeSdk_klaviyoAndroidSdkVersion=6.5.4" > "$WORK/fake-sdk/android/gradle.properties"
+out=$(SDK_DIR="$WORK/fake-sdk" bash "$CI_DIR/sdk-ref.sh")
+if [[ "$out" == *"| iOS SDK 9.8.7 | Android SDK 6.5.4" ]]; then
+  pass "sdk-ref: native versions come from the installed package"
+else
+  fail "sdk-ref: native versions come from the installed package" "$out"
+fi
+
+# --- sdk-ref.sh: reports unknown when the package is missing -----------------
+out=$(SDK_DIR="$WORK/no-sdk" bash "$CI_DIR/sdk-ref.sh")
+if [[ "$out" == *"| iOS SDK unknown | Android SDK unknown" ]]; then
+  pass "sdk-ref: unknown when the package is not installed"
+else
+  fail "sdk-ref: unknown when the package is not installed" "$out"
 fi
 
 # Helper: run eas-deploy.sh <platform> <number> from a scratch copy of the repo
