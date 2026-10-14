@@ -336,5 +336,29 @@ fresh_copy
 edit "$CHECKS" 's = s.replace("        run: python3 -B scripts/ci/tests/test-bash-compat.py\n", "        run: echo skipped\n", 1)'
 expect_fail "a checks job that stops running the bash 3.2 check is caught" "the checks job runs test-bash-compat.py"
 
+fresh_copy
+edit "$CHECKS" 's = s.replace("actionlint .github/workflows/publish-example*.yml", "actionlint .github/workflows/publish-example.yml .github/workflows/publish-example-checks.yml", 1)'
+expect_fail "an actionlint step that names its files is caught" "actionlint globs the publish workflows"
+
+fresh_copy
+edit "$CHECKS" 's = s.replace("shellcheck scripts/ci/*.sh scripts/ci/tests/*.sh", "shellcheck scripts/ci/eas-deploy.sh scripts/ci/release-notes.sh", 1)'
+expect_fail "a shellcheck step that names its files is caught" "shellcheck globs the script directories"
+
+fresh_copy
+edit "$CHECKS" 's = s.replace("shellcheck-py==0.9.0.6", "shellcheck-py", 1)'
+expect_fail "an unpinned shellcheck is caught" "both linters are pinned"
+
+fresh_copy
+edit "$CHECKS" 's = s.replace("actionlint-py==1.7.7.23", "actionlint-py", 1)'
+expect_fail "an unpinned actionlint is caught" "both linters are pinned"
+
+fresh_copy
+edit "$CHECKS" 's = s.replace(" example/lib/*.js", "", 1)'
+expect_fail "a node syntax check that skips the app formatter is caught" "node --check covers the scripts"
+
+fresh_copy
+edit "$CHECKS" 's = s.replace("        run: bash scripts/ci/tests/lint-actions.sh\n", "        run: echo skipped\n", 1)'
+expect_fail "a checks job that stops linting the composite actions is caught" "the checks job runs lint-actions.sh"
+
 echo "SUMMARY: $PASSED passed, $FAILED failed"
 ((FAILED == 0))

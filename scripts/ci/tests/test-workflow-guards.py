@@ -277,9 +277,25 @@ for job in ("deploy-android", "deploy-ios"):
 
 # The checks job runs every test script, so a script that is written but never run cannot pass unnoticed.
 checks_text = read(CHECKS_PATH)
-for script in ("test-ci-scripts.sh", "test-workflow-guards.sh", "test-workflow-guards-selftest.sh", "test-notes-env.py", "test-bash-compat.py"):
+for script in ("test-ci-scripts.sh", "test-workflow-guards.sh", "test-workflow-guards-selftest.sh", "test-notes-env.py", "test-bash-compat.py", "lint-actions.sh"):
     report(script in checks_text, f"the checks job runs {script}")
 report("scripts/ci/tests/*.test.js" in checks_text, "the checks job runs the node tests")
+
+# The lint steps glob their inputs, so a file added later is covered without editing the workflow, and
+# the linters are pinned so the result does not depend on the runner image.
+report(re.search(r"(?m)^\s+run: actionlint \.github/workflows/publish-example\*\.yml$", checks_text) is not None,
+       "actionlint globs the publish workflows, so a new one is linted")
+report(re.search(r"(?m)^\s+run: shellcheck scripts/ci/\*\.sh scripts/ci/tests/\*\.sh$", checks_text) is not None,
+       "shellcheck globs the script directories, so a new script is linted")
+report("shellcheck-py==0.9.0.6" in checks_text and "actionlint-py==" in checks_text,
+       "both linters are pinned")
+report("scripts/ci/*.js scripts/ci/tests/*.js example/lib/*.js" in checks_text,
+       "node --check covers the scripts, the tests and the app's formatter")
+# Every shell script in the directories the glob names must exist where the glob looks, and none may sit outside.
+stray = [path for path in glob.glob(os.path.join(ROOT, "scripts", "ci", "**", "*.sh"), recursive=True)
+         if os.path.dirname(path) not in (os.path.join(ROOT, "scripts", "ci"), os.path.join(ROOT, "scripts", "ci", "tests"))]
+report(not stray, "every shell script under scripts/ci is in a directory the shellcheck glob covers",
+       "\n".join(os.path.relpath(path, ROOT) for path in stray))
 
 # The commit is the pull request head, not the merge commit.
 report("COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}" in deploy,

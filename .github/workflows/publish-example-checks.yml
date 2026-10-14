@@ -49,18 +49,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install actionlint
-        run: python -m pip install --quiet actionlint-py==1.7.7.23
+      - name: Install the linters
+        run: python -m pip install --quiet actionlint-py==1.7.7.23 shellcheck-py==0.9.0.6
 
       - name: Lint workflows
-        run: actionlint .github/workflows/publish-example.yml .github/workflows/publish-example-checks.yml
+        run: actionlint .github/workflows/publish-example*.yml
 
       - name: Lint shell scripts
         run: shellcheck scripts/ci/*.sh scripts/ci/tests/*.sh
 
+      - name: Lint the shell in the composite actions
+        run: bash scripts/ci/tests/lint-actions.sh
+
       - name: Check script syntax
         run: |
-          for f in scripts/ci/*.js; do node --check "$f"; done
+          for f in scripts/ci/*.js scripts/ci/tests/*.js example/lib/*.js; do node --check "$f"; done
 
       - name: Validate eas.json
         run: |
