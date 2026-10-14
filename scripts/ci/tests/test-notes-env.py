@@ -173,6 +173,7 @@ for event, spec in EVENTS.items():
         for index, (what, want) in enumerate(expected_lines):
             got = actual_lines[index] if index < len(actual_lines) else "(missing)"
             report(got == want, f"{label}: {what} is exactly {want!r}", f"got {got!r}")
+        report(len(notes.rstrip("\n")) <= cap, f"{label}: the notes fit the {cap}-character cap", f"{len(notes.rstrip(chr(10)))} characters")
         body_lines = actual_lines[len(expected_lines):]
         if spec["expect_body"]:
             want_tail = ["", "Release notes (Version 1.1.0):", "Adds build info."]
@@ -324,10 +325,62 @@ for event, spec in EVENTS.items():
             "build": "1.0.0 (21)",
             "sdks": f"Expo 1.0.0{plugin_ref} | RN 2.5.0 | {short} —",
             "source": f"{source} ({github['event_name']})",
-            "commit": sha7,
         }
         report(out["slack"] == expected_slack, f"{label}: the Slack fields are exactly the expected fields",
                f"got {json.dumps(out['slack'], ensure_ascii=False)}\nwant {json.dumps(expected_slack, ensure_ascii=False)}")
+
+        # The Slack message is laid out by slack-payload.sh from these fields and the full commit; compare it
+        # line by line, since that script alone decides what the short SHA and the links look like.
+        platform_label = "iOS" if platform == "ios" else "Android"
+        destination = "TestFlight" if platform == "ios" else "Play internal"
+        for result, headline in (
+            ("success", f"→ {destination}"),
+            ("failure", "deploy failed at EAS build or submit"),
+        ):
+            payload_file = os.path.join(context["runner"]["temp"], f"slack-{result}.json")
+            slack_env = {
+                "PATH": os.environ["PATH"], "RESULT": result, "PLATFORM": platform_label, "DESTINATION": destination,
+                "BUILD": out["slack"]["build"], "SDKS": out["slack"]["sdks"], "SOURCE": out["slack"]["source"],
+                "COMMIT_SHA": context["env"]["COMMIT_SHA"], "SERVER_URL": github["server_url"],
+                "REPOSITORY": github["repository"], "RUN_ID": github["run_id"], "FAILED_STEP": "EAS build or submit",
+                "GET_BUILD": "Open the app",
+            }
+            built = subprocess.run(["bash", os.path.join(ROOT, "scripts", "ci", "slack-payload.sh"), payload_file],
+                                   capture_output=True, text=True, env=slack_env)
+            if built.returncode != 0:
+                report(False, f"{label}: slack-payload.sh builds the {result} message", built.stderr)
+                continue
+            message = json.load(open(payload_file))["blocks"][0]["text"]["text"].split("\n")
+            full_sha = context["env"]["COMMIT_SHA"]
+            repo_url = f"{github['server_url']}/{github['repository']}"
+            icon = "✅" if result == "success" else "❌"
+            expected_message = [f"{icon} *Expo Example ({platform_label})* {headline}", f"*Build:* {expected_slack['build']}"]
+            if result == "success":
+                expected_message.append(f"*SDKs:* {expected_slack['sdks']}")
+            expected_message += [
+                f"*Source:* {expected_slack['source']}",
+                f"*Commit:* <{repo_url}/commit/{full_sha}|{full_sha[:7]}> · <{repo_url}/actions/runs/{github['run_id']}|CI run>",
+            ]
+            if result == "success":
+                expected_message.append("*Get the build:* Open the app")
+            for index, want in enumerate(expected_message):
+                got = message[index] if index < len(message) else "(missing)"
+                report(got == want, f"{label}: {result} message line {index + 1} is exactly {want!r}", f"got {got!r}")
+            report(len(message) == len(expected_message), f"{label}: the {result} message has exactly {len(expected_message)} lines", "\n".join(message))
+
+# A release body long enough to hit each platform's cap: the notes must come out at exactly the cap, with
+# the marker last and the header lines untouched, so an off-by-one in the cap is visible.
+long_release = json.loads(json.dumps(EVENTS["release"]))
+long_release["github"]["event"]["release"]["body"] = "Adds build info. " * 400
+for job, platform, cap in (("deploy-android", "android", 500), ("deploy-ios", "ios", 4000)):
+    code, notes, stderr, _ = run_composer("release", long_release, job, platform, cap)
+    text = notes.rstrip("\n")
+    report(code == 0 and len(text) == cap and text.endswith("…[truncated]"),
+           f"a long release body is cut to exactly the {platform} cap of {cap} characters, marker last",
+           f"length {len(text)}, ends {text[-24:]!r} {stderr}")
+    header = text.split("\n\nRelease notes")[0].split("\n")
+    report(len(header) == 7 and header[5].startswith("Built: ") and header[6].startswith("CI run: "),
+           f"{platform}: the seven header lines survive the cut", "\n".join(header))
 
 # The harness must notice when the workflow stops setting a variable the composer reads, so each one
 # that the build info file does not supply is dropped in turn and the output must change.

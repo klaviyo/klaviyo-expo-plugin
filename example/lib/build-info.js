@@ -198,7 +198,7 @@ function notesText(input, maxChars) {
 }
 
 // Field map for Slack messages: version/build, short SDK entries joined
-// with ' | ', build source, and the short commit sha as plain text.
+// with ' | ', and the build source. The commit line is built in slack-payload.sh.
 function slackFields(input, options) {
   const data = input || {};
   const sdks = Array.isArray(data.sdks) ? data.sdks : [];
@@ -206,7 +206,6 @@ function slackFields(input, options) {
     build: `${orMissing(data.appVersion)} (${orMissing(data.buildNumber)})`,
     sdks: sdks.map((sdk) => sdkLine(sdk, { short: true })).join(' | '),
     source: `${orMissing(data.sourceLabel)} (${orMissing(data.event)})`,
-    commit: sha7(data.commitSha),
   };
 }
 

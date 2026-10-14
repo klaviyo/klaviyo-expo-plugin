@@ -315,7 +315,6 @@ test("slackFields renders the Slack field map", () => {
     build: "1.2.0 (1042)",
     sdks: "Expo 0.3.2 | RN 2.5.0 · main@abc1234 | iOS 5.4.0 | Android 4.1.0",
     source: "push (push)",
-    commit: "abc1234",
   });
 });
 
@@ -332,7 +331,6 @@ test("slackFields renders missing values as the missing marker", () => {
   assert.equal(fields.build, "— (—)");
   assert.equal(fields.sdks, "");
   assert.equal(fields.source, "— (—)");
-  assert.equal(fields.commit, "—");
 });
 
 const cutBase = {
