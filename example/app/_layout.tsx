@@ -76,6 +76,8 @@ Notifications.setNotificationHandler({
     if (isSilentPush) {
       return {
         shouldShowAlert: false,
+        shouldShowBanner: false,
+        shouldShowList: false,
         shouldPlaySound: false,
         shouldSetBadge: false,
       };
@@ -84,6 +86,8 @@ Notifications.setNotificationHandler({
     // For regular notifications, show alert and play sound
     return {
       shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
       shouldShowInForeground: true,
