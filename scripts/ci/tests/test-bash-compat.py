@@ -5,7 +5,7 @@ The runner has bash 5, so CI cannot catch these by running the scripts. Prints o
 case and exits 1 if any case fails.
 
   - no mapfile, readarray, associative arrays, case-conversion expansions or |&
-  - no GNU-only or BSD-only flags (mktemp -p, date -d, readlink -f, stat -c, sed -i without a suffix, grep -P),
+  - no GNU-only or BSD-only flags (mktemp -p, date -d, readlink -f, stat -c, sed -i without an attached suffix (including sed -i ''), grep -P),
     in the scripts and in the workflow and action run blocks; each pattern is also checked against a bad sample
   - an array that can be empty is not expanded as "${name[@]}" under set -u, because 3.2 reports an empty
     array as unbound. The safe form is ${name[@]+"${name[@]}"}.
@@ -56,7 +56,8 @@ PORTABILITY = {
     "date -d / --date (GNU only)": (r"\bdate\s+(-d|--date)\b", 'date -d "@123" +%s'),
     "readlink -f (GNU only)": (r"\breadlink\s+-f\b", 'readlink -f "$0"'),
     "stat -c (GNU only)": (r"\bstat\s+-c\b", "stat -c %s file"),
-    "sed -i without a suffix argument": (r"\bsed\s+(-[A-Za-z]*\s+)*-i(?!\.|\s*'')(?:\s|$)", "sed -i s/a/b/ file"),
+    "sed -i without a suffix argument": (r"\bsed\s+(-[A-Za-z]*\s+)*-i(?![.A-Za-z0-9_])", "sed -i s/a/b/ file"),
+    "sed -i '' (BSD only; use -i.bak)": (r"\bsed\s+(-[A-Za-z]*\s+)*-i(?![.A-Za-z0-9_])", "sed -i '' s/a/b/ file"),
     "grep -P (GNU only)": (r"\bgrep\s+(-[A-Za-z]+\s+)*-[A-Za-z]*P", "grep -oP 'a\\K.*' file"),
 }
 PORTABILITY_FILES = FILES + sorted(
