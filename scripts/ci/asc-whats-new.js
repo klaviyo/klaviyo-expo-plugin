@@ -126,9 +126,15 @@ function parseArgs(argv) {
         throw new Error(`Unknown argument: ${flag}`);
     }
   }
-  if (!opts.bundleId || !opts.marketingVersion || !opts.buildNumber || !opts.notesFile) {
+  const missing = [
+    ["--bundle-id", opts.bundleId],
+    ["--marketing-version", opts.marketingVersion],
+    ["--build-number", opts.buildNumber],
+    ["--notes-file", opts.notesFile],
+  ].filter(([, value]) => !value).map(([flag]) => flag);
+  if (missing.length) {
     throw new Error(
-      "Usage: node scripts/ci/asc-whats-new.js --bundle-id X --marketing-version V " +
+      `Missing ${missing.join(", ")}. Usage: node scripts/ci/asc-whats-new.js --bundle-id X --marketing-version V ` +
         "--build-number N --notes-file F [--timeout SECONDS] [--poll-interval SECONDS] [--dry-run]",
     );
   }

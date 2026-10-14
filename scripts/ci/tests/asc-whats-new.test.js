@@ -257,6 +257,13 @@ test("no request body or header leaks the private key", async (t) => {
   }
 });
 
+// A clock that advances on every sleep, so a lookup that never finds its build times out
+// instead of polling forever.
+function steppingClock() {
+  let clock = 0;
+  return { now: () => clock, sleep: async () => { clock += 30_000; } };
+}
+
 // A fake App Store Connect that holds builds from several marketing versions and applies whichever
 // filters the query carries, newest build last, as the real API lists older builds first here.
 function makeVersionedFetch(calls, builds) {
@@ -299,8 +306,8 @@ test("notes go to the build of the right marketing version when two versions sha
   const calls = [];
   const fetchImpl = makeVersionedFetch(calls, SHARED_NUMBER_BUILDS);
   const notes = withNotesFile(t);
-  const argv = ARGV.map((a) => (a === "NOTES" ? notes : a === "1.2.0" ? "0.3.2" : a));
-  await asc.run({ argv, env: ENV, fetchImpl, sleep: async () => {}, now: () => 1_000_000 });
+  const argv = ARGV.map((a) => (a === "NOTES" ? notes : a === "1.2.0" ? "0.3.2" : a)).concat(["--timeout", "60"]);
+  await asc.run({ argv, env: ENV, fetchImpl, ...steppingClock() });
   const writes = calls.filter((c) => c.method === "POST" || c.method === "PATCH");
   assert.equal(writes.length, 1);
   assert.match(writes[0].body, /NEW-0\.3\.2-b7/);
@@ -319,8 +326,8 @@ test("the build lookup sends the app, the marketing version and the build number
   const calls = [];
   const fetchImpl = makeVersionedFetch(calls, SHARED_NUMBER_BUILDS);
   const notes = withNotesFile(t);
-  const argv = ARGV.map((a) => (a === "NOTES" ? notes : a === "1.2.0" ? "0.3.2" : a));
-  await asc.run({ argv, env: ENV, fetchImpl, sleep: async () => {}, now: () => 1_000_000 });
+  const argv = ARGV.map((a) => (a === "NOTES" ? notes : a === "1.2.0" ? "0.3.2" : a)).concat(["--timeout", "60"]);
+  await asc.run({ argv, env: ENV, fetchImpl, ...steppingClock() });
   const lookup = new URL(calls.find((c) => c.url.includes("/v1/builds?")).url).searchParams;
   assert.equal(lookup.get("filter[app]"), "APP1");
   assert.equal(lookup.get("filter[preReleaseVersion.version]"), "0.3.2");
@@ -331,22 +338,70 @@ test("a prerelease marketing version is stripped before the lookup", async (t) =
   const calls = [];
   const fetchImpl = makeVersionedFetch(calls, SHARED_NUMBER_BUILDS);
   const notes = withNotesFile(t);
-  const argv = ARGV.map((a) => (a === "NOTES" ? notes : a === "1.2.0" ? "0.3.2-alpha.1" : a));
-  await asc.run({ argv, env: ENV, fetchImpl, sleep: async () => {}, now: () => 1_000_000 });
+  const argv = ARGV.map((a) => (a === "NOTES" ? notes : a === "1.2.0" ? "0.3.2-alpha.1" : a)).concat(["--timeout", "60"]);
+  await asc.run({ argv, env: ENV, fetchImpl, ...steppingClock() });
   const lookup = new URL(calls.find((c) => c.url.includes("/v1/builds?")).url).searchParams;
   assert.equal(lookup.get("filter[preReleaseVersion.version]"), "0.3.2");
 });
 
-test("a missing or malformed marketing version is an error, never a lookup by build number alone", async (t) => {
+// A fetch that records every call, so a test can assert that nothing was sent.
+function spyFetch() {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(url);
+    return jsonResponse(200, { data: [] });
+  };
+  return { calls, fetchImpl };
+}
+
+const ALL_FLAGS = (notes) => ["--bundle-id", "com.example", "--marketing-version", "0.3.2", "--build-number", "7", "--notes-file", notes];
+const without = (flags, name) => {
+  const out = flags.slice();
+  const i = out.indexOf(name);
+  out.splice(i, 2);
+  return out;
+};
+
+test("a missing --marketing-version is named in the error and nothing is sent", async (t) => {
   const notes = withNotesFile(t);
-  assert.throws(
-    () => asc.parseArgs(["--bundle-id", "com.example", "--build-number", "7", "--notes-file", notes]),
-    /Usage/,
+  const { calls, fetchImpl } = spyFetch();
+  const argv = without(ALL_FLAGS(notes), "--marketing-version");
+  assert.throws(() => asc.parseArgs(argv), /Missing --marketing-version\./);
+  await assert.rejects(
+    () => asc.run({ argv, env: ENV, fetchImpl, ...steppingClock() }),
+    /Missing --marketing-version\./,
   );
-  assert.throws(
-    () => asc.parseArgs(["--bundle-id", "com.example", "--marketing-version", "latest", "--build-number", "7", "--notes-file", notes]),
-    /Cannot derive an iOS marketing version/,
+  assert.equal(calls.length, 0);
+});
+
+test("each other missing flag is named on its own, so the version is not blamed for it", async (t) => {
+  const notes = withNotesFile(t);
+  for (const flag of ["--bundle-id", "--build-number", "--notes-file"]) {
+    const { calls, fetchImpl } = spyFetch();
+    const argv = without(ALL_FLAGS(notes), flag);
+    await assert.rejects(
+      () => asc.run({ argv, env: ENV, fetchImpl, ...steppingClock() }),
+      new RegExp(`Missing ${flag}\\.`),
+    );
+    assert.equal(calls.length, 0, flag);
+  }
+});
+
+test("a malformed marketing version is rejected for that reason before anything is sent", async (t) => {
+  const notes = withNotesFile(t);
+  const { calls, fetchImpl } = spyFetch();
+  const argv = ALL_FLAGS(notes).map((a) => (a === "0.3.2" ? "latest" : a));
+  await assert.rejects(
+    () => asc.run({ argv, env: ENV, fetchImpl, ...steppingClock() }),
+    /Cannot derive an iOS marketing version from 'latest'/,
   );
-  const client = new asc.AscClient("K", "I", "KEY", async () => jsonResponse(200, { data: [] }), () => 0);
-  await assert.rejects(() => client.findBuild("APP1", "", "7"), /needs a marketing version/);
+  assert.equal(calls.length, 0);
+});
+
+test("findBuild refuses a blank marketing version without sending a request", async () => {
+  const { calls, fetchImpl } = spyFetch();
+  const client = new asc.AscClient("K", "I", PEM, fetchImpl, () => 0);
+  await assert.rejects(() => client.findBuild("APP1", "", "7"), /findBuild needs a marketing version/);
+  await assert.rejects(() => client.findBuild("APP1", undefined, "7"), /findBuild needs a marketing version/);
+  assert.equal(calls.length, 0);
 });

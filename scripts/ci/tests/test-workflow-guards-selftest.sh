@@ -304,5 +304,13 @@ s = s[:j] + s[k:]
 '
 expect_fail "a notes step without RUN_URL is caught" "step running release-notes.sh sets"
 
+fresh_copy
+edit "$CHECKS" 's = s.replace("        run: python3 -B scripts/ci/tests/test-notes-env.py\n", "        run: echo skipped\n", 1)'
+expect_fail "a checks job that stops running the notes env test is caught" "the checks job runs test-notes-env.py"
+
+fresh_copy
+edit "$CHECKS" 's = s.replace("        run: node --test scripts/ci/tests/*.test.js\n", "        run: echo skipped\n", 1)'
+expect_fail "a checks job that stops running the node tests is caught" "the checks job runs the node tests"
+
 echo "SUMMARY: $PASSED passed, $FAILED failed"
 ((FAILED == 0))

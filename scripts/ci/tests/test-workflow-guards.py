@@ -255,6 +255,12 @@ for job in ("deploy-android", "deploy-ios"):
                 report(not absent, f"the {job} step running {marker} sets {', '.join(needed)}",
                        "missing: " + ", ".join(absent))
 
+# The checks job runs every test script, so a script that is written but never run cannot pass unnoticed.
+checks_text = read(CHECKS_PATH)
+for script in ("test-ci-scripts.sh", "test-workflow-guards.sh", "test-workflow-guards-selftest.sh", "test-notes-env.py"):
+    report(script in checks_text, f"the checks job runs {script}")
+report("scripts/ci/tests/*.test.js" in checks_text, "the checks job runs the node tests")
+
 # The commit is the pull request head, not the merge commit.
 report("COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}" in deploy,
        "the commit is the pull request head, not the merge commit")

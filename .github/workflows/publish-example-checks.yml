@@ -75,6 +75,9 @@ jobs:
       - name: Check that the workflow checks fail on the mistakes they guard
         run: bash scripts/ci/tests/test-workflow-guards-selftest.sh
 
+      - name: Run the notes and stamping scripts with the env the workflow defines
+        run: python3 -B scripts/ci/tests/test-notes-env.py
+
       - name: Test Node scripts
         run: node --test scripts/ci/tests/*.test.js
 

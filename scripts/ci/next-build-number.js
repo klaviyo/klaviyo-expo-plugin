@@ -84,11 +84,16 @@ function parseArgs(argv) {
     }
   }
   if (platform === "ios") {
-    if (!opts.bundleId || !opts.marketingVersion) {
+    const missing = [
+      ["--bundle-id", opts.bundleId],
+      ["--marketing-version", opts.marketingVersion],
+    ].filter(([, value]) => !value).map(([flag]) => flag);
+    if (missing.length) {
       throw new Error(
-        "Usage: node scripts/ci/next-build-number.js ios --bundle-id ID --marketing-version V [--minimum N]",
+        `Missing ${missing.join(", ")}. Usage: node scripts/ci/next-build-number.js ios --bundle-id ID --marketing-version V [--minimum N]`,
       );
     }
+    opts.marketingVersion = stripToMarketingVersion(opts.marketingVersion);
   } else if (platform === "android") {
     if (!opts.packageName) {
       throw new Error(

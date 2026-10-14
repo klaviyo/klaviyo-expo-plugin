@@ -263,9 +263,11 @@ test("parseArgs rejects a missing platform and an unknown platform", () => {
   assert.throws(() => nbn.parseArgs(["windows"]), /Unknown platform/);
 });
 
-test("parseArgs requires --bundle-id and --marketing-version for ios", () => {
-  assert.throws(() => nbn.parseArgs(["ios"]), /--bundle-id/);
-  assert.throws(() => nbn.parseArgs(["ios", "--bundle-id", "x"]), /--bundle-id/);
+test("parseArgs names each missing ios flag separately", () => {
+  assert.throws(() => nbn.parseArgs(["ios", "--bundle-id", "x"]), /Missing --marketing-version\./);
+  assert.throws(() => nbn.parseArgs(["ios", "--marketing-version", "1.0.0"]), /Missing --bundle-id\./);
+  assert.throws(() => nbn.parseArgs(["ios"]), /Missing --bundle-id, --marketing-version\./);
+  assert.doesNotThrow(() => nbn.parseArgs(["ios", "--bundle-id", "x", "--marketing-version", "1.0.0"]));
 });
 
 test("parseArgs requires --package for android", () => {
@@ -410,4 +412,112 @@ test("ios: a malformed marketing version is an error, not an unfiltered lookup",
     () => nbn.iosPreflight({ client, bundleId: "com.example", marketingVersion: "" }),
     /Cannot derive an iOS marketing version/,
   );
+});
+
+test("a missing --marketing-version stops the preflight before any request, with no fallback to the global max", async () => {
+  const calls = [];
+  const fetchImpl = makeVersionedIosFetch(calls, TWO_VERSION_BUILDS);
+  await assert.rejects(
+    () => nbn.run({ argv: ["ios", "--bundle-id", "com.example"], env: ASC_ENV, fetchImpl, out: () => {} }),
+    /Missing --marketing-version\./,
+  );
+  assert.equal(calls.length, 0);
+});
+
+test("recentBuildVersions refuses a blank marketing version without sending a request", async () => {
+  const calls = [];
+  const client = { request: async (...args) => { calls.push(args); return { data: [] }; } };
+  for (const blank of ["", undefined, null]) {
+    await assert.rejects(() => nbn.recentBuildVersions(client, "APP1", blank), /recentBuildVersions needs a marketing version/);
+  }
+  assert.equal(calls.length, 0);
+});
+
+test("a malformed marketing version is rejected for that reason before the app is looked up", async () => {
+  const calls = [];
+  const fetchImpl = makeVersionedIosFetch(calls, TWO_VERSION_BUILDS);
+  await assert.rejects(
+    () => nbn.run({ argv: iosArgv("latest"), env: ASC_ENV, fetchImpl, out: () => {} }),
+    /Cannot derive an iOS marketing version from 'latest'/,
+  );
+  assert.equal(calls.length, 0);
+});
+
+test("parseArgs strips a prerelease marketing version and rejects a malformed one for that reason", () => {
+  const stripped = nbn.parseArgs(["ios", "--bundle-id", "x", "--marketing-version", "2.1.0-rc.1+meta"]);
+  assert.equal(stripped.marketingVersion, "2.1.0");
+  assert.throws(
+    () => nbn.parseArgs(["ios", "--bundle-id", "x", "--marketing-version", "latest"]),
+    /Cannot derive an iOS marketing version from 'latest'/,
+  );
+});
+
+// A fake Play Developer API that keeps bundles and tracks per package and answers only for the package in
+// the URL, so a lookup that asks about the wrong package gets the wrong (or no) data.
+function makeStatefulPlayFetch(calls, apps) {
+  const edits = new Map();
+  return async (url, options = {}) => {
+    const method = options.method || "GET";
+    calls.push({ method, url });
+    if (url === "https://oauth2.googleapis.com/token") {
+      return jsonResponse(200, { access_token: "TOKEN" });
+    }
+    const match = url.match(/\/applications\/([^/]+)\/edits(?:\/([^/]+?))?(?:\/(bundles|tracks))?$/);
+    if (!match) throw new Error(`unexpected fetch: ${method} ${url}`);
+    const [, pkg, editId, resource] = match;
+    if (!apps[pkg]) return jsonResponse(404, { error: { message: `no such package ${pkg}` } });
+    if (!editId && method === "POST") {
+      const id = `EDIT-${pkg}`;
+      edits.set(id, pkg);
+      return jsonResponse(200, { id });
+    }
+    if (edits.get(editId) !== pkg) return jsonResponse(404, { error: { message: "edit not found for this package" } });
+    if (resource === "bundles") return jsonResponse(200, { bundles: apps[pkg].bundles });
+    if (resource === "tracks") return jsonResponse(200, { tracks: apps[pkg].tracks });
+    if (method === "DELETE") {
+      edits.delete(editId);
+      return jsonResponse(200, {});
+    }
+    throw new Error(`unexpected fetch: ${method} ${url}`);
+  };
+}
+
+const PLAY_APPS = {
+  "com.klaviyo.expoexample": {
+    bundles: [{ versionCode: 41 }, { versionCode: 12 }],
+    tracks: [{ track: "internal", releases: [{ versionCodes: ["40", "58"] }] }],
+  },
+  "com.example.decoy": {
+    bundles: [{ versionCode: 900 }],
+    tracks: [{ track: "internal", releases: [{ versionCodes: ["901"] }] }],
+  },
+};
+
+async function androidNext(pkg, apps = PLAY_APPS) {
+  const calls = [];
+  const lines = [];
+  await nbn.run({
+    argv: ["android", "--package", pkg],
+    env: PLAY_ENV,
+    fetchImpl: makeStatefulPlayFetch(calls, apps),
+    out: (line) => lines.push(line),
+  });
+  return { result: JSON.parse(lines[0]), calls };
+}
+
+test("android: the versionCode comes from the requested package, not another app's", async () => {
+  const { result, calls } = await androidNext("com.klaviyo.expoexample");
+  assert.equal(result.highest_version_code, 58);
+  assert.equal(result.build_number, 59);
+  assert.ok(calls.filter((c) => c.url.includes("/applications/")).every((c) => c.url.includes("/applications/com.klaviyo.expoexample/")));
+  assert.ok(!calls.some((c) => c.url.includes("com.example.decoy")));
+});
+
+test("android: the highest versionCode is global across bundles and every track", async () => {
+  const apps = { p: { bundles: [{ versionCode: 5 }], tracks: [{ track: "production", releases: [{ versionCodes: ["9"] }] }, { track: "beta", releases: [{ versionCodes: ["7"] }] }] } };
+  assert.equal((await androidNext("p", apps)).result.build_number, 10);
+});
+
+test("android: an unknown package fails for that reason and the edit is not left open", async () => {
+  await assert.rejects(() => androidNext("com.not.there"), /no such package com\.not\.there/);
 });
