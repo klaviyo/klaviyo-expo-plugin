@@ -41,6 +41,13 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Shorten the commit
+      id: short
+      shell: bash
+      env:
+        SHA: ${{ inputs.commit_sha }}
+      run: echo "sha=${SHA:0:7}" >> "$GITHUB_OUTPUT"
+
     - name: Check for a webhook
       id: webhook
       shell: bash
@@ -65,4 +72,4 @@ runs:
             - type: "section"
               text:
                 type: "mrkdwn"
-                text: "${{ inputs.result == 'success' && '✅' || inputs.result == 'failure' && '❌' || '⚠️' }} *Expo Example (${{ inputs.platform }})* ${{ inputs.result == 'success' && format('→ {0}', inputs.destination) || inputs.result == 'failure' && format('deploy failed at {0}', inputs.failed_step || 'an unknown step') || format('build uploaded to {0}, but its release notes were not set. Re-run the failed job or set them by hand in the store console.', inputs.destination) }}\n*Build:* ${{ inputs.build }}${{ inputs.result != 'failure' && format('\n*SDKs:* {0}', inputs.sdks) || '' }}\n*Source:* ${{ inputs.source }}\n*Commit:* <${{ github.server_url }}/${{ github.repository }}/commit/${{ inputs.commit_sha }}|${{ substr(inputs.commit_sha, 0, 7) }}> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|CI run>${{ inputs.result == 'success' && inputs.get_build != '' && format('\n*Get the build:* {0}', inputs.get_build) || '' }}"
+                text: "${{ inputs.result == 'success' && '✅' || inputs.result == 'failure' && '❌' || '⚠️' }} *Expo Example (${{ inputs.platform }})* ${{ inputs.result == 'success' && format('→ {0}', inputs.destination) || inputs.result == 'failure' && format('deploy failed at {0}', inputs.failed_step || 'an unknown step') || format('build uploaded to {0}, but its release notes were not set. Re-run the failed job or set them by hand in the store console.', inputs.destination) }}\n*Build:* ${{ inputs.build }}${{ inputs.result != 'failure' && format('\n*SDKs:* {0}', inputs.sdks) || '' }}\n*Source:* ${{ inputs.source }}\n*Commit:* <${{ github.server_url }}/${{ github.repository }}/commit/${{ inputs.commit_sha }}|${{ steps.short.outputs.sha }}> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|CI run>${{ inputs.result == 'success' && inputs.get_build != '' && format('\n*Get the build:* {0}', inputs.get_build) || '' }}"

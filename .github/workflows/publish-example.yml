@@ -198,6 +198,7 @@ jobs:
         working-directory: example
         env:
           BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           RECHECK_CMD: node ../scripts/ci/next-build-number.js android --package "$ANDROID_PACKAGE"
         run: ../scripts/ci/eas-deploy.sh android "${{ steps.number.outputs.build_number }}"
@@ -267,6 +268,7 @@ jobs:
 
       - name: Notify Slack on success
         if: success()
+        continue-on-error: true
         uses: ./.github/actions/notify-slack-example-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -281,6 +283,7 @@ jobs:
 
       - name: Notify Slack on failure
         if: failure()
+        continue-on-error: true
         uses: ./.github/actions/notify-slack-example-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -331,6 +334,7 @@ jobs:
 
       - name: Warn on Slack that the notes were not set
         if: steps.notes.outcome == 'failure'
+        continue-on-error: true
         uses: ./.github/actions/notify-slack-example-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -408,6 +412,7 @@ jobs:
         working-directory: example
         env:
           BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
@@ -479,6 +484,7 @@ jobs:
 
       - name: Notify Slack on success
         if: success()
+        continue-on-error: true
         uses: ./.github/actions/notify-slack-example-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -493,6 +499,7 @@ jobs:
 
       - name: Notify Slack on failure
         if: failure()
+        continue-on-error: true
         uses: ./.github/actions/notify-slack-example-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -548,6 +555,7 @@ jobs:
 
       - name: Warn on Slack that What to Test was not set
         if: steps.notes.outcome == 'failure'
+        continue-on-error: true
         uses: ./.github/actions/notify-slack-example-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}

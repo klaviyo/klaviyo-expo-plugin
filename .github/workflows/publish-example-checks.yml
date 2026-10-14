@@ -69,6 +69,9 @@ jobs:
       - name: Test shell scripts
         run: bash scripts/ci/tests/test-ci-scripts.sh
 
+      - name: Check the publish workflow for mistakes actionlint misses
+        run: bash scripts/ci/tests/test-workflow-guards.sh
+
       - name: Test Node scripts
         run: node --test scripts/ci/tests/*.test.js
 
