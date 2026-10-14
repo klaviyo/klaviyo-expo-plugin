@@ -18,6 +18,12 @@ const {
 
 const len = (text) => Array.from(text).length;
 
+// Asserts that `text` has `line` as one whole line. A substring check passes when the line is longer than
+// expected, for example a source label that is really "<branch>@<sha7>".
+function assertHasLine(text, line, message) {
+  assert.ok(text.split("\n").includes(line), message || `no whole line equals ${JSON.stringify(line)} in:\n${text}`);
+}
+
 test("MISSING is the em dash", () => {
   assert.equal(MISSING, "—");
 });
@@ -233,20 +239,30 @@ test("notesText drops the CI run line before any other header line", () => {
   const header = notesHeader(input);
   const cap = len(header) - 1;
   const text = notesText(input, cap);
-  assert.ok(!text.includes("CI run:"));
-  assert.ok(text.endsWith("…[truncated]"));
-  assert.ok(text.includes("Commit: abc1234 on push (push)"));
-  assert.ok(text.includes("Built: 2026-10-13 14:05 UTC"));
+  assert.deepEqual(text.split("\n"), [
+    "KlaviyoExample 1.2.0 (1042)",
+    "Klaviyo Expo Plugin 0.3.2",
+    "Klaviyo RN SDK 2.5.0 · main@abc1234",
+    "Klaviyo iOS SDK 5.4.0",
+    "Klaviyo Android SDK 4.1.0",
+    "Commit: abc1234 on push (push)",
+    "Built: 2026-10-13 14:05 UTC…[truncated]",
+  ]);
   assert.ok(len(text) <= cap);
 });
 
 test("notesText never cuts the app, sdk, Commit or Built lines", () => {
   const input = { ...FULL_INPUT, releaseBody: undefined };
   const text = notesText(input, 10);
-  assert.ok(text.includes("KlaviyoExample 1.2.0 (1042)"));
-  assert.ok(text.includes("Klaviyo iOS SDK 5.4.0"));
-  assert.ok(text.includes("Commit: abc1234 on push (push)"));
-  assert.ok(text.includes("Built: 2026-10-13 14:05 UTC"));
+  assert.deepEqual(text.split("\n"), [
+    "KlaviyoExample 1.2.0 (1042)",
+    "Klaviyo Expo Plugin 0.3.2",
+    "Klaviyo RN SDK 2.5.0 · main@abc1234",
+    "Klaviyo iOS SDK 5.4.0",
+    "Klaviyo Android SDK 4.1.0",
+    "Commit: abc1234 on push (push)",
+    "Built: 2026-10-13 14:05 UTC…[truncated]",
+  ]);
 });
 
 test("notesText fits a long release body under a 4000-char cap", () => {
@@ -367,9 +383,10 @@ test("notesText drops the CI run line before any other header line", () => {
   const noBody = { ...cutBase, releaseBody: undefined };
   const header = lib.notesHeader(noBody);
   const text = lib.notesText(noBody, Array.from(header).length - 3);
-  assert.ok(!text.includes("CI run:"));
-  assert.ok(text.includes("Built:"));
-  assert.ok(text.includes("…[truncated]"));
+  const lines = text.split("\n");
+  assert.deepEqual(lines.slice(0, -1), header.split("\n").slice(0, -2));
+  assert.equal(lines[lines.length - 1], "Built: 2026-01-02 03:04 UTC…[truncated]");
+  assert.ok(!lines.some((line) => line.startsWith("CI run:")));
 });
 
 const fs = require("node:fs");
@@ -409,9 +426,9 @@ test("notes read the stamped values from the build info file, not the environmen
     BUILD_INFO_FILE: file,
   });
   assert.match(text, /^Expo Example 1\.0\.0 \(21\)\n/);
-  assert.ok(text.includes("Commit: abc1234 on feat/x (push)"));
-  assert.ok(text.includes("Built: 2026-01-02 03:04 UTC"));
-  assert.ok(text.includes("Klaviyo Expo Plugin 1.0.0 · feat/x@abc1234"));
+  assertHasLine(text, "Commit: abc1234 on feat/x (push)");
+  assertHasLine(text, "Built: 2026-01-02 03:04 UTC");
+  assertHasLine(text, "Klaviyo Expo Plugin 1.0.0 · feat/x@abc1234");
   assert.ok(!text.includes("9.9.9") && !text.includes("1999") && !text.includes("wrong-branch"));
 });
 

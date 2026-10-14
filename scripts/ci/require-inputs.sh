@@ -20,3 +20,23 @@ require_ci_inputs() {
     return 1
   fi
 }
+
+# Fails with the names of any listed tools that are not on PATH. Called before an expensive step, so a
+# tool missing from the runner image fails in seconds and not after the build.
+#
+# Usage: require_tools <script name> <tool>...
+require_tools() {
+  local script="$1"
+  shift
+  local missing=()
+  local tool
+  for tool in "$@"; do
+    command -v "$tool" > /dev/null 2>&1 || missing+=("$tool")
+  done
+  if ((${#missing[@]} > 0)); then
+    local list
+    list=$(IFS=,; echo "${missing[*]}")
+    echo "::error::$script needs ${list//,/, } on PATH and could not find ${#missing[@]} of them. Checked before the build starts, so no EAS build was used."
+    return 1
+  fi
+}

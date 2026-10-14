@@ -155,16 +155,30 @@ for event, spec in EVENTS.items():
             report(False, f"{label}: release-notes.sh runs with the workflow's env", stderr)
             continue
         expected_commit = context["env"]["COMMIT_SHA"][:7]
-        checks = [
-            ("the commit is the one the workflow builds", f"Commit: {expected_commit} on " in notes),
-            ("the source label and event come through", f"({github['event_name']})" in notes),
-            ("the CI run link points at this run", f"{github['server_url']}/{github['repository']}/actions/runs/{github['run_id']}" in notes),
-            ("the plugin ref follows the event", ("Klaviyo Expo Plugin 1.0.0\n" in notes) == (event == "release")),
-            ("the release body is present only for a release", ("Adds build info." in notes) == spec["expect_body"]),
-            ("no missing value renders as a dash", "(—)" not in notes and "on — (" not in notes),
+        source_label = context["env"]["SOURCE_LABEL"]
+        branch = github["head_ref"] or github["ref_name"]
+        run_url = f"{github['server_url']}/{github['repository']}/actions/runs/{github['run_id']}"
+        plugin_ref = "" if event == "release" else f" · {branch}@{expected_commit}"
+        native = "Klaviyo iOS SDK —" if platform == "ios" else "Klaviyo Android SDK —"
+        expected_lines = [
+            ("the app line", "Expo Example 1.0.0 (21)"),
+            ("the plugin line", f"Klaviyo Expo Plugin 1.0.0{plugin_ref}"),
+            ("the React Native SDK line", "Klaviyo RN SDK 2.5.0"),
+            ("the native SDK line", native),
+            ("the commit line", f"Commit: {expected_commit} on {source_label} ({github['event_name']})"),
+            ("the build date line", "Built: 2026-01-02 03:04 UTC"),
+            ("the CI run line", f"CI run: {run_url}"),
         ]
-        for what, ok in checks:
-            report(ok, f"{label}: {what}", notes)
+        actual_lines = notes.rstrip("\n").split("\n")
+        for index, (what, want) in enumerate(expected_lines):
+            got = actual_lines[index] if index < len(actual_lines) else "(missing)"
+            report(got == want, f"{label}: {what} is exactly {want!r}", f"got {got!r}")
+        body_lines = actual_lines[len(expected_lines):]
+        if spec["expect_body"]:
+            want_tail = ["", "Release notes (Version 1.1.0):", "Adds build info."]
+            report(body_lines == want_tail, f"{label}: the release block is exactly the name and body", f"got {body_lines!r}")
+        else:
+            report(body_lines == [], f"{label}: nothing follows the header", f"got {body_lines!r}")
 
 def run_deploy(event, spec, job, platform, drop=None):
     """Runs the real eas-deploy.sh with the env the workflow defines for the deploy step, against a fake
@@ -216,6 +230,7 @@ fi
                             capture_output=True, text=True, env=process_env, cwd=project)
     if result.returncode != 0 or not os.path.exists(info):
         return None, result.stdout + result.stderr, context
+    context["project"] = project
     return json.load(open(info)), "", context
 
 
@@ -238,6 +253,81 @@ for event, spec in EVENTS.items():
             ("stamps the release tag only for a release", stamped["releaseTag"], github["event"].get("release", {}).get("tag_name", "")),
         ):
             report(got == want, f"{label}: {what}", f"got {got!r}, want {want!r}")
+
+def in_app_and_slack(project, platform):
+    """The in-app values reach the app through eas.json env and app.config.js, a different path from the
+    notes. Evaluates the real config the way the EAS server does and renders it through the real formatter."""
+    env_block = json.load(open(os.path.join(project, "eas.json")))["build"]["production"]["env"]
+    node_env = {"PATH": os.environ["PATH"], "EAS_BUILD": "true", "SDK_DIR": "/nonexistent",
+                **{k: v for k, v in env_block.items() if k.startswith("APP_")},
+                "IOS_BUILD_NUMBER": env_block.get("IOS_BUILD_NUMBER", ""), "ANDROID_VERSION_CODE": env_block.get("ANDROID_VERSION_CODE", "")}
+    script = """
+      const lib = require(process.argv[1]);
+      const info = require("./app.config.js")().extra.buildInfo;
+      const keys = ["expo-plugin", "rn", process.argv[2]];
+      const sdks = info.sdks.filter((s) => keys.includes(s.key));
+      const input = { ...info, appName: "Expo Example", buildNumber: process.argv[3], sdks };
+      console.log(JSON.stringify({
+        rows: lib.buildInfoRows(input),
+        copy: lib.copyText(input),
+        slack: lib.slackFields(input),
+      }));
+    """
+    number = env_block.get("IOS_BUILD_NUMBER") or env_block.get("ANDROID_VERSION_CODE")
+    result = subprocess.run(["node", "-e", script, os.path.join(ROOT, "example", "lib", "build-info.js"), platform, number],
+                            capture_output=True, text=True, env=node_env, cwd=project)
+    return json.loads(result.stdout) if result.returncode == 0 else None, result.stderr
+
+
+for event, spec in EVENTS.items():
+    github = spec["github"]
+    for job, platform in (("deploy-android", "android"), ("deploy-ios", "ios")):
+        label = f"{event}, {platform}, in-app and Slack"
+        stamped, error, context = run_deploy(event, spec, job, platform)
+        if stamped is None:
+            report(False, f"{label}: eas-deploy.sh runs with the workflow's env", error)
+            continue
+        out, error = in_app_and_slack(context["project"], platform)
+        if out is None:
+            report(False, f"{label}: app.config.js and the formatter run on the stamped env", error)
+            continue
+        sha7 = (PR_SHA if event == "pull_request label" else SHA)[:7]
+        branch = github["head_ref"] or github["ref_name"]
+        source = context["env"]["SOURCE_LABEL"]
+        plugin_ref = "" if event == "release" else f" · {branch}@{sha7}"
+        native = f"Klaviyo {'iOS' if platform == 'ios' else 'Android'} SDK —"
+        expected_rows = [
+            {"label": "App", "value": "1.0.0 (21)"},
+            {"label": "Klaviyo Expo Plugin", "value": "1.0.0" + plugin_ref},
+            {"label": "Klaviyo RN SDK", "value": "2.5.0"},
+            {"label": native.rsplit(" ", 1)[0], "value": "—"},
+            {"label": "App commit", "value": f"{sha7} on {branch}"},
+            {"label": "Built", "value": stamped["builtAt"]},
+        ]
+        report(out["rows"] == expected_rows, f"{label}: the in-app rows are exactly the expected rows",
+               f"got {json.dumps(out['rows'], ensure_ascii=False)}\nwant {json.dumps(expected_rows, ensure_ascii=False)}")
+        expected_copy = "\n".join([
+            "Expo Example 1.0.0 (21)",
+            f"Klaviyo Expo Plugin 1.0.0{plugin_ref}",
+            "Klaviyo RN SDK 2.5.0",
+            native,
+            f"Commit: {sha7} on {source} ({github['event_name']})",
+            f"Built: {stamped['builtAt']}",
+        ])
+        copy_lines = out["copy"].split("\n")
+        for index, want in enumerate(expected_copy.split("\n")):
+            got = copy_lines[index] if index < len(copy_lines) else "(missing)"
+            report(got == want, f"{label}: copy line {index + 1} is exactly {want!r}", f"got {got!r}")
+        report(len(copy_lines) == 6, f"{label}: the copy block has exactly six lines", out["copy"])
+        short = "iOS" if platform == "ios" else "Android"
+        expected_slack = {
+            "build": "1.0.0 (21)",
+            "sdks": f"Expo 1.0.0{plugin_ref} | RN 2.5.0 | {short} —",
+            "source": f"{source} ({github['event_name']})",
+            "commit": sha7,
+        }
+        report(out["slack"] == expected_slack, f"{label}: the Slack fields are exactly the expected fields",
+               f"got {json.dumps(out['slack'], ensure_ascii=False)}\nwant {json.dumps(expected_slack, ensure_ascii=False)}")
 
 # The harness must notice when the workflow stops setting a variable the composer reads, so each one
 # that the build info file does not supply is dropped in turn and the output must change.

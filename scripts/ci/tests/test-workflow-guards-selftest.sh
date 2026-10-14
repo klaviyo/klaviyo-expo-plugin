@@ -321,8 +321,16 @@ j = s.index('          $var:', i)
 k = s.index(chr(10), j) + 1
 s = s[:j] + s[k:]
 "
-  expect_fail "an iOS deploy step without $var is caught" "the deploy-ios step sets COMMIT_SHA, BRANCH and SOURCE_LABEL"
+  expect_fail "an iOS deploy step without $var is caught" "the deploy-ios step running eas-deploy.sh sets COMMIT_SHA, BRANCH, SOURCE_LABEL"
 done
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("      - name: Render Slack fields\n", "      - name: Seed the build info\n        run: ./scripts/ci/release-notes.sh android 500 \"${RUNNER_TEMP}/seed.txt\"\n\n      - name: Render Slack fields\n", 1)'
+expect_fail "a new step that runs a stamper without the required inputs is caught, whatever it is called" "step running release-notes.sh sets COMMIT_SHA, BRANCH, SOURCE_LABEL"
+
+fresh_copy
+edit "$DEPLOY" 's = s.replace("      - name: Render Slack fields\n", "      - name: Record versions\n        run: ../scripts/ci/eas-deploy.sh android 1\n\n      - name: Render Slack fields\n", 1)'
+expect_fail "a pre-build eas-deploy.sh call with no flags is caught" "step running eas-deploy.sh sets COMMIT_SHA, BRANCH, SOURCE_LABEL"
 
 echo "SUMMARY: $PASSED passed, $FAILED failed"
 ((FAILED == 0))

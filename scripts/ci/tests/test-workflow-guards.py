@@ -151,12 +151,25 @@ for job in ("deploy-android", "deploy-ios"):
     else:
         report(RELEASE_TAG_LINE in step, f"the {job} step sets RELEASE_TAG", step)
 
-# In CI the stamper refuses a missing commit, branch or source label, so each deploy step must set all three.
-for job in ("deploy-android", "deploy-ios"):
-    step = find_step(jobs.get(job, ""), "EAS build and submit")
-    absent = [name for name in ("COMMIT_SHA", "BRANCH", "SOURCE_LABEL") if f"{name}:" not in step]
-    report(bool(step) and not absent, f"the {job} step sets COMMIT_SHA, BRANCH and SOURCE_LABEL for the stamper",
-           "missing: " + ", ".join(absent))
+# GitHub sets CI=true on every step, and the stampers refuse a missing commit, branch or source label in
+# CI. So every step in every job that runs a stamper, found by what it runs and not by its name, must pass
+# all three. release-notes.sh only needs them when it has no build info file to read.
+STAMPERS = ("eas-deploy.sh", "release-notes.sh")
+REQUIRED = ("COMMIT_SHA", "BRANCH", "SOURCE_LABEL")
+stamper_steps = [
+    (job, tool, block)
+    for job, body in jobs.items()
+    for block in split_steps(body)
+    for tool in STAMPERS
+    if re.search(rf"(?m)^        run: .*{re.escape(tool)}", block)
+]
+report(len(stamper_steps) >= 4, f"the workflow runs the stampers where expected ({len(stamper_steps)} calls found)",
+       "\n".join(f"{job}: {tool}" for job, tool, _ in stamper_steps) or "none found")
+for job, tool, block in stamper_steps:
+    if tool == "release-notes.sh" and "BUILD_INFO_FILE:" in block:
+        continue
+    absent = [name for name in REQUIRED if not re.search(rf"(?m)^          {name}: ", block)]
+    report(not absent, f"the {job} step running {tool} sets {', '.join(REQUIRED)}", "missing: " + ", ".join(absent))
 
 # The notes and the app are stamped from the same event fields.
 for job in ("deploy-android", "deploy-ios"):

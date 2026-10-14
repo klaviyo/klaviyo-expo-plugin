@@ -63,11 +63,12 @@ set_output() {
   fi
 }
 
-DASHBOARD_URL=$(node -p "const c = require('./app.config.js')(); 'https://expo.dev/accounts/' + c.owner + '/projects/' + c.slug + '/builds/'")
-
 # shellcheck source=scripts/ci/require-inputs.sh
 source "$(dirname "$0")/require-inputs.sh"
 require_ci_inputs eas-deploy.sh COMMIT_SHA BRANCH SOURCE_LABEL || exit 1
+require_tools eas-deploy.sh eas jq node sed tee mv || exit 1
+
+DASHBOARD_URL=$(node -p "const c = require('./app.config.js')(); 'https://expo.dev/accounts/' + c.owner + '/projects/' + c.slug + '/builds/'")
 
 SHA="${COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
 export APP_COMMIT_SHA="${SHA:0:7}"

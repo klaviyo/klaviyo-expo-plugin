@@ -49,6 +49,26 @@ assert_not_contains() {
   fi
 }
 
+# Hashes of the files the CI scripts could touch if one wrote into the real tree. Only hashes are kept.
+if command -v sha256sum > /dev/null 2>&1; then
+  hash_file() { sha256sum "$1"; }
+elif command -v shasum > /dev/null 2>&1; then
+  hash_file() { shasum -a 256 "$1"; }
+else
+  echo "FAIL: neither sha256sum nor shasum is available, so the real tree cannot be checked"
+  exit 1
+fi
+real_tree_hash() {
+  (cd "$ROOT" && for f in example/eas.json example/app.config.js example/package.json package.json \
+    scripts/ci/*.sh scripts/ci/*.js example/lib/build-info.js; do
+    [[ -e "$f" ]] && hash_file "$f"
+  done
+  for f in example/.env .env; do
+    [[ -e "$f" ]] && echo "present: $f"
+  done) | sort
+}
+REAL_TREE_BEFORE=$(real_tree_hash)
+
 FAKES=$(mktemp -d)
 WORK=$(mktemp -d)
 trap 'rm -rf "$FAKES" "$WORK"' EXIT
@@ -361,6 +381,49 @@ else
   fail "app copy text equals the notes header without the CI run line" "rc=$rc"$'\n'"--- app:"$'\n'"$app_copy"$'\n'"--- notes:"$'\n'"$notes_header"
 fi
 
+# --- eas-deploy.sh checks its tools before the build, with the real PATH lookup ----------------------
+# A scratch bin directory holds links to the tools the script needs and the fake eas. Removing one link
+# makes that tool genuinely absent from PATH, so this exercises the real `command -v` lookup, not a stub.
+tool_bin="$WORK/tool-bin"
+mkdir -p "$tool_bin"
+for tool in bash env jq node sed tee mv cat date mkdir mktemp rm dirname basename grep head cp git; do
+  src=$(command -v "$tool") && ln -sf "$src" "$tool_bin/$tool"
+done
+ln -sf "$FAKES/eas" "$tool_bin/eas"
+for missing_tool in eas jq node sed tee mv; do
+  rm -f "$WORK/tool-bin-$missing_tool"; cp -R "$tool_bin" "$WORK/tool-bin-$missing_tool"
+  rm -f "$WORK/tool-bin-$missing_tool/$missing_tool"
+  state="tool-$missing_tool"
+  mkdir -p "$WORK/state-$state" "$WORK/repo-$state/example"
+  cp "$ROOT/package.json" "$WORK/repo-$state/"
+  cp "$ROOT/example/app.config.js" "$ROOT/example/eas.json" "$ROOT/example/package.json" "$WORK/repo-$state/example/"
+  log=$(cd "$WORK/repo-$state/example" && env -i PATH="$WORK/tool-bin-$missing_tool" FAKE_EAS_STATE="$WORK/state-$state" \
+    GITHUB_OUTPUT="$WORK/gh-output.txt" COMMIT_SHA=abc1234def5678 BRANCH=main SOURCE_LABEL=main \
+    "$tool_bin/bash" "$CI_DIR/eas-deploy.sh" android 10 2>&1) && rc=0 || rc=$?
+  builds="0"
+  [[ -f "$WORK/state-$state/count" ]] && builds=$(cat "$WORK/state-$state/count")
+  if ((rc != 0)) && ((builds == 0)) && [[ "$log" == *"needs "*"$missing_tool"*"on PATH"* ]] \
+    && [[ "$log" == *"Checked before the build starts"* ]]; then
+    pass "eas-deploy: a missing $missing_tool fails before the build and names it"
+  else
+    fail "eas-deploy: a missing $missing_tool fails before the build and names it" "rc=$rc builds=$builds"$'\n'"$log"
+  fi
+done
+
+# With every tool present the same scratch PATH runs the deploy, so the failures above are the lookup's.
+state="tool-all"
+mkdir -p "$WORK/state-$state" "$WORK/repo-$state/example"
+cp "$ROOT/package.json" "$WORK/repo-$state/"
+cp "$ROOT/example/app.config.js" "$ROOT/example/eas.json" "$ROOT/example/package.json" "$WORK/repo-$state/example/"
+log=$(cd "$WORK/repo-$state/example" && env -i PATH="$tool_bin" FAKE_EAS_STATE="$WORK/state-$state" \
+  GITHUB_OUTPUT="$WORK/gh-output.txt" COMMIT_SHA=abc1234def5678 BRANCH=main SOURCE_LABEL=main \
+  "$tool_bin/bash" "$CI_DIR/eas-deploy.sh" android 10 2>&1) && rc=0 || rc=$?
+if ((rc == 0)); then
+  pass "eas-deploy: with every tool on the scratch PATH the deploy runs"
+else
+  fail "eas-deploy: with every tool on the scratch PATH the deploy runs" "rc=$rc"$'\n'"$log"
+fi
+
 # --- eas-deploy.sh in CI: an empty or missing commit, branch or source label fails and names the field ---
 for field in COMMIT_SHA BRANCH SOURCE_LABEL; do
   for how in empty unset; do
@@ -662,6 +725,13 @@ if [[ "$(cksum < "$ROOT/example/eas.json")" == "$REAL_EAS_JSON_SUM" ]]; then
   pass "example/eas.json untouched"
 else
   fail "example/eas.json untouched"
+fi
+
+# --- the suite wrote nothing into the real tree -----------------------------------------------------
+if [[ "$(real_tree_hash)" == "$REAL_TREE_BEFORE" ]]; then
+  pass "the suite left the real tree byte-identical (hashes compared, no contents read)"
+else
+  fail "the suite left the real tree byte-identical" "$(diff <(echo "$REAL_TREE_BEFORE") <(real_tree_hash))"
 fi
 
 echo
