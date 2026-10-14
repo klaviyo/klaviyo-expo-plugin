@@ -5,6 +5,8 @@ The runner has bash 5, so CI cannot catch these by running the scripts. Prints o
 case and exits 1 if any case fails.
 
   - no mapfile, readarray, associative arrays, case-conversion expansions or |&
+  - no GNU-only or BSD-only flags (mktemp -p, date -d, readlink -f, stat -c, sed -i without a suffix, grep -P),
+    in the scripts and in the workflow and action run blocks; each pattern is also checked against a bad sample
   - an array that can be empty is not expanded as "${name[@]}" under set -u, because 3.2 reports an empty
     array as unbound. The safe form is ${name[@]+"${name[@]}"}.
 """
@@ -48,6 +50,28 @@ def code_lines(path):
 for label, pattern in FORBIDDEN.items():
     hits = [f"{os.path.relpath(p, ROOT)}:{n}: {text.strip()}" for p in FILES for n, text in code_lines(p) if re.search(pattern, text)]
     report(not hits, f"no {label} in the shell scripts (bash 3.2 does not have it)", "\n".join(hits))
+
+PORTABILITY = {
+    "mktemp -p (use the template form)": (r"\bmktemp\b[^|;&]*\s-p\b", 'mktemp -d -p "$TMPDIR"'),
+    "date -d / --date (GNU only)": (r"\bdate\s+(-d|--date)\b", 'date -d "@123" +%s'),
+    "readlink -f (GNU only)": (r"\breadlink\s+-f\b", 'readlink -f "$0"'),
+    "stat -c (GNU only)": (r"\bstat\s+-c\b", "stat -c %s file"),
+    "sed -i without a suffix argument": (r"\bsed\s+(-[A-Za-z]*\s+)*-i(?!\.|\s*'')(?:\s|$)", "sed -i s/a/b/ file"),
+    "grep -P (GNU only)": (r"\bgrep\s+(-[A-Za-z]+\s+)*-[A-Za-z]*P", "grep -oP 'a\\K.*' file"),
+}
+PORTABILITY_FILES = FILES + sorted(
+    glob.glob(os.path.join(ROOT, ".github", "workflows", "publish-example*.yml")) + glob.glob(os.path.join(ROOT, ".github", "actions", "*", "action.yml"))
+)
+for label, (pattern, sample) in PORTABILITY.items():
+    report(re.search(pattern, sample) is not None, f"the {label} rule matches a known-bad sample")
+    hits = [
+        f"{os.path.relpath(p, ROOT)}:{n}: {text.strip()}"
+        for p in PORTABILITY_FILES
+        if os.path.abspath(p) != os.path.abspath(__file__)
+        for n, text in code_lines(p)
+        if re.search(pattern, text)
+    ]
+    report(not hits, f"no {label} in scripts, workflows or actions", "\n".join(hits))
 
 # An array that is initialised empty can still be empty when it is expanded. Flag each unguarded expansion
 # of such an array, unless a length check on the same array precedes it in the file.
