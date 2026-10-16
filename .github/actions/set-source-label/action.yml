@@ -1,0 +1,20 @@
+name: Set source label
+description: Exports SOURCE_LABEL (the release tag or branch name, reduced to characters that are safe inside a Slack payload) to the job environment.
+
+runs:
+  using: composite
+  steps:
+    - name: Set source label
+      shell: bash
+      env:
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
+        PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      run: |
+        if [ -n "$RELEASE_TAG" ]; then
+          source_label="release $RELEASE_TAG"
+        elif [ -n "$PR_HEAD_REF" ]; then
+          source_label="$PR_HEAD_REF"
+        else
+          source_label="$GITHUB_REF_NAME"
+        fi
+        echo "SOURCE_LABEL=$(printf '%s' "$source_label" | tr -cd 'A-Za-z0-9._/ +-')" >> "$GITHUB_ENV"

@@ -7,8 +7,8 @@
         "./*"
       ]
     },
-    "module": "Node16",
-    "moduleResolution": "node16"
+    "module": "preserve",
+    "moduleResolution": "bundler"
   },
   "include": [
     "**/*.ts",
