@@ -195,6 +195,17 @@ jobs:
         id: setup
         uses: ./.github/actions/setup-eas
 
+      - name: Resolve app version base
+        id: marketing
+        run: |
+          base=$(node -p "require('./package.json').version")
+          base="${base%%[-+]*}"
+          if [[ ! "$base" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Plugin version '$base' is not X.Y.Z, so the app version cannot be derived."
+            exit 1
+          fi
+          echo "version=${base}" >> "$GITHUB_OUTPUT"
+
       - name: Resolve next versionCode from Play
         id: number
         env:
@@ -210,6 +221,7 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          BASE_VERSION: ${{ steps.marketing.outputs.version }}
           BUILD_NUMBER: ${{ steps.number.outputs.build_number }}
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           RECHECK_CMD: node ../scripts/ci/next-build-number.js android --package "$ANDROID_PACKAGE"
@@ -266,12 +278,14 @@ jobs:
         if: failure()
         env:
           SETUP: ${{ steps.setup.outcome }}
+          MARKETING: ${{ steps.marketing.outcome }}
           NUMBER: ${{ steps.number.outcome }}
           DEPLOY: ${{ steps.deploy.outcome }}
           RENDER: ${{ steps.slack.outcome }}
         run: |
           step="an earlier step"
           if [ "$SETUP" = failure ]; then step="setup"
+          elif [ "$MARKETING" = failure ]; then step="resolving the app version"
           elif [ "$NUMBER" = failure ]; then step="the Play versionCode lookup"
           elif [ "$DEPLOY" = failure ]; then step="EAS build or submit"
           elif [ "$RENDER" = failure ]; then step="rendering the release notes"
@@ -405,13 +419,16 @@ jobs:
           jq --arg id "${ASC_APP_ID}" '.submit.production.ios.ascAppId = $id' eas.json > eas.json.tmp
           mv eas.json.tmp eas.json
 
-      - name: Read marketing version
+      - name: Resolve app version base
         id: marketing
-        working-directory: example
         run: |
-          full=$(node -p "require('./app.config.js')().version")
-          echo "full=${full}" >> "$GITHUB_OUTPUT"
-          echo "version=${full%%[-+]*}" >> "$GITHUB_OUTPUT"
+          base=$(node -p "require('./package.json').version")
+          base="${base%%[-+]*}"
+          if [[ ! "$base" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Plugin version '$base' is not X.Y.Z, so the app version cannot be derived."
+            exit 1
+          fi
+          echo "version=${base}" >> "$GITHUB_OUTPUT"
 
       - name: Resolve next build number from App Store Connect
         id: number
@@ -431,7 +448,7 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-          EXPECTED_VERSION: ${{ steps.marketing.outputs.version }}
+          BASE_VERSION: ${{ steps.marketing.outputs.version }}
           MARKETING_VERSION: ${{ steps.marketing.outputs.version }}
           BUILD_NUMBER: ${{ steps.number.outputs.build_number }}
           APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
@@ -496,7 +513,7 @@ jobs:
         run: |
           step="an earlier step"
           if [ "$SETUP" = failure ]; then step="setup"
-          elif [ "$MARKETING" = failure ]; then step="reading the marketing version"
+          elif [ "$MARKETING" = failure ]; then step="resolving the app version"
           elif [ "$NUMBER" = failure ]; then step="the App Store Connect build number lookup"
           elif [ "$DEPLOY" = failure ]; then step="EAS build or submit"
           elif [ "$RENDER" = failure ]; then step="rendering the release notes"

@@ -50,10 +50,12 @@ const pluginRef = (version) => {
 };
 
 module.exports = () => {
+  // CI sets APP_VERSION (scripts/ci/eas-deploy.sh), e.g. 1.2.0-rc.7. iOS gets only the numeric X.Y.Z.
+  const appVersion = process.env.APP_VERSION || '1.0.0';
   const config = {
     name: 'klaviyo plugin example',
     slug: 'klaviyo-plugin-example',
-    version: '1.0.0',
+    version: appVersion,
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'expoexample',
@@ -63,7 +65,9 @@ module.exports = () => {
       // CI sets IOS_BUILD_NUMBER (scripts/ci/next-build-number.js); local builds use 1.
       buildNumber: process.env.IOS_BUILD_NUMBER || '1',
       bundleIdentifier: 'com.klaviyo.expoexample',
+      version: appVersion.split(/[-+]/)[0],
       infoPlist: {
+        KlaviyoAppVersion: appVersion,
         UIBackgroundModes: ['remote-notification'],
       },
     },

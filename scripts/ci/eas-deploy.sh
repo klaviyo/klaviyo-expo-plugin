@@ -20,16 +20,24 @@
 # All EAS output is filtered through `redact`, which masks signed artifact
 # download URLs.
 #
+# When BASE_VERSION (X.Y.Z) is set, the app version is derived from it and the
+# build number, and written to the build profile env as APP_VERSION:
+#   RELEASE_TAG set        X.Y.Z
+#   BRANCH matches rel/*   X.Y.Z-rc.<build number>
+#   anything else          X.Y.Z-alpha.<build number>
+# The version is derived again whenever the build number changes. Android gets
+# the full string; iOS gets plain X.Y.Z (app.config.js drops the suffix). CI
+# requires BASE_VERSION.
+#
 # After every build the version the build reports (appBuildVersion, appVersion)
 # is checked against what was asked for. A mismatch fails the deploy before the
-# submit, since the binary does not carry the number the store would see. When
-# EXPECTED_VERSION is set, the reported appVersion must match it after any
-# -prerelease or +metadata suffix is dropped.
+# submit, since the binary does not carry the number the store would see.
 #
 # Writes build_id, app_version, build_number, build_url and build_date to
-# $GITHUB_OUTPUT (and echoes them) after every successful build. build_number
-# is the number the build reports, and BUILD_INFO_FILE (when set) receives the
-# build info the app was stamped with, for the notes to read.
+# $GITHUB_OUTPUT (and echoes them) after every successful build. app_version is
+# the full derived string. build_number is the number the build reports, and
+# BUILD_INFO_FILE (when set) receives the build info the app was stamped with,
+# for the notes to read.
 set -euo pipefail
 
 PLATFORM="${1:?usage: eas-deploy.sh <android|ios> <build-number>}"
@@ -66,6 +74,7 @@ if [[ -n "${CI:-}" ]]; then
   : "${COMMIT_SHA:?COMMIT_SHA must come from the workflow; GITHUB_SHA is the merge commit on a pull request}"
   : "${BRANCH:?BRANCH must come from the workflow}"
   : "${SOURCE_LABEL:?SOURCE_LABEL must come from the workflow}"
+  : "${BASE_VERSION:?BASE_VERSION must come from the workflow}"
 fi
 
 DASHBOARD_URL=$(node -p "const c = require('./app.config.js')(); 'https://expo.dev/accounts/' + c.owner + '/projects/' + c.slug + '/builds/'")
@@ -78,6 +87,22 @@ SOURCE_LABEL="${SOURCE_LABEL:-local}"
 export APP_SOURCE_LABEL="$SOURCE_LABEL"
 export APP_EVENT="${GITHUB_EVENT_NAME:-manual}"
 
+derive_app_version() {
+  [[ -n "${BASE_VERSION:-}" ]] || return 0
+  if [[ ! "$BASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "::error::BASE_VERSION '$BASE_VERSION' is not X.Y.Z"
+    exit 1
+  fi
+  if [[ -n "$APP_RELEASE_TAG" ]]; then
+    APP_VERSION="$BASE_VERSION"
+  elif [[ "$APP_BRANCH" == rel/* ]]; then
+    APP_VERSION="${BASE_VERSION}-rc.${BUILD_NUMBER}"
+  else
+    APP_VERSION="${BASE_VERSION}-alpha.${BUILD_NUMBER}"
+  fi
+  export APP_VERSION
+}
+
 # Writes the build number and build info into the profile's env in eas.json, so the
 # EAS build server's app.config.js sees them.
 set_build_env() {
@@ -85,7 +110,7 @@ set_build_env() {
   [[ "$PLATFORM" == ios ]] && var=IOS_BUILD_NUMBER
   local pair
   for pair in "$var:$BUILD_NUMBER" "APP_COMMIT_SHA:$APP_COMMIT_SHA" "APP_BRANCH:$APP_BRANCH" "APP_BUILT_AT:$APP_BUILT_AT" \
-    "APP_RELEASE_TAG:$APP_RELEASE_TAG" "APP_SOURCE_LABEL:$APP_SOURCE_LABEL" "APP_EVENT:$APP_EVENT"; do
+    "APP_VERSION:${APP_VERSION:-}" "APP_RELEASE_TAG:$APP_RELEASE_TAG" "APP_SOURCE_LABEL:$APP_SOURCE_LABEL" "APP_EVENT:$APP_EVENT"; do
     [[ -n "${pair#*:}" ]] || continue
     jq --arg profile "$PROFILE" --arg name "${pair%%:*}" --arg value "${pair#*:}" \
       '.build[$profile].env[$name] = $value' eas.json > eas.json.tmp
@@ -97,6 +122,7 @@ attempt=1
 while true; do
   export APP_BUILT_AT
   APP_BUILT_AT="$(date -u '+%Y-%m-%d %H:%M UTC')"
+  derive_app_version
   set_build_env
   set_output build_number "$BUILD_NUMBER"
 
@@ -119,21 +145,22 @@ while true; do
     echo "::error::EAS build $build_id reports build number '${reported_number:-none}', expected $BUILD_NUMBER. The number did not reach the build; not submitting."
     exit 1
   fi
-  if [[ -n "${EXPECTED_VERSION:-}" ]]; then
-    reported_numeric="${reported_version%%[-+]*}"
-    if [[ "$reported_numeric" != "$EXPECTED_VERSION" ]]; then
-      echo "::error::EAS build $build_id reports version '${reported_version:-none}', expected $EXPECTED_VERSION. The build number came from another version's sequence; not submitting."
+  if [[ -n "${BASE_VERSION:-}" ]]; then
+    expected="$APP_VERSION"
+    [[ "$PLATFORM" == ios ]] && expected="$BASE_VERSION"
+    if [[ "$reported_version" != "$expected" ]]; then
+      echo "::error::EAS build $build_id reports version '${reported_version:-none}', expected $expected. The version did not reach the build; not submitting."
       exit 1
     fi
   fi
   set_output build_id "$build_id"
-  set_output app_version "${reported_version:-?}"
+  set_output app_version "${APP_VERSION:-${reported_version:-?}}"
   set_output build_number "$reported_number"
   set_output build_url "${DASHBOARD_URL}${build_id}"
   set_output build_date "$APP_BUILT_AT"
   if [[ -n "${BUILD_INFO_FILE:-}" ]]; then
     jq -n --arg sha "$APP_COMMIT_SHA" --arg branch "$APP_BRANCH" --arg builtAt "$APP_BUILT_AT" \
-      --arg tag "$APP_RELEASE_TAG" --arg number "$reported_number" --arg version "$reported_version" \
+      --arg tag "$APP_RELEASE_TAG" --arg number "$reported_number" --arg version "${APP_VERSION:-$reported_version}" \
       --arg source "$APP_SOURCE_LABEL" --arg event "$APP_EVENT" \
       '{commitSha: $sha, branch: $branch, builtAt: $builtAt, releaseTag: $tag, buildNumber: $number, appVersion: $version, sourceLabel: $source, event: $event}' \
       > "$BUILD_INFO_FILE"

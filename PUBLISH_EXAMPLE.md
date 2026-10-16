@@ -74,7 +74,7 @@ Credentials are EAS-hosted. Signing keys, provisioning profiles and the store su
 
 `example/eas.json` sets `cli.appVersionSource` to `local` and turns `autoIncrement` off. CI picks the numbers from the stores and passes them to the build, because EAS's remote counter is keyed by app and bundle ID only and cannot restart per marketing version.
 
-- iOS: `scripts/ci/next-build-number.js ios` asks App Store Connect for the highest build number uploaded for the current marketing version and uses one above it, or 1 if that version has no builds. Numbering restarts at 1 for each new marketing version and increases within it. The marketing version is the numeric `X.Y.Z` of `version` in `example/app.config.js`: the deploy drops any `-prerelease` or `+metadata` suffix, so `0.3.2-alpha.1` and `0.3.2` share one build number sequence.
+- iOS: `scripts/ci/next-build-number.js ios` asks App Store Connect for the highest build number uploaded for the current marketing version and uses one above it, or 1 if that version has no builds. Numbering restarts at 1 for each new marketing version and increases within it. The marketing version is the plugin's `X.Y.Z` from the root `package.json`, so every prerelease of one version shares one build number sequence.
 - Android: `scripts/ci/next-build-number.js android` asks the Play Developer API for the highest versionCode across all bundles and tracks and uses one above it. The versionCode is global and never restarts.
 
 `scripts/ci/eas-deploy.sh` writes the number into the `production` profile's `env` in `example/eas.json` as `IOS_BUILD_NUMBER` or `ANDROID_VERSION_CODE`, and `app.config.js` reads it. EAS build servers cannot see GitHub environment variables, but they do build the checked-out working tree, so the edit reaches them. The edit exists only on the runner and is never committed. For local builds both numbers default to 1.
@@ -197,3 +197,17 @@ EAS builds and signs on Expo's servers, so some pieces of the native workflows d
 - Concurrency never cancels a started run. See [Overview](#overview).
 - Android release notes are set after the submit through the Play Developer API, since `eas submit` has no notes option. iOS notes go through the App Store Connect API in their own job, as in the iOS test app.
 - The Slack message has no EAS build page link. The layout is shared across the example apps and has no slot for it, so the build page URL stays in the job log, where only the job output reaches it.
+
+## App version
+
+CI derives the app version from the plugin version in the root `package.json` (`X.Y.Z`) and the build number:
+
+| Trigger | App version |
+| --- | --- |
+| `release: published` | `X.Y.Z` |
+| Push to `rel/**` | `X.Y.Z-rc.<build number>` |
+| Anything else | `X.Y.Z-alpha.<build number>` |
+
+Android uses the full string as `versionName`. iOS `CFBundleShortVersionString` is plain `X.Y.Z` because Apple allows only integers there, and the full string goes in the `KlaviyoAppVersion` Info.plist key. The in-app build info, the release notes and the Slack message show the full string. The run fails if the plugin version is not `X.Y.Z`. Local builds use `1.0.0`.
+
+`scripts/ci/eas-deploy.sh` derives the version after the build number is known and again whenever a duplicate-number or re-check retry changes the number, then writes it to the `production` profile `env` as `APP_VERSION`.
