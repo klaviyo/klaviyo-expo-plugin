@@ -86,8 +86,6 @@ Credentials are EAS-hosted. Signing keys, provisioning profiles and the store su
 
 If the first store query fails, the deploy stops before building, so a guessed number cannot burn several EAS builds on conflicts.
 
-The version is bumped by `scripts/bump-version.js`, which also updates `example/app.config.js`. That script accepts only `X.Y.Z`, so a prerelease version has to be set by hand. Android keeps the full version string, and everything a person reads (release notes, What to Test, Slack, the in-app info) shows it in full.
-
 ---
 
 ## Release notes
@@ -211,3 +209,5 @@ CI derives the app version from the plugin version in the root `package.json` (`
 Android uses the full string as `versionName`. iOS `CFBundleShortVersionString` is plain `X.Y.Z` because Apple allows only integers there, and the full string goes in the `KlaviyoAppVersion` Info.plist key. The in-app build info, the release notes and the Slack message show the full string. The run fails if the plugin version is not `X.Y.Z`. Local builds use `1.0.0`.
 
 `scripts/ci/eas-deploy.sh` derives the version after the build number is known and again whenever a duplicate-number or re-check retry changes the number, then writes it to the `production` profile `env` as `APP_VERSION`.
+
+`scripts/bump-version.js` bumps the plugin version, which is the base of the app version. It accepts only `X.Y.Z`.
