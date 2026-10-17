@@ -3,6 +3,21 @@ name: Publish SDK to NPM
 on:
   release:
     types: [published]
+  workflow_call:
+    inputs:
+      version:
+        description: Version to publish (X.Y.Z)
+        required: true
+        type: string
+      ref:
+        description: Commit SHA to build and publish
+        required: true
+        type: string
+      release_url:
+        description: URL of the draft release this publish belongs to
+        required: false
+        type: string
+        default: ''
 
 env:
   PACKAGE_NAME: klaviyo-expo-plugin
@@ -17,11 +32,13 @@ jobs:
       dist_tag: ${{ steps.version.outputs.dist_tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Resolve release version
         id: version
         env:
-          TAG_NAME: ${{ github.event.release.tag_name }}
+          TAG_NAME: ${{ inputs.version || github.event.release.tag_name }}
         run: |
           version="${TAG_NAME#v}"
           package_version="$(node -p "require('./package.json').version")"
@@ -59,6 +76,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -115,5 +134,5 @@ jobs:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           result: ${{ needs.publish-sdk.result == 'success' && 'success' || 'failure' }}
           package: ${{ env.PACKAGE_NAME }}
-          version: ${{ needs.test.outputs.version || github.event.release.tag_name }}
-          release_url: ${{ github.event.release.html_url }}
+          version: ${{ needs.test.outputs.version || inputs.version || github.event.release.tag_name }}
+          release_url: ${{ inputs.release_url || github.event.release.html_url }}

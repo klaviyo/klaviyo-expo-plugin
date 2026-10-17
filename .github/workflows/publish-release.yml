@@ -1,0 +1,180 @@
+name: Publish release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (X.Y.Z)
+        required: true
+        type: string
+      ref:
+        description: Branch or commit to release (defaults to the default branch)
+        required: false
+        type: string
+        default: ''
+
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      checks: read
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+      release_url: ${{ steps.draft.outputs.url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.event.repository.default_branch }}
+
+      - name: Resolve commit
+        id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Validate version input
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version must be X.Y.Z, got '$VERSION'."
+            exit 1
+          fi
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" >/dev/null 2>&1; then
+            echo "::error::Tag $VERSION already exists."
+            exit 1
+          fi
+
+      - name: Check version stamps match
+        run: |
+          fail=0
+          check() {
+            if [ "$2" != "$VERSION" ]; then
+              echo "::error file=$1::$1 has version '$2', expected '$VERSION'. Run: node scripts/bump-version.js $VERSION"
+              fail=1
+            fi
+          }
+          check package.json "$(node -p "require('./package.json').version")"
+          check example/package.json "$(node -p "require('./example/package.json').version")"
+          check ios/klaviyo-plugin-configuration.plist "$(grep -A1 'klaviyo_sdk_plugin_version_override' ios/klaviyo-plugin-configuration.plist | sed -n 's:.*<string>\(.*\)</string>.*:\1:p')"
+          check plugin/withKlaviyoAndroid.ts "$(sed -n "s/.*setStringResource('klaviyo_sdk_plugin_version_override', '\([^']*\)').*/\1/p" plugin/withKlaviyoAndroid.ts)"
+          exit "$fail"
+
+      - name: Check CI is green on the commit
+        env:
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          shas="$SHA"
+          pr_head="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/pulls" --jq '[.[] | select(.merged_at != null)][0].head.sha // empty')"
+          if [ -n "$pr_head" ]; then
+            echo "Commit came from a PR; also checking its head commit $pr_head."
+            shas="$shas $pr_head"
+          fi
+          runs=""
+          for s in $shas; do
+            runs+="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${s}/check-runs" \
+              --jq '.check_runs[] | select(.name | IN("prepare", "stale") or startswith("publish-npm") or startswith("publish-release") | not) | "\(.name)\t\(.status)\t\(.conclusion)"')"$'\n'
+          done
+          runs="$(sed '/^$/d' <<<"$runs")"
+          if [ -z "$runs" ]; then
+            echo "::error::No CI check runs found on $SHA or its PR."
+            exit 1
+          fi
+          bad="$(awk -F'\t' '$2 != "completed" || ($3 != "success" && $3 != "skipped" && $3 != "neutral")' <<<"$runs")"
+          if [ -n "$bad" ]; then
+            echo "::error::CI is not green:"
+            printf '%s\n' "$bad"
+            exit 1
+          fi
+
+      - name: Find or create the draft release
+        id: draft
+        env:
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          existing="$(gh release view "$VERSION" --json isDraft,url --jq '"\(.isDraft)\t\(.url)"' 2>/dev/null || true)"
+          if [ -n "$existing" ]; then
+            if [ "$(cut -f1 <<<"$existing")" != "true" ]; then
+              echo "::error::Release $VERSION exists and is already published."
+              exit 1
+            fi
+            url="$(cut -f2 <<<"$existing")"
+            echo "Reusing existing draft release; notes left as written."
+          else
+            url="$(gh release create "$VERSION" --draft --target "$SHA" --title "$VERSION" --generate-notes)"
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "### Release $VERSION awaiting approval" >> "$GITHUB_STEP_SUMMARY"
+          echo "Review and edit the draft notes, then approve the \`npm\` deployment in this run: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify Slack (awaiting approval)
+        if: env.SLACK_WEBHOOK_URL != ''
+        continue-on-error: true
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "⏳ Expo plugin release ${{ inputs.version }} awaiting approval"
+            blocks:
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "⏳ *Expo plugin release `${{ inputs.version }}` awaiting approval*\n*Draft release:* <${{ steps.draft.outputs.url }}|Review notes>\n*Started by:* ${{ github.actor }}\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Approve here>"
+
+  publish-npm:
+    needs: prepare
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publish-sdk.yml
+    with:
+      version: ${{ inputs.version }}
+      ref: ${{ needs.prepare.outputs.sha }}
+      release_url: ${{ needs.prepare.outputs.release_url }}
+    secrets: inherit
+
+  publish-release:
+    needs: [prepare, publish-npm]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish the draft release
+        id: release
+        env:
+          SHA: ${{ needs.prepare.outputs.sha }}
+        run: |
+          gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --target "$SHA"
+          {
+            echo "### Release $VERSION published"
+            echo "- npm: https://www.npmjs.com/package/klaviyo-expo-plugin/v/$VERSION"
+            echo "- Release: ${{ needs.prepare.outputs.release_url }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify Slack (release step failed)
+        if: failure()
+        continue-on-error: true
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "🚨 Expo plugin ${{ inputs.version }} is on npm but the GitHub release could not be published"
+            blocks:
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "🚨 *Expo plugin `${{ inputs.version }}` is on npm but the GitHub release could not be published.* Publish the draft by hand.\n*Draft release:* <${{ needs.prepare.outputs.release_url }}|Open draft>\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
