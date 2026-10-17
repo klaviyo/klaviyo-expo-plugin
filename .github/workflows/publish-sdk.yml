@@ -47,6 +47,7 @@ jobs:
           token: ${{ secrets.NPM_TOKEN }}
 
       - name: Verify the version is on npm
+        timeout-minutes: 6
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
