@@ -4,14 +4,31 @@ on:
   release:
     types: [published]
 
+env:
+  PACKAGE_NAME: klaviyo-expo-plugin
+
 jobs:
   publish-sdk:
     runs-on: ubuntu-22.04
+    environment: npm
     permissions:
       contents: read
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve release version
+        id: version
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          version="${TAG_NAME#v}"
+          package_version="$(node -p "require('./package.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$version" != "$package_version" ]; then
+            echo "::error::Release tag $TAG_NAME does not match package.json version $package_version."
+            exit 1
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -28,3 +45,30 @@ jobs:
       - uses: JS-DevTools/npm-publish@v3
         with:
           token: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify the version is on npm
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          for attempt in $(seq 1 20); do
+            published="$(npm view "${PACKAGE_NAME}@${VERSION}" version 2>/dev/null || true)"
+            if [ "$published" = "$VERSION" ]; then
+              echo "${PACKAGE_NAME}@${VERSION} is live on npm."
+              exit 0
+            fi
+            echo "Attempt $attempt/20: ${PACKAGE_NAME}@${VERSION} not visible yet; retrying in 15s."
+            sleep 15
+          done
+          echo "::error::${PACKAGE_NAME}@${VERSION} did not appear on npm within 5 minutes."
+          exit 1
+
+      - name: Notify Slack
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: ${{ job.status == 'success' && 'success' || 'failure' }}
+          package: ${{ env.PACKAGE_NAME }}
+          version: ${{ steps.version.outputs.version || github.event.release.tag_name }}
+          release_url: ${{ github.event.release.html_url }}
