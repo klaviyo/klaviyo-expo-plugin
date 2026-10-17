@@ -50,12 +50,17 @@ const pluginRef = (version) => {
 };
 
 module.exports = () => {
-  // CI sets APP_VERSION (scripts/ci/eas-deploy.sh), e.g. 1.2.0-rc.7. iOS gets only the numeric X.Y.Z.
+  // CI sets APP_VERSION (scripts/ci/eas-deploy.sh), e.g. 1.2.0-rc.7.
   const appVersion = process.env.APP_VERSION || '1.0.0';
+  // EAS reads the top-level version for iOS and ignores ios.version; the App
+  // Store requires numeric X.Y.Z. eas-deploy.sh exports EAS_BUILD_PLATFORM so
+  // the local eas CLI resolves the same value as the build server.
+  const version =
+    process.env.EAS_BUILD_PLATFORM === 'ios' ? appVersion.split(/[-+]/)[0] : appVersion;
   const config = {
     name: 'klaviyo plugin example',
     slug: 'klaviyo-plugin-example',
-    version: appVersion,
+    version,
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'expoexample',
@@ -69,6 +74,7 @@ module.exports = () => {
       infoPlist: {
         KlaviyoAppVersion: appVersion,
         UIBackgroundModes: ['remote-notification'],
+        ITSAppUsesNonExemptEncryption: false,
       },
     },
     android: {
@@ -164,6 +170,6 @@ module.exports = () => {
     },
     owner: 'klaviyo',
   };
-  config.extra.buildInfo.appVersion = config.version;
+  config.extra.buildInfo.appVersion = appVersion;
   return config;
 };

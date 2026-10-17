@@ -127,6 +127,9 @@ while true; do
   set_output build_number "$BUILD_NUMBER"
 
   echo "::group::EAS build ($PLATFORM, number $BUILD_NUMBER, attempt $attempt of $MAX_ATTEMPTS)"
+  # The CLI evaluates app.config.js locally to resolve the build's appVersion;
+  # EAS_BUILD_PLATFORM lets it pick the per-platform version the server will see.
+  export EAS_BUILD_PLATFORM="$PLATFORM"
   # --json prints the build list on stdout; progress logs go to stderr.
   build_json=$(eas build \
     --platform "$PLATFORM" \
