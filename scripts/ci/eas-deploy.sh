@@ -22,7 +22,7 @@
 #
 # When BASE_VERSION (X.Y.Z) is set, the app version is derived from it and the
 # build number, and written to the build profile env as APP_VERSION:
-#   RELEASE_TAG set        X.Y.Z
+#   RELEASE_TAG set        X.Y.Z (or the full X.Y.Z-suffix for a prerelease tag)
 #   BRANCH matches rel/*   X.Y.Z-rc.<build number>
 #   anything else          X.Y.Z-alpha.<build number>
 # The version is derived again whenever the build number changes. Android gets
@@ -94,7 +94,19 @@ derive_app_version() {
     exit 1
   fi
   if [[ -n "$APP_RELEASE_TAG" ]]; then
-    APP_VERSION="$BASE_VERSION"
+    # Strip an optional v prefix, then split the tag into its X.Y.Z base and
+    # any -prerelease suffix. The base must match the plugin version; a
+    # matching prerelease tag carries its suffix into the app version.
+    tag="${APP_RELEASE_TAG#v}"
+    suffix=""
+    case "$tag" in
+      *-*) suffix="-${tag#*-}"; tag="${tag%%-*}" ;;
+    esac
+    if [[ "$tag" != "$BASE_VERSION" ]]; then
+      echo "::error::release tag '$APP_RELEASE_TAG' does not match plugin version $BASE_VERSION"
+      exit 1
+    fi
+    APP_VERSION="${BASE_VERSION}${suffix}"
   elif [[ "$APP_BRANCH" == rel/* ]]; then
     APP_VERSION="${BASE_VERSION}-rc.${BUILD_NUMBER}"
   else
