@@ -1,6 +1,6 @@
-import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { Klaviyo } from 'klaviyo-react-native-sdk';
+import React from "react";
+import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
+import { Klaviyo } from "klaviyo-react-native-sdk";
 
 export default function FormsScreen() {
   const handleRegisterForInAppForms = () => {
@@ -11,8 +11,18 @@ export default function FormsScreen() {
     <View style={styles.container}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>In-App Forms</Text>
-        <TouchableOpacity style={[styles.button, styles.fullWidthButton]} onPress={handleRegisterForInAppForms}>
+        <TouchableOpacity
+          style={[styles.button, styles.fullWidthButton]}
+          onPress={handleRegisterForInAppForms}
+        >
           <Text style={styles.buttonText}>Register for In-App Forms</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.fullWidthButton]}
+          accessibilityRole="button"
+          onPress={() => Klaviyo.createEvent({ name: "Added to Cart" })}
+        >
+          <Text style={styles.buttonText}>Track Added to Cart</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -22,7 +32,7 @@ export default function FormsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   section: {
     padding: 20,
@@ -30,22 +40,22 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 10,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   fullWidthButton: {
-    width: '100%',
+    width: "100%",
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
-}); 
+});
