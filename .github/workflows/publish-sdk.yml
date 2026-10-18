@@ -8,12 +8,12 @@ env:
   PACKAGE_NAME: klaviyo-expo-plugin
 
 jobs:
-  publish-sdk:
+  test:
     runs-on: ubuntu-22.04
-    environment: npm
     permissions:
       contents: read
-
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,6 +39,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        run: npm test
+
+  publish-sdk:
+    needs: test
+    runs-on: ubuntu-22.04
+    environment: npm
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Prepare
         run: npm run prepare
 
@@ -49,7 +74,7 @@ jobs:
       - name: Verify the version is on npm
         timeout-minutes: 6
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.test.outputs.version }}
         run: |
           for attempt in $(seq 1 20); do
             published="$(npm view "${PACKAGE_NAME}@${VERSION}" version 2>/dev/null || true)"
@@ -63,13 +88,21 @@ jobs:
           echo "::error::${PACKAGE_NAME}@${VERSION} did not appear on npm within 5 minutes."
           exit 1
 
+  notify:
+    needs: [test, publish-sdk]
+    if: always()
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Notify Slack
-        if: always()
         continue-on-error: true
         uses: ./.github/actions/notify-slack-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: ${{ job.status == 'success' && 'success' || 'failure' }}
+          result: ${{ needs.publish-sdk.result == 'success' && 'success' || 'failure' }}
           package: ${{ env.PACKAGE_NAME }}
-          version: ${{ steps.version.outputs.version || github.event.release.tag_name }}
+          version: ${{ needs.test.outputs.version || github.event.release.tag_name }}
           release_url: ${{ github.event.release.html_url }}
