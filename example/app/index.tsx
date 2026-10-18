@@ -22,15 +22,20 @@ export default function ProfileScreen() {
 
   useEffect(() => () => auth.disable(), [auth]);
 
-  const clearAuthentication = () => {
-    auth.resetProfile();
+  const clearTokenState = () => {
     setPastedToken("");
     setTokenAssigned(false);
     setProviderEnabled(false);
   };
 
+  const clearAuthentication = () => {
+    auth.clear();
+    clearTokenState();
+  };
+
   const handleResetProfile = () => {
-    clearAuthentication();
+    auth.resetProfile();
+    clearTokenState();
     setProfile({
       email: "",
       firstName: "",

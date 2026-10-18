@@ -42,6 +42,20 @@ describe("pasted token authentication", () => {
     expect(auth.enable()).toBe(true);
   });
 
+  it("clears authentication for profile saves without resetting the SDK profile", async () => {
+    auth.setToken("token-a");
+    auth.enable();
+    const previousProvider = provider!;
+    auth.clear();
+    expect(resetCount).toBe(0);
+    expect(provider).toBeUndefined();
+    expect(auth.enable()).toBe(false);
+    await expect(previousProvider()).rejects.toThrow("Provider replaced");
+    auth.setToken("token-b");
+    auth.enable();
+    await expect(provider!()).resolves.toBe("token-b");
+  });
+
   it("clears tokens on reset and invalidates the old provider before another user", async () => {
     auth.setToken("token-a");
     auth.enable();

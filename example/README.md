@@ -146,7 +146,8 @@ on account and form configuration; this demo does not validate JWTs locally.
 **Set** replaces an enabled provider, invalidating its cached token so a replacement
 JWT can be tested. **Reset Profile** unregisters the provider, clears the assigned and
 pasted tokens, and calls `resetProfile()` to log out. Saving a profile or initializing
-an account also clears authentication; save the new identity before assigning its JWT.
+an account clears the JWT and unregisters the provider without resetting the SDK profile;
+save the new identity before assigning its JWT.
 Dismiss an open form before changing users, since its token remains valid until expiry.
 
 This is a manual testing tool, not a production auth integration. It returns the same

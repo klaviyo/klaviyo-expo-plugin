@@ -28,6 +28,11 @@ export function createPastedTokenAuth(api: AuthApi) {
     api.unregisterAuthTokenProvider();
   };
 
+  const clear = () => {
+    disable();
+    token = "";
+  };
+
   return {
     setToken(value: string) {
       token = value.trim();
@@ -40,9 +45,9 @@ export function createPastedTokenAuth(api: AuthApi) {
       return true;
     },
     disable,
+    clear,
     resetProfile() {
-      disable();
-      token = "";
+      clear();
       api.resetProfile();
     },
   };
