@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version to release (X.Y.Z)
+        description: Version to release (X.Y.Z, or X.Y.Z-suffix for a prerelease)
         required: true
         type: string
       ref:
@@ -40,8 +40,8 @@ jobs:
 
       - name: Validate version input
         run: |
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::version must be X.Y.Z, got '$VERSION'."
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::version must be X.Y.Z or X.Y.Z-suffix, got '$VERSION'."
             exit 1
           fi
           if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" >/dev/null 2>&1; then
@@ -105,7 +105,9 @@ jobs:
             url="$(cut -f2 <<<"$existing")"
             echo "Reusing existing draft release; notes left as written."
           else
-            url="$(gh release create "$VERSION" --draft --target "$SHA" --title "$VERSION" --generate-notes)"
+            prerelease_flag=()
+            if [[ "$VERSION" == *-* ]]; then prerelease_flag=(--prerelease --latest=false); fi
+            url="$(gh release create "$VERSION" --draft "${prerelease_flag[@]}" --target "$SHA" --title "$VERSION" --generate-notes)"
           fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "### Release $VERSION awaiting approval" >> "$GITHUB_STEP_SUMMARY"
@@ -152,7 +154,11 @@ jobs:
         env:
           SHA: ${{ needs.prepare.outputs.sha }}
         run: |
-          gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --target "$SHA"
+          if [[ "$VERSION" == *-* ]]; then
+            gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false --target "$SHA"
+          else
+            gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest --target "$SHA"
+          fi
           {
             echo "### Release $VERSION published"
             echo "- npm: https://www.npmjs.com/package/klaviyo-expo-plugin/v/$VERSION"

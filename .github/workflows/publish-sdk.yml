@@ -6,7 +6,7 @@ on:
   workflow_call:
     inputs:
       version:
-        description: Version to publish (X.Y.Z)
+        description: Version to publish (X.Y.Z or X.Y.Z-suffix)
         required: true
         type: string
       ref:
