@@ -56,7 +56,11 @@ case "$RESULT" in
     ;;
   notes-failure)
     icon="⚠️"
-    headline="build uploaded to ${DESTINATION}, but its release notes were not set. Re-run the failed job or set them by hand in the store console."
+    if [[ -n "$FAILED_STEP" ]]; then
+      headline="build uploaded to ${DESTINATION}, but ${FAILED_STEP} failed. The build is on the store; check the run and set anything missing by hand."
+    else
+      headline="build uploaded to ${DESTINATION}, but its release notes were not set. Re-run the failed job or set them by hand in the store console."
+    fi
     ;;
   *)
     echo "::error::Unknown RESULT '$RESULT' (expected success, failure or notes-failure)"

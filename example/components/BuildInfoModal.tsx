@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
 import * as Clipboard from 'expo-clipboard';
@@ -78,17 +78,19 @@ export function BuildInfoModal({ visible, onClose }: { visible: boolean; onClose
             <Text style={styles.close}>Close</Text>
           </TouchableOpacity>
         </View>
-        {rows.map((row) => (
-          <View key={row.label} style={styles.row}>
-            <Text style={styles.label}>{row.label}</Text>
-            <Text style={styles.value} selectable testID={`build-info-${row.label}`}>
-              {row.value}
-            </Text>
-          </View>
-        ))}
-        <TouchableOpacity style={styles.copyButton} onPress={copy} testID="build-info-copy">
-          <Text style={styles.copyText}>{copied ? 'Copied' : 'Copy build info'}</Text>
-        </TouchableOpacity>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+          {rows.map((row) => (
+            <View key={row.label} style={styles.row}>
+              <Text style={styles.label}>{row.label}</Text>
+              <Text style={styles.value} selectable testID={`build-info-${row.label}`}>
+                {row.value}
+              </Text>
+            </View>
+          ))}
+          <TouchableOpacity style={styles.copyButton} onPress={copy} testID="build-info-copy">
+            <Text style={styles.copyText}>{copied ? 'Copied' : 'Copy build info'}</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </SafeAreaView>
     </Modal>
   );
@@ -105,6 +107,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '600', color: '#000' },
   close: { fontSize: 16, color: '#007AFF' },
   headerButton: { marginRight: 16 },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 24 },
   row: { marginBottom: 14 },
   label: { fontSize: 12, color: '#8E8E93', marginBottom: 4 },
   value: {
