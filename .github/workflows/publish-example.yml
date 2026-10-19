@@ -229,9 +229,7 @@ jobs:
 
       - name: Record install link
         id: result
-        env:
-          PLAY_TESTERS_URL: ${{ vars.PLAY_TESTERS_URL }}
-        run: echo "install_url=${PLAY_TESTERS_URL:-https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}}" >> "$GITHUB_OUTPUT"
+        run: echo "install_url=https://play.google.com/apps/test/${ANDROID_PACKAGE}/${{ steps.deploy.outputs.build_number }}" >> "$GITHUB_OUTPUT"
 
       - name: Render release notes
         if: success()
@@ -305,7 +303,7 @@ jobs:
           sdks: ${{ steps.slack.outputs.sdks }}
           source: ${{ steps.slack.outputs.source }}
           commit_sha: ${{ env.COMMIT_SHA }}
-          get_build: "<${{ steps.result.outputs.install_url }}|Open Klaviyo Expo Example in Google Play> on your Android device and install `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. Internal testers can only reach the app through the opt-in link. Not a tester yet? Ask in #mobile-push-team to be added, and give them your Google account email."
+          get_build: "<${{ steps.result.outputs.install_url }}|Install Klaviyo Expo Example from Google Play> on your Android device to get `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. Only internal testers can open this link. Not a tester yet? Ask in #mobile-push-team to be added, and give them your Google account email."
 
       - name: Notify Slack on failure
         if: failure()

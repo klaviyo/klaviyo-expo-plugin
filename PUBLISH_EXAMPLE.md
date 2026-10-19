@@ -53,7 +53,6 @@ These are not secret.
 |----------|-------------|
 | `KLAVIYO_EAS_PROJECT_ID` | EAS project ID for `klaviyo/klaviyo-plugin-example` |
 | `APPLE_TEAM_ID` | Apple Developer team that signs the app |
-| `PLAY_TESTERS_URL` | Optional. The internal testing opt-in link from Play Console (Internal testing, Testers tab). Slack uses it for "Get the build" and the environment link, and falls back to the public store listing when it is unset |
 | `ASC_APP_ID` | App Store Connect app ID for `com.klaviyo.expoexample`. The workflow writes it into `eas.json` at build time, since non-interactive iOS submits need it |
 
 ---
@@ -190,7 +189,7 @@ Add `-f platform=android` or `-f platform=ios` to publish one platform.
 
 EAS builds and signs on Expo's servers, so some pieces of the native workflows do not apply here.
 
-- No Internal App Sharing link: `eas submit` uploads to the internal track and offers no sharing upload. Slack links the internal testing opt-in link from `PLAY_TESTERS_URL` instead.
+- No Internal App Sharing link: `eas submit` uploads to the internal track and offers no sharing upload. Slack links the build's per-release Play URL (`play.google.com/apps/test/<package>/<versionCode>`) instead, which works for the same internal testers.
 - No keystore or signing key cleanup steps: signing material lives on EAS and never reaches the runner. CI holds only `EXPO_TOKEN` and the store API keys, and they are passed through `env` for the steps that need them. No step writes them to disk.
 - Concurrency never cancels a started run. See [Overview](#overview).
 - Android release notes are set after the submit through the Play Developer API, since `eas submit` has no notes option. iOS notes go through the App Store Connect API in their own job, as in the iOS test app.
