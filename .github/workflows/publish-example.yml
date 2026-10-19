@@ -27,6 +27,11 @@ on:
     branches:
       - master
       - "rel/**"
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.coderabbit.yaml'
   release:
     types: [published]
   workflow_dispatch:
@@ -176,6 +181,8 @@ jobs:
       app_version: ${{ steps.deploy.outputs.app_version }}
       build_number: ${{ steps.deploy.outputs.build_number }}
       build_date: ${{ steps.deploy.outputs.build_date }}
+      uploaded: ${{ steps.deploy.outcome == 'success' }}
+      notes_uploaded: ${{ steps.upload_notes.outcome == 'success' }}
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
@@ -230,11 +237,13 @@ jobs:
       - name: Record install link
         id: result
         env:
-          PLAY_TESTERS_URL: ${{ vars.PLAY_TESTERS_URL }}
-        run: echo "install_url=${PLAY_TESTERS_URL:-https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}}" >> "$GITHUB_OUTPUT"
+          VERSION_CODE: ${{ steps.deploy.outputs.build_number }}
+        run: echo "install_url=https://play.google.com/apps/test/${ANDROID_PACKAGE}/${VERSION_CODE}" >> "$GITHUB_OUTPUT"
 
       - name: Render release notes
+        id: render_notes
         if: success()
+        continue-on-error: true
         env:
           RELEASE_NAME: ${{ github.event.release.name }}
           RELEASE_BODY: ${{ github.event.release.body }}
@@ -248,7 +257,9 @@ jobs:
         run: ./scripts/ci/release-notes.sh android 500 "${RUNNER_TEMP}/play-notes.txt"
 
       - name: Upload release notes
+        id: upload_notes
         if: success()
+        continue-on-error: true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: play-notes
@@ -258,6 +269,7 @@ jobs:
       - name: Render Slack fields
         id: slack
         if: success()
+        continue-on-error: true
         env:
           BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
           BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -281,19 +293,32 @@ jobs:
           MARKETING: ${{ steps.marketing.outcome }}
           NUMBER: ${{ steps.number.outcome }}
           DEPLOY: ${{ steps.deploy.outcome }}
-          RENDER: ${{ steps.slack.outcome }}
         run: |
           step="an earlier step"
           if [ "$SETUP" = failure ]; then step="setup"
           elif [ "$MARKETING" = failure ]; then step="resolving the app version"
           elif [ "$NUMBER" = failure ]; then step="the Play versionCode lookup"
           elif [ "$DEPLOY" = failure ]; then step="EAS build or submit"
-          elif [ "$RENDER" = failure ]; then step="rendering the release notes"
+          fi
+          echo "step=$step" >> "$GITHUB_OUTPUT"
+
+      - name: Find the failed post-upload step
+        id: warned
+        if: success() && (steps.render_notes.outcome == 'failure' || steps.upload_notes.outcome == 'failure' || steps.slack.outcome == 'failure')
+        env:
+          RENDER_NOTES: ${{ steps.render_notes.outcome }}
+          UPLOAD_NOTES: ${{ steps.upload_notes.outcome }}
+          SLACK: ${{ steps.slack.outcome }}
+        run: |
+          step="a post-upload step"
+          if [ "$RENDER_NOTES" = failure ]; then step="rendering the release notes"
+          elif [ "$UPLOAD_NOTES" = failure ]; then step="uploading the release notes"
+          elif [ "$SLACK" = failure ]; then step="rendering the Slack fields"
           fi
           echo "step=$step" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack on success
-        if: success()
+        if: success() && steps.warned.outcome != 'success'
         continue-on-error: true
         uses: ./.github/actions/notify-slack-example-publish
         with:
@@ -305,7 +330,22 @@ jobs:
           sdks: ${{ steps.slack.outputs.sdks }}
           source: ${{ steps.slack.outputs.source }}
           commit_sha: ${{ env.COMMIT_SHA }}
-          get_build: "<${{ steps.result.outputs.install_url }}|Open Klaviyo Expo Example in Google Play> on your Android device and install `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. Internal testers can only reach the app through the opt-in link. Not a tester yet? Ask in #mobile-push-team to be added, and give them your Google account email."
+          get_build: "<${{ steps.result.outputs.install_url }}|Install Klaviyo Expo Example from Google Play> on your Android device to get `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. Only internal testers can open this link."
+
+      - name: Notify Slack on upload with warnings
+        if: success() && steps.warned.outcome == 'success'
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: notes-failure
+          platform: Android
+          destination: Play internal
+          build: ${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})
+          sdks: ${{ steps.slack.outputs.sdks }}
+          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
+          commit_sha: ${{ env.COMMIT_SHA }}
+          failed_step: ${{ steps.warned.outputs.step }}
 
       - name: Notify Slack on failure
         if: failure()
@@ -324,7 +364,11 @@ jobs:
   android-notes:
     name: Set Play release notes
     needs: deploy-android
-    if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    if: |
+      always()
+      && needs.deploy-android.outputs.uploaded == 'true'
+      && needs.deploy-android.outputs.notes_uploaded == 'true'
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -343,6 +387,8 @@ jobs:
           node-version-file: .nvmrc
 
       - name: Download release notes
+        id: download_notes
+        continue-on-error: true
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: play-notes
@@ -350,6 +396,7 @@ jobs:
 
       - name: Set notes on the Play release
         id: notes
+        if: steps.download_notes.outcome == 'success'
         continue-on-error: true
         env:
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
@@ -360,7 +407,7 @@ jobs:
         run: node scripts/ci/play-release-notes.js "$VERSION_CODE" "${RUNNER_TEMP}/play-notes.txt"
 
       - name: Warn on Slack that the notes were not set
-        if: steps.notes.outcome == 'failure'
+        if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
         continue-on-error: true
         uses: ./.github/actions/notify-slack-example-publish
         with:
@@ -389,6 +436,8 @@ jobs:
       marketing_version: ${{ steps.marketing.outputs.version }}
       build_number: ${{ steps.deploy.outputs.build_number }}
       build_date: ${{ steps.deploy.outputs.build_date }}
+      uploaded: ${{ steps.deploy.outcome == 'success' }}
+      notes_uploaded: ${{ steps.upload_notes.outcome == 'success' }}
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
@@ -462,7 +511,9 @@ jobs:
         run: echo "testflight_url=https://beta.itunes.apple.com/v1/app/${ASC_APP_ID}" >> "$GITHUB_OUTPUT"
 
       - name: Render release notes
+        id: render_notes
         if: success()
+        continue-on-error: true
         env:
           RELEASE_NAME: ${{ github.event.release.name }}
           RELEASE_BODY: ${{ github.event.release.body }}
@@ -476,7 +527,9 @@ jobs:
         run: ./scripts/ci/release-notes.sh ios 4000 "${RUNNER_TEMP}/what-to-test.txt"
 
       - name: Upload release notes
+        id: upload_notes
         if: success()
+        continue-on-error: true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: what-to-test-notes
@@ -486,6 +539,7 @@ jobs:
       - name: Render Slack fields
         id: slack
         if: success()
+        continue-on-error: true
         env:
           BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
           BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -509,19 +563,32 @@ jobs:
           MARKETING: ${{ steps.marketing.outcome }}
           NUMBER: ${{ steps.number.outcome }}
           DEPLOY: ${{ steps.deploy.outcome }}
-          RENDER: ${{ steps.slack.outcome }}
         run: |
           step="an earlier step"
           if [ "$SETUP" = failure ]; then step="setup"
           elif [ "$MARKETING" = failure ]; then step="resolving the app version"
           elif [ "$NUMBER" = failure ]; then step="the App Store Connect build number lookup"
           elif [ "$DEPLOY" = failure ]; then step="EAS build or submit"
-          elif [ "$RENDER" = failure ]; then step="rendering the release notes"
+          fi
+          echo "step=$step" >> "$GITHUB_OUTPUT"
+
+      - name: Find the failed post-upload step
+        id: warned
+        if: success() && (steps.render_notes.outcome == 'failure' || steps.upload_notes.outcome == 'failure' || steps.slack.outcome == 'failure')
+        env:
+          RENDER_NOTES: ${{ steps.render_notes.outcome }}
+          UPLOAD_NOTES: ${{ steps.upload_notes.outcome }}
+          SLACK: ${{ steps.slack.outcome }}
+        run: |
+          step="a post-upload step"
+          if [ "$RENDER_NOTES" = failure ]; then step="rendering the release notes"
+          elif [ "$UPLOAD_NOTES" = failure ]; then step="uploading the release notes"
+          elif [ "$SLACK" = failure ]; then step="rendering the Slack fields"
           fi
           echo "step=$step" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack on success
-        if: success()
+        if: success() && steps.warned.outcome != 'success'
         continue-on-error: true
         uses: ./.github/actions/notify-slack-example-publish
         with:
@@ -533,7 +600,22 @@ jobs:
           sdks: ${{ steps.slack.outputs.sdks }}
           source: ${{ steps.slack.outputs.source }}
           commit_sha: ${{ env.COMMIT_SHA }}
-          get_build: "<${{ steps.result.outputs.testflight_url }}|Open Klaviyo Expo Example in TestFlight> on your iPhone, then install `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. The build shows up once Apple finishes processing it, usually in 5 to 30 minutes. Not a tester yet? Ask in #mobile-push-team to be added to the internal TestFlight group, and give them your Apple ID email."
+          get_build: "<${{ steps.result.outputs.testflight_url }}|Open Klaviyo Expo Example in TestFlight> on your iPhone, then install `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. The build shows up once Apple finishes processing it, usually in 5 to 30 minutes."
+
+      - name: Notify Slack on upload with warnings
+        if: success() && steps.warned.outcome == 'success'
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: notes-failure
+          platform: iOS
+          destination: TestFlight
+          build: ${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})
+          sdks: ${{ steps.slack.outputs.sdks }}
+          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
+          commit_sha: ${{ env.COMMIT_SHA }}
+          failed_step: ${{ steps.warned.outputs.step }}
 
       - name: Notify Slack on failure
         if: failure()
@@ -552,7 +634,11 @@ jobs:
   what-to-test:
     name: Set TestFlight "What to Test"
     needs: deploy-ios
-    if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    if: |
+      always()
+      && needs.deploy-ios.outputs.uploaded == 'true'
+      && needs.deploy-ios.outputs.notes_uploaded == 'true'
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -571,6 +657,8 @@ jobs:
           node-version-file: .nvmrc
 
       - name: Download release notes
+        id: download_notes
+        continue-on-error: true
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: what-to-test-notes
@@ -578,6 +666,7 @@ jobs:
 
       - name: Set What to Test on the uploaded build
         id: notes
+        if: steps.download_notes.outcome == 'success'
         continue-on-error: true
         env:
           APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
@@ -593,7 +682,7 @@ jobs:
             --notes-file "${RUNNER_TEMP}/what-to-test.txt"
 
       - name: Warn on Slack that What to Test was not set
-        if: steps.notes.outcome == 'failure'
+        if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
         continue-on-error: true
         uses: ./.github/actions/notify-slack-example-publish
         with:
