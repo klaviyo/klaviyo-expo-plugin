@@ -7,7 +7,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Klaviyo } from 'klaviyo-react-native-sdk';
-import { BuildInfoButton } from '../components/BuildInfoModal';
 import { ExampleColors, useExampleTheme } from '../theme';
 import { StatusBar } from 'expo-status-bar';
 
@@ -219,7 +218,6 @@ export default function AppLayout() {
         name="index"
         options={{
           title: 'Profile',
-          headerRight: () => <BuildInfoButton />,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
           ),

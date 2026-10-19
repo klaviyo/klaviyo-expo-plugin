@@ -1,7 +1,6 @@
 {
   "cli": {
-    "version": ">= 16.17.3",
-    "appVersionSource": "local"
+    "version": ">= 16.17.3"
   },
   "build": {
     "development": {
@@ -12,17 +11,10 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": false,
-      "environment": "production"
+      "autoIncrement": false
     }
   },
   "submit": {
-    "production": {
-      "android": {
-        "track": "internal",
-        "releaseStatus": "completed"
-      },
-      "ios": {}
-    }
+    "production": {}
   }
 }

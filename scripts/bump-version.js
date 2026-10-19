@@ -6,6 +6,7 @@
  *   - example/package.json
  *   - ios/klaviyo-plugin-configuration.plist  (klaviyo_sdk_plugin_version_override)
  *   - plugin/withKlaviyoAndroid.ts            (klaviyo_sdk_plugin_version_override)
+ *   - example/app.config.js                    (version field)
  *   - tests/withKlaviyoAndroid.internal.test.ts (version assertions)
  *
  * Usage:
@@ -77,6 +78,19 @@ function bumpTestVersionAssertions(filePath, oldVersion, newVersion) {
   console.log(`  ${path.relative(ROOT, filePath)}: ${oldVersion} -> ${newVersion} (${count} assertion(s))`);
 }
 
+function bumpAppConfigJs(filePath, version) {
+  let content = fs.readFileSync(filePath, 'utf8');
+  const pattern = /(version:\s*')[^']+(')/;
+  const match = content.match(pattern);
+  if (!match) {
+    throw new Error(`Could not find version field in ${filePath}`);
+  }
+  const old = match[0].match(/'([^']+)'/)[1];
+  content = content.replace(pattern, `$1${version}$2`);
+  fs.writeFileSync(filePath, content);
+  console.log(`  ${path.relative(ROOT, filePath)}: ${old} -> ${version}`);
+}
+
 function bumpAndroidTs(filePath, version) {
   let content = fs.readFileSync(filePath, 'utf8');
   const pattern = /(setStringResource\('klaviyo_sdk_plugin_version_override',\s*')[^']+(')/;
@@ -119,6 +133,7 @@ async function main() {
 
   bumpJson(rootPkg, newVersion);
   bumpJson(path.join(ROOT, 'example', 'package.json'), newVersion);
+  bumpAppConfigJs(path.join(ROOT, 'example', 'app.config.js'), newVersion);
   bumpPlist(path.join(ROOT, 'ios', 'klaviyo-plugin-configuration.plist'), newVersion);
   bumpAndroidTs(path.join(ROOT, 'plugin', 'withKlaviyoAndroid.ts'), newVersion);
   bumpTestVersionAssertions(
