@@ -181,7 +181,8 @@ jobs:
       app_version: ${{ steps.deploy.outputs.app_version }}
       build_number: ${{ steps.deploy.outputs.build_number }}
       build_date: ${{ steps.deploy.outputs.build_date }}
-      uploaded: ${{ steps.deploy.outputs.build_number }}
+      uploaded: ${{ steps.deploy.outcome == 'success' }}
+      notes_uploaded: ${{ steps.upload_notes.outcome == 'success' }}
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
@@ -235,7 +236,9 @@ jobs:
 
       - name: Record install link
         id: result
-        run: echo "install_url=https://play.google.com/apps/test/${ANDROID_PACKAGE}/${{ steps.deploy.outputs.build_number }}" >> "$GITHUB_OUTPUT"
+        env:
+          VERSION_CODE: ${{ steps.deploy.outputs.build_number }}
+        run: echo "install_url=https://play.google.com/apps/test/${ANDROID_PACKAGE}/${VERSION_CODE}" >> "$GITHUB_OUTPUT"
 
       - name: Render release notes
         id: render_notes
@@ -363,7 +366,8 @@ jobs:
     needs: deploy-android
     if: |
       always()
-      && needs.deploy-android.outputs.uploaded != ''
+      && needs.deploy-android.outputs.uploaded == 'true'
+      && needs.deploy-android.outputs.notes_uploaded == 'true'
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -432,7 +436,8 @@ jobs:
       marketing_version: ${{ steps.marketing.outputs.version }}
       build_number: ${{ steps.deploy.outputs.build_number }}
       build_date: ${{ steps.deploy.outputs.build_date }}
-      uploaded: ${{ steps.deploy.outputs.build_number }}
+      uploaded: ${{ steps.deploy.outcome == 'success' }}
+      notes_uploaded: ${{ steps.upload_notes.outcome == 'success' }}
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
@@ -631,7 +636,8 @@ jobs:
     needs: deploy-ios
     if: |
       always()
-      && needs.deploy-ios.outputs.uploaded != ''
+      && needs.deploy-ios.outputs.uploaded == 'true'
+      && needs.deploy-ios.outputs.notes_uploaded == 'true'
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 60

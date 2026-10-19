@@ -10,7 +10,7 @@ EAS compiles and signs both platforms on Expo's infrastructure. The GitHub runne
 
 Each platform deploys in its own job, in a GitHub environment (`android-internal-track` and `testflight`), so the repo's Deployments page lists every deploy with a link to the build in the store. The environments have no protection rules and no secrets of their own. The repo secrets below still apply.
 
-After each deploy, a second job sets the store release notes: `what-to-test` for TestFlight and `android-notes` for Play. A failure there leaves the build on the store without notes and posts a separate Slack warning.
+After each deploy, a second job sets the store release notes: `what-to-test` for TestFlight and `android-notes` for Play. It runs only when the submit succeeded and the deploy job uploaded the notes file. If the deploy job could not render or upload the notes, its own Slack message carries the warning and the notes job skips. A failure in the notes job leaves the build on the store without notes and posts a separate Slack warning.
 
 `.github/workflows/publish-example-checks.yml` holds the checks: the plugin's type check and jest suite, and the example app's type check. It runs on pull requests that touch the publish files or `example/`, and `publish-example.yml` calls it as its `checks` job. Both deploy jobs `need` that job, so a failing check means nothing reaches a store, label deploys included. It uses no secrets and makes no store or EAS calls.
 
