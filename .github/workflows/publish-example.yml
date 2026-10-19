@@ -27,6 +27,11 @@ on:
     branches:
       - master
       - "rel/**"
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.coderabbit.yaml'
   release:
     types: [published]
   workflow_dispatch:
