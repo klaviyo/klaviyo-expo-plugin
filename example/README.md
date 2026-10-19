@@ -101,3 +101,7 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Continuous deployment
+
+Pushes to `master` and `rel/**` and published releases build this app on EAS and submit it to the Play internal track and TestFlight. See [PUBLISH_EXAMPLE.md](../PUBLISH_EXAMPLE.md) for secrets, EAS setup and troubleshooting.
