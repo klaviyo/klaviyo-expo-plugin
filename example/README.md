@@ -154,3 +154,7 @@ This is a manual testing tool, not a production auth integration. It returns the
 assigned JWT until you replace it, so it cannot refresh an expired token. Production
 providers should fetch a fresh JWT for the current signed-in user on each invocation,
 keep signing credentials on the server, and follow the SDK's provider requirements.
+
+## Continuous deployment
+
+Pushes to `master` and `rel/**` and published releases build this app on EAS and submit it to the Play internal track and TestFlight. See [PUBLISH_EXAMPLE.md](../PUBLISH_EXAMPLE.md) for secrets, EAS setup and troubleshooting.
