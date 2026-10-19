@@ -303,7 +303,7 @@ jobs:
           sdks: ${{ steps.slack.outputs.sdks }}
           source: ${{ steps.slack.outputs.source }}
           commit_sha: ${{ env.COMMIT_SHA }}
-          get_build: "<${{ steps.result.outputs.install_url }}|Install Klaviyo Expo Example from Google Play> on your Android device to get `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. Only internal testers can open this link. Not a tester yet? Ask in #mobile-push-team to be added, and give them your Google account email."
+          get_build: "<${{ steps.result.outputs.install_url }}|Install Klaviyo Expo Example from Google Play> on your Android device to get `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. Only internal testers can open this link."
 
       - name: Notify Slack on failure
         if: failure()
@@ -531,7 +531,7 @@ jobs:
           sdks: ${{ steps.slack.outputs.sdks }}
           source: ${{ steps.slack.outputs.source }}
           commit_sha: ${{ env.COMMIT_SHA }}
-          get_build: "<${{ steps.result.outputs.testflight_url }}|Open Klaviyo Expo Example in TestFlight> on your iPhone, then install `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. The build shows up once Apple finishes processing it, usually in 5 to 30 minutes. Not a tester yet? Ask in #mobile-push-team to be added to the internal TestFlight group, and give them your Apple ID email."
+          get_build: "<${{ steps.result.outputs.testflight_url }}|Open Klaviyo Expo Example in TestFlight> on your iPhone, then install `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. The build shows up once Apple finishes processing it, usually in 5 to 30 minutes."
 
       - name: Notify Slack on failure
         if: failure()
