@@ -12,14 +12,17 @@
     "clean-android": "cd .. && npm run build && cd example && rm -rf android && EXPO_DEBUG=true npx expo prebuild --clean --platform android && npx expo run:android",
     "clean-ios": "cd .. && npm run build && cd example && rm -rf ios && EXPO_DEBUG=true npx expo prebuild --clean --platform ios && npx expo run:ios",
     "eas-ios-local": "rm -rf ios && npx expo prebuild --platform ios --clean && eas build --platform ios --local",
-    "eas-android-local": "rm -rf android && npx expo prebuild --platform android --clean && eas build --platform android --local"
+    "eas-android-local": "rm -rf android && npx expo prebuild --platform android --clean && eas build --platform android --local",
+    "eas-build-pre-install": "cd .. && npm ci"
   },
   "dependencies": {
     "@babel/runtime": "^7.24.0",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "54.0.22",
+    "expo-application": "~7.0.8",
     "expo-asset": "^12.0.8",
+    "expo-clipboard": "~8.0.7",
     "expo-constants": "~18.0.10",
     "expo-font": "^14.0.7",
     "expo-linking": "~8.0.8",
