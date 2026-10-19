@@ -7,6 +7,10 @@ export default function FormsScreen() {
     Klaviyo.registerForInAppForms();
   };
 
+  const handleUnregisterFromInAppForms = () => {
+    Klaviyo.unregisterFromInAppForms();
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.section}>
@@ -16,6 +20,13 @@ export default function FormsScreen() {
           onPress={handleRegisterForInAppForms}
         >
           <Text style={styles.buttonText}>Register for In-App Forms</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.fullWidthButton]}
+          accessibilityRole="button"
+          onPress={handleUnregisterFromInAppForms}
+        >
+          <Text style={styles.buttonText}>Unregister from In-App Forms</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.fullWidthButton]}
