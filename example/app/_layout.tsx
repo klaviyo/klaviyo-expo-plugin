@@ -8,6 +8,8 @@ import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Klaviyo } from 'klaviyo-react-native-sdk';
 import { BuildInfoButton } from '../components/BuildInfoModal';
+import { ExampleColors, useExampleTheme } from '../theme';
+import { StatusBar } from 'expo-status-bar';
 
 const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
 
@@ -110,6 +112,8 @@ const handleDeeplink = (notification: Notifications.Notification | Notifications
 };
 
 export default function AppLayout() {
+  const colors = useExampleTheme();
+  const styles = createStyles(colors);
 
   useEffect(() => {
     // Initialize Klaviyo from stored API key
@@ -198,10 +202,14 @@ export default function AppLayout() {
   }, []);
 
   return (
+    <>
+    <StatusBar style="auto" />
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
+        headerTintColor: colors.text,
+        sceneStyle: { backgroundColor: colors.background },
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.secondaryText,
         tabBarStyle: styles.tabBar,
         headerStyle: styles.header,
         headerTitleStyle: styles.headerTitle,
@@ -245,22 +253,23 @@ export default function AppLayout() {
         }}
       />
     </Tabs>
+    </>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ExampleColors) => StyleSheet.create({
   tabBar: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
+    borderTopColor: colors.border,
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: colors.border,
   },
   headerTitle: {
-    color: '#000',
+    color: colors.text,
     fontSize: 17,
     fontWeight: '600',
   },

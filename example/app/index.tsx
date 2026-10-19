@@ -12,8 +12,11 @@ import {
 import { Klaviyo } from "klaviyo-react-native-sdk";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createPastedTokenAuth } from "../pastedTokenAuth";
+import { ExampleColors, useExampleTheme } from "../theme";
 
 export default function ProfileScreen() {
+  const colors = useExampleTheme();
+  const styles = createStyles(colors);
   const [apiKey, setApiKey] = useState("");
   const [auth] = useState(() => createPastedTokenAuth(Klaviyo));
   const [pastedToken, setPastedToken] = useState("");
@@ -165,6 +168,8 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <View style={styles.inputRow}>
           <TextInput
+            placeholderTextColor={colors.placeholder}
+            selectionColor={colors.accent}
             style={styles.apiInput}
             placeholder="Enter 6-char API key"
             value={apiKey}
@@ -186,6 +191,8 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Profile Information</Text>
         <TextInput
+          placeholderTextColor={colors.placeholder}
+          selectionColor={colors.accent}
           style={styles.input}
           placeholder="Email"
           value={profile.email}
@@ -194,18 +201,24 @@ export default function ProfileScreen() {
           autoCapitalize="none"
         />
         <TextInput
+          placeholderTextColor={colors.placeholder}
+          selectionColor={colors.accent}
           style={styles.input}
           placeholder="First Name"
           value={profile.firstName}
           onChangeText={(text) => setProfile({ ...profile, firstName: text })}
         />
         <TextInput
+          placeholderTextColor={colors.placeholder}
+          selectionColor={colors.accent}
           style={styles.input}
           placeholder="Last Name"
           value={profile.lastName}
           onChangeText={(text) => setProfile({ ...profile, lastName: text })}
         />
         <TextInput
+          placeholderTextColor={colors.placeholder}
+          selectionColor={colors.accent}
           style={styles.input}
           placeholder="Phone Number"
           value={profile.phoneNumber}
@@ -213,6 +226,8 @@ export default function ProfileScreen() {
           keyboardType="phone-pad"
         />
         <TextInput
+          placeholderTextColor={colors.placeholder}
+          selectionColor={colors.accent}
           style={styles.input}
           placeholder="External ID"
           value={profile.externalId}
@@ -230,11 +245,13 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>
           Personalized Forms Authentication
         </Text>
-        <Text>
+        <Text style={styles.text}>
           Save the matching profile first, then assign a JWT from your backend.
         </Text>
         <View style={styles.inputRow}>
           <TextInput
+            placeholderTextColor={colors.placeholder}
+            selectionColor={colors.accent}
             style={styles.apiInput}
             accessibilityLabel="Raw JWT"
             placeholder="Paste raw JWT"
@@ -245,22 +262,22 @@ export default function ProfileScreen() {
             secureTextEntry
           />
           <TouchableOpacity
-            style={styles.button}
+            style={[styles.button, !pastedToken.trim() && styles.buttonDisabled]}
             accessibilityRole="button"
             accessibilityState={{ disabled: !pastedToken.trim() }}
             disabled={!pastedToken.trim()}
             onPress={handleSetToken}
           >
-            <Text style={styles.buttonText}>Set</Text>
+            <Text style={[styles.buttonText, !pastedToken.trim() && styles.buttonTextDisabled]}>Set</Text>
           </TouchableOpacity>
         </View>
-        <Text>
+        <Text style={styles.text}>
           {tokenAssigned
             ? "A token is assigned in memory."
             : "No token assigned."}
         </Text>
         <View style={styles.inputRow}>
-          <Text>Enable JWT provider</Text>
+          <Text style={styles.text}>Enable JWT provider</Text>
           <Switch
             accessibilityLabel="Enable JWT provider"
             value={providerEnabled}
@@ -268,7 +285,7 @@ export default function ProfileScreen() {
             onValueChange={handleToggleProvider}
           />
         </View>
-        <Text>
+        <Text style={styles.text}>
           Disabling the provider turns personalization off. Reset Profile logs
           out and clears the pasted token.
         </Text>
@@ -284,16 +301,17 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ExampleColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: colors.background,
   },
   section: {
     padding: 20,
     gap: 15,
   },
   sectionTitle: {
+    color: colors.text,
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 10,
@@ -305,21 +323,25 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   apiInput: {
+    color: colors.text,
+    backgroundColor: colors.background,
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.border,
     borderRadius: 8,
     padding: 10,
   },
   input: {
+    color: colors.text,
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.border,
     borderRadius: 8,
     padding: 10,
     marginBottom: 10,
   },
   button: {
-    backgroundColor: "#007AFF",
+    backgroundColor: colors.button,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
@@ -329,8 +351,11 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   buttonText: {
-    color: "#fff",
+    color: colors.onButton,
     fontSize: 16,
     fontWeight: "bold",
   },
+  text: { color: colors.text },
+  buttonDisabled: { backgroundColor: colors.disabledButton },
+  buttonTextDisabled: { color: colors.disabledText },
 });

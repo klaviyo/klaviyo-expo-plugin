@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Alert, Clipboard, Platform, S
 import { Klaviyo } from 'klaviyo-react-native-sdk';
 import * as Notifications from 'expo-notifications';
 import { useNavigation } from 'expo-router';
+import { ExampleColors, useExampleTheme } from '../theme';
 
 // Add type declaration for global variable
 declare global {
@@ -10,6 +11,8 @@ declare global {
 }
 
 export default function PushScreen() {
+  const colors = useExampleTheme();
+  const styles = createStyles(colors);
   const [pushPermissionStatus, setPushPermissionStatus] = useState<Notifications.PermissionStatus | null>(null);
   const [pushToken, setPushToken] = useState<string | null>(null);
   const [lastNotification, setLastNotification] = useState<Notifications.Notification | null>(null);
@@ -223,22 +226,23 @@ export default function PushScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ExampleColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   section: {
     padding: 20,
     gap: 15,
   },
   sectionTitle: {
+    color: colors.text,
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.button,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
@@ -248,27 +252,27 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   buttonText: {
-    color: '#fff',
+    color: colors.onButton,
     fontSize: 16,
     fontWeight: 'bold',
   },
   buttonSuccess: {
-    backgroundColor: '#34C759',
+    backgroundColor: colors.successButton,
   },
   permissionStatus: {
     textAlign: 'center',
     marginTop: 8,
-    color: '#666',
+    color: colors.secondaryText,
   },
   tokenContainer: {
     marginTop: 10,
     padding: 10,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.surface,
     borderRadius: 8,
   },
   tokenLabel: {
     fontSize: 14,
-    color: '#666',
+    color: colors.secondaryText,
     marginBottom: 5,
   },
   tokenRow: {
@@ -278,39 +282,40 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   tokenText: {
+    color: colors.text,
     fontSize: 12,
     fontFamily: 'monospace',
     flex: 1,
   },
   copyButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.button,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
   },
   copyButtonText: {
-    color: '#fff',
+    color: colors.onButton,
     fontSize: 12,
     fontWeight: 'bold',
   },
   notificationContainer: {
     marginTop: 10,
     padding: 10,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.card,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.border,
   },
   notificationTitle: {
     fontSize: 14,
     fontWeight: 'bold',
     marginBottom: 5,
-    color: '#333',
+    color: colors.text,
   },
   notificationText: {
     fontSize: 12,
-    color: '#666',
+    color: colors.secondaryText,
     marginBottom: 3,
     fontFamily: 'monospace',
   },
-}); 
+});

@@ -7,7 +7,7 @@ module.exports = {
     '**/?(*.)+(spec|test).ts'
   ],
   transform: {
-    '^.+\\.ts$': 'ts-jest',
+    '^.+\\.tsx?$': ['ts-jest', { tsconfig: { jsx: 'react' } }],
   },
   collectCoverageFrom: [
     'plugin/**/*.ts',
@@ -16,7 +16,8 @@ module.exports = {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
-  moduleFileExtensions: ['ts', 'js', 'json'],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'json'],
+  moduleNameMapper: { '^react$': '<rootDir>/node_modules/react' },
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   testTimeout: 10000,
-}; 
+};

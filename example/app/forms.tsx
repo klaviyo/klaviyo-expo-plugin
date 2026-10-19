@@ -1,8 +1,11 @@
 import React from "react";
 import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
 import { Klaviyo } from "klaviyo-react-native-sdk";
+import { ExampleColors, useExampleTheme } from "../theme";
 
 export default function FormsScreen() {
+  const colors = useExampleTheme();
+  const styles = createStyles(colors);
   const handleRegisterForInAppForms = () => {
     Klaviyo.registerForInAppForms();
   };
@@ -40,22 +43,23 @@ export default function FormsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ExampleColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: colors.background,
   },
   section: {
     padding: 20,
     gap: 15,
   },
   sectionTitle: {
+    color: colors.text,
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 10,
   },
   button: {
-    backgroundColor: "#007AFF",
+    backgroundColor: colors.button,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
@@ -65,7 +69,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   buttonText: {
-    color: "#fff",
+    color: colors.onButton,
     fontSize: 16,
     fontWeight: "bold",
   },
