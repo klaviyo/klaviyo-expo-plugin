@@ -2,7 +2,7 @@
 
 ## Overview
 
-`.github/workflows/publish-example.yml` builds the example app on EAS and submits it to the Play Store internal track and TestFlight. It runs on every push to `master` or a `rel/**` branch, whenever a GitHub release is published, on demand through `workflow_dispatch`, and when a deploy label is added to a pull request. Until the `EXPO_TOKEN` secret and the `KLAVIYO_EAS_PROJECT_ID` variable exist, the workflow skips with a warning.
+`.github/workflows/publish-example.yml` builds the example app on EAS and submits it to the Play Store internal track and TestFlight. It runs on every push to `master` or a `rel/**` branch, whenever a GitHub release is published, on demand through `workflow_dispatch`, and when a deploy label is added to a pull request. When a required secret or variable from the tables below is missing, a push or release run posts a notice and skips the deploy, while a manual or label run fails with an error.
 
 A run is never cancelled once it starts. A push waits for the in-flight run on the same branch, and a newer queued push replaces an older queued one, so quick merges deploy the latest commit without wasting builds. Cancelling would leave the EAS build running on Expo's servers, unsupervised and using a build number, with no submit step to follow it. Release, manual and label runs queue on their own.
 
@@ -151,9 +151,9 @@ Do not add steps that print environment variables, upload signed artifacts, or p
 
 ## Debugging common failures
 
-### The workflow skips with a warning
+### The workflow skips with a notice
 
-`EXPO_TOKEN` or `KLAVIYO_EAS_PROJECT_ID` is unset. Add them and re-run.
+A push or release run skips the deploy when a required secret or variable from the tables above is missing, and posts a notice naming which ones. A manual or label run fails with an error instead. Add the missing entries and re-run.
 
 ### "Increment Build Number" or a duplicate build number on submit
 
