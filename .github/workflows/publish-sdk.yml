@@ -55,6 +55,7 @@ jobs:
     environment: npm
     permissions:
       contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -71,10 +72,15 @@ jobs:
       - name: Prepare
         run: npm run prepare
 
-      - uses: JS-DevTools/npm-publish@v3
-        with:
-          token: ${{ secrets.NPM_TOKEN }}
-          tag: ${{ needs.test.outputs.dist_tag }}
+      # Trusted publishing (OIDC): npm exchanges this job's OIDC token for
+      # a short-lived credential, so there is no NPM_TOKEN secret to rotate.
+      # Requires npm >= 11.15 and a trust relationship on npmjs.com allowing
+      # `npm publish` from this workflow; provenance attestation is included.
+      - name: Update npm for trusted publishing
+        run: npm install -g "npm@^11.15.0"
+
+      - name: Publish to npm
+        run: npm publish --tag "${{ needs.test.outputs.dist_tag }}"
 
       - name: Verify the version is on npm
         timeout-minutes: 6
