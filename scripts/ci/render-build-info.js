@@ -141,7 +141,7 @@ function buildInput(platform, env) {
     event: env.GITHUB_EVENT_NAME,
     runUrl: env.RUN_URL,
     releaseName: env.RELEASE_NAME,
-    releaseBody: env.GITHUB_EVENT_NAME === "release" ? env.RELEASE_BODY : undefined,
+    releaseBody: env.GITHUB_EVENT_NAME === "release" || env.RELEASE_TAG ? env.RELEASE_BODY : undefined,
     sdks: sdkEntries(platform, env),
   };
 }

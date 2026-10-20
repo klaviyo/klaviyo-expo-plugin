@@ -9,6 +9,9 @@
 #                and the other header lines are never cut
 #
 # Env: see render-build-info.js. BUILD_DATE defaults to the current UTC time.
+# On a workflow_dispatch at a tag (REF_TYPE=tag, REF_NAME=<tag>) with no
+# RELEASE_BODY, the release is read with `gh release view` (needs GH_TOKEN);
+# a failed lookup exits non-zero.
 set -euo pipefail
 
 PLATFORM="${1:?usage: release-notes.sh <platform> <max-chars> <output-file>}"
@@ -26,6 +29,17 @@ export COMMIT_SHA="${COMMIT_SHA:-$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || 
 export BRANCH="${BRANCH:-$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)}"
 export SOURCE_LABEL="${SOURCE_LABEL:-$BRANCH}"
 export GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME:-manual}"
+
+if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "${REF_TYPE:-}" == "tag" && -z "${RELEASE_BODY:-}" ]]; then
+  if ! release="$(gh release view "$REF_NAME" --repo "$GITHUB_REPOSITORY" --json tagName,name,body)"; then
+    echo "::error::Could not read GitHub release ${REF_NAME} for the store notes" >&2
+    exit 1
+  fi
+  RELEASE_TAG="$(jq -r '.tagName' <<<"$release")"
+  RELEASE_NAME="$(jq -r '.name // .tagName' <<<"$release")"
+  RELEASE_BODY="$(jq -r '.body // ""' <<<"$release")"
+  export RELEASE_TAG RELEASE_NAME RELEASE_BODY
+fi
 
 node "$ROOT/scripts/ci/render-build-info.js" notes --platform "$PLATFORM" --max-chars "$MAX_CHARS" > "$OUT_FILE"
 cat "$OUT_FILE"
