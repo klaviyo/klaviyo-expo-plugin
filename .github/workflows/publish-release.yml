@@ -227,7 +227,16 @@ jobs:
         env:
           SHA: ${{ needs.prepare.outputs.sha }}
         run: |
-          tagged="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${VERSION}" --jq .sha 2>/dev/null || true)"
+          set -euo pipefail
+          tag_ref="$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${VERSION}" \
+            --jq "[.[] | select(.ref == \"refs/tags/${VERSION}\")][0].object // empty | \"\(.type) \(.sha)\"")"
+          tagged=""
+          if [ -n "$tag_ref" ]; then
+            read -r tag_type tagged <<<"$tag_ref"
+            if [ "$tag_type" = "tag" ]; then
+              tagged="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tagged}" --jq .object.sha)"
+            fi
+          fi
           if [ -n "$tagged" ] && [ "$tagged" != "$SHA" ]; then
             echo "::error::Tag $VERSION now points at $tagged, not the released commit $SHA."
             exit 1
