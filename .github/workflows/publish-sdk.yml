@@ -91,7 +91,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Prepare
         run: npm run prepare
@@ -186,3 +186,4 @@ jobs:
           release_url: ${{ inputs.release_url }}
           dist_tag: ${{ needs.test.outputs.dist_tag }}
           already_published: ${{ needs.publish-sdk.outputs.already_published }}
+          commit: ${{ inputs.ref }}

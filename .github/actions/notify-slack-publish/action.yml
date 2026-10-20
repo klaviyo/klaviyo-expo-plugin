@@ -19,6 +19,10 @@ inputs:
     description: URL of the GitHub release that triggered the publish
     required: false
     default: ''
+  commit:
+    description: Commit SHA that was built and published
+    required: false
+    default: ''
   dist_tag:
     description: npm dist-tag the version was published to
     required: false
@@ -87,7 +91,7 @@ runs:
             - type: "section"
               text:
                 type: "mrkdwn"
-                text: "*Package:* <https://www.npmjs.com/package/${{ inputs.package }}/v/${{ inputs.version }}|${{ inputs.package }}>\n*Version:* `${{ inputs.version }}`\n*Commit:* `${{ github.sha }}`\n*Author:* ${{ github.actor }}${{ inputs.release_url != '' && format('\n*Release:* <{0}|View release>', inputs.release_url) || '' }}"
+                text: "*Package:* <https://www.npmjs.com/package/${{ inputs.package }}/v/${{ inputs.version }}|${{ inputs.package }}>\n*Version:* `${{ inputs.version }}`\n*Commit:* `${{ inputs.commit || github.sha }}`\n*Author:* ${{ github.actor }}${{ inputs.release_url != '' && format('\n*Release:* <{0}|View release>', inputs.release_url) || '' }}"
             - type: "section"
               text:
                 type: "mrkdwn"
