@@ -203,6 +203,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      actions: read
     uses: ./.github/workflows/publish-sdk.yml
     with:
       version: ${{ inputs.version || github.event.release.tag_name }}
@@ -255,3 +256,24 @@ jobs:
                 text:
                   type: "mrkdwn"
                   text: "🚨 *Expo plugin `${{ env.VERSION }}` is on npm but ${{ steps.example.outcome == 'failure' && 'the example app deploy could not be dispatched.* Run publish-example.yml by hand on the tag.' || 'the GitHub release could not be published.* Publish the draft by hand.' }}\n*Release:* <${{ needs.prepare.outputs.release_url }}|Open release>\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+
+  stopped:
+    needs: [prepare, publish-npm, publish-release]
+    if: always() && contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Notify Slack (cancelled)
+        continue-on-error: true
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "⚠️ Expo plugin release ${{ env.VERSION }} stopped: run cancelled"
+            blocks:
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "⚠️ *Expo plugin release `${{ env.VERSION }}` stopped: the run was cancelled.* Check the run for what finished before it stopped.\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
