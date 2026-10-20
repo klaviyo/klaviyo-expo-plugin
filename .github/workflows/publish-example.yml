@@ -227,7 +227,7 @@ jobs:
           COMMIT_SHA: ${{ env.COMMIT_SHA }}
           BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || (github.ref_type == 'tag' && github.ref_name) || '' }}
           BASE_VERSION: ${{ steps.marketing.outputs.version }}
           BUILD_NUMBER: ${{ steps.number.outputs.build_number }}
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
@@ -251,7 +251,7 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           COMMIT_SHA: ${{ env.COMMIT_SHA }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || (github.ref_type == 'tag' && github.ref_name) || '' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: ./scripts/ci/release-notes.sh android 500 "${RUNNER_TEMP}/play-notes.txt"
@@ -275,7 +275,7 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           COMMIT_SHA: ${{ env.COMMIT_SHA }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || (github.ref_type == 'tag' && github.ref_name) || '' }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           fields=$(node scripts/ci/render-build-info.js slack --platform android)
@@ -496,7 +496,7 @@ jobs:
           COMMIT_SHA: ${{ env.COMMIT_SHA }}
           BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || (github.ref_type == 'tag' && github.ref_name) || '' }}
           BASE_VERSION: ${{ steps.marketing.outputs.version }}
           MARKETING_VERSION: ${{ steps.marketing.outputs.version }}
           BUILD_NUMBER: ${{ steps.number.outputs.build_number }}
@@ -521,7 +521,7 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           COMMIT_SHA: ${{ env.COMMIT_SHA }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || (github.ref_type == 'tag' && github.ref_name) || '' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: ./scripts/ci/release-notes.sh ios 4000 "${RUNNER_TEMP}/what-to-test.txt"
@@ -545,7 +545,7 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
           SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
           COMMIT_SHA: ${{ env.COMMIT_SHA }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || (github.ref_type == 'tag' && github.ref_name) || '' }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           fields=$(node scripts/ci/render-build-info.js slack --platform ios)
