@@ -34,6 +34,10 @@ jest.mock("@react-native-async-storage/async-storage", () => ({}), {
 });
 jest.mock("expo-constants", () => ({ expoConfig: {} }), { virtual: true });
 jest.mock("expo-location", () => ({}), { virtual: true });
+jest.mock("expo-application", () => ({ nativeBuildVersion: "1" }), {
+  virtual: true,
+});
+jest.mock("expo-clipboard", () => ({}), { virtual: true });
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }), {
   virtual: true,
 });
@@ -92,6 +96,10 @@ const screens = [
   ["Forms", jest.requireActual("../example/app/forms").default],
   ["Push", jest.requireActual("../example/app/push").default],
   ["Geofencing", jest.requireActual("../example/app/geofencing").default],
+  [
+    "Build info",
+    jest.requireActual("../example/components/BuildInfoModal").BuildInfoModal,
+  ],
 ];
 
 function flatten(style: unknown): Record<string, unknown> {
