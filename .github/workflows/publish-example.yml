@@ -1,0 +1,725 @@
+# Builds the example app on EAS and submits it to the Play internal track and
+# TestFlight. Android and iOS deploy in independent jobs, each followed by a
+# job that sets the store release notes.
+#
+# Triggers:
+#   - push to master or rel/**  (both platforms)
+#   - release: published        (both platforms; the release body goes into the notes)
+#   - workflow_dispatch         (manual; choose `both` / `android` / `ios`)
+#   - pull_request: labeled     (deploys the PR head; the label picks the platforms)
+#
+# Label conventions (the cleanup-label job removes them after the run, so
+# applying one again re-triggers):
+#   - `deploy-example-app`          both platforms
+#   - `deploy-example-app:android`  Android only
+#   - `deploy-example-app:ios`      iOS only
+#
+# Credentials are EAS-hosted and CI authenticates with EXPO_TOKEN. Build
+# numbers come from store preflights (scripts/ci/next-build-number.js). See
+# PUBLISH_EXAMPLE.md for secrets, variables and one-time setup.
+#
+# Logs on this repo are public. Never print EAS artifact URLs, tokens or keys.
+
+name: Publish Example App
+
+on:
+  push:
+    branches:
+      - master
+      - "rel/**"
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.coderabbit.yaml'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Which platform(s) to publish"
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - android
+          - ios
+  pull_request:
+    types: [labeled]
+
+# Runs are never cancelled once started. Pushes to one branch queue behind the in-flight run, and a
+# newer queued push replaces an older queued one. Release, manual and label runs queue alone.
+concurrency:
+  group: publish-example-${{ github.event_name == 'push' && github.ref || github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  ANDROID_PACKAGE: com.klaviyo.expoexample
+  IOS_BUNDLE_ID: com.klaviyo.expoexample
+  COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  plan:
+    name: Choose platforms
+    if: |
+      github.event_name != 'pull_request'
+      || (startsWith(github.event.label.name, 'deploy-example-app')
+          && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      android: ${{ steps.plan.outputs.android }}
+      ios: ${{ steps.plan.outputs.ios }}
+    steps:
+      - name: Plan the deploy
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_PLATFORM: ${{ inputs.platform }}
+          LABEL_NAME: ${{ github.event.label.name }}
+        run: |
+          case "$EVENT_NAME" in
+            workflow_dispatch) wanted="$DISPATCH_PLATFORM" ;;
+            pull_request)
+              case "$LABEL_NAME" in
+                deploy-example-app) wanted=both ;;
+                deploy-example-app:android) wanted=android ;;
+                deploy-example-app:ios) wanted=ios ;;
+                *)
+                  wanted=none
+                  echo "::notice::Label '$LABEL_NAME' does not select a deploy."
+                  ;;
+              esac
+              ;;
+            *) wanted=both ;;
+          esac
+
+          android=false
+          ios=false
+          if [ "$wanted" = both ] || [ "$wanted" = android ]; then android=true; fi
+          if [ "$wanted" = both ] || [ "$wanted" = ios ]; then ios=true; fi
+          echo "android=$android" >> "$GITHUB_OUTPUT"
+          echo "ios=$ios" >> "$GITHUB_OUTPUT"
+
+  preflight:
+    name: Check required secrets
+    needs: plan
+    if: |
+      (needs.plan.outputs.android == 'true' || needs.plan.outputs.ios == 'true')
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      android: ${{ steps.android.outputs.ready }}
+      ios: ${{ steps.ios.outputs.ready }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.COMMIT_SHA }}
+          persist-credentials: false
+
+      - name: Check Android secrets
+        id: android
+        if: needs.plan.outputs.android == 'true'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          ./scripts/ci/check-secrets.sh Android "$EVENT_NAME" \
+            EXPO_TOKEN SERVICE_ACCOUNT_JSON KLAVIYO_EAS_PROJECT_ID
+
+      - name: Check iOS secrets
+        id: ios
+        if: needs.plan.outputs.ios == 'true'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
+          KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          ASC_APP_ID: ${{ vars.ASC_APP_ID }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          ./scripts/ci/check-secrets.sh iOS "$EVENT_NAME" \
+            EXPO_TOKEN APP_STORE_CONNECT_API_KEY_KEY_ID APP_STORE_CONNECT_API_KEY_ISSUER_ID \
+            APP_STORE_CONNECT_API_KEY_KEY KLAVIYO_EAS_PROJECT_ID APPLE_TEAM_ID ASC_APP_ID
+
+  checks:
+    name: Checks
+    needs: preflight
+    if: |
+      !cancelled() && !failure()
+      && (needs.preflight.outputs.android == 'true' || needs.preflight.outputs.ios == 'true')
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    uses: ./.github/workflows/publish-example-checks.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha || github.sha }}
+    permissions:
+      contents: read
+
+  deploy-android:
+    name: Publish to Play Store internal track
+    needs: [checks, preflight]
+    if: |
+      !cancelled() && !failure()
+      && needs.preflight.outputs.android == 'true'
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment:
+      name: android-internal-track
+      url: ${{ steps.result.outputs.install_url }}
+    outputs:
+      app_version: ${{ steps.deploy.outputs.app_version }}
+      build_number: ${{ steps.deploy.outputs.build_number }}
+      build_date: ${{ steps.deploy.outputs.build_date }}
+      uploaded: ${{ steps.deploy.outcome == 'success' }}
+      notes_uploaded: ${{ steps.upload_notes.outcome == 'success' }}
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.COMMIT_SHA }}
+          persist-credentials: false
+
+      - name: Set source label
+        id: label
+        uses: ./.github/actions/set-source-label
+
+      - name: Setup EAS
+        id: setup
+        uses: ./.github/actions/setup-eas
+
+      - name: Resolve app version base
+        id: marketing
+        run: |
+          base=$(node -p "require('./package.json').version")
+          base="${base%%[-+]*}"
+          if [[ ! "$base" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Plugin version '$base' is not X.Y.Z, so the app version cannot be derived."
+            exit 1
+          fi
+          echo "version=${base}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve next versionCode from Play
+        id: number
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+        run: node scripts/ci/next-build-number.js android --package "$ANDROID_PACKAGE"
+
+      - name: EAS build and submit
+        id: deploy
+        working-directory: example
+        env:
+          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
+          COMMIT_SHA: ${{ env.COMMIT_SHA }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          BASE_VERSION: ${{ steps.marketing.outputs.version }}
+          BUILD_NUMBER: ${{ steps.number.outputs.build_number }}
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          RECHECK_CMD: node ../scripts/ci/next-build-number.js android --package "$ANDROID_PACKAGE"
+        run: ../scripts/ci/eas-deploy.sh android "$BUILD_NUMBER"
+
+      - name: Record install link
+        id: result
+        env:
+          VERSION_CODE: ${{ steps.deploy.outputs.build_number }}
+        run: echo "install_url=https://play.google.com/apps/test/${ANDROID_PACKAGE}/${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+
+      - name: Render release notes
+        id: render_notes
+        if: success()
+        continue-on-error: true
+        env:
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
+          COMMIT_SHA: ${{ env.COMMIT_SHA }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: ./scripts/ci/release-notes.sh android 500 "${RUNNER_TEMP}/play-notes.txt"
+
+      - name: Upload release notes
+        id: upload_notes
+        if: success()
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: play-notes
+          path: ${{ runner.temp }}/play-notes.txt
+          retention-days: 7
+
+      - name: Render Slack fields
+        id: slack
+        if: success()
+        continue-on-error: true
+        env:
+          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
+          COMMIT_SHA: ${{ env.COMMIT_SHA }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          fields=$(node scripts/ci/render-build-info.js slack --platform android)
+          {
+            echo "build=$(jq -r .build <<< "$fields")"
+            echo "sdks=$(jq -r .sdks <<< "$fields")"
+            echo "source=$(jq -r .source <<< "$fields")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Find the failed step
+        id: failed
+        if: failure()
+        env:
+          SETUP: ${{ steps.setup.outcome }}
+          MARKETING: ${{ steps.marketing.outcome }}
+          NUMBER: ${{ steps.number.outcome }}
+          DEPLOY: ${{ steps.deploy.outcome }}
+        run: |
+          step="an earlier step"
+          if [ "$SETUP" = failure ]; then step="setup"
+          elif [ "$MARKETING" = failure ]; then step="resolving the app version"
+          elif [ "$NUMBER" = failure ]; then step="the Play versionCode lookup"
+          elif [ "$DEPLOY" = failure ]; then step="EAS build or submit"
+          fi
+          echo "step=$step" >> "$GITHUB_OUTPUT"
+
+      - name: Find the failed post-upload step
+        id: warned
+        if: success() && (steps.render_notes.outcome == 'failure' || steps.upload_notes.outcome == 'failure' || steps.slack.outcome == 'failure')
+        env:
+          RENDER_NOTES: ${{ steps.render_notes.outcome }}
+          UPLOAD_NOTES: ${{ steps.upload_notes.outcome }}
+          SLACK: ${{ steps.slack.outcome }}
+        run: |
+          step="a post-upload step"
+          if [ "$RENDER_NOTES" = failure ]; then step="rendering the release notes"
+          elif [ "$UPLOAD_NOTES" = failure ]; then step="uploading the release notes"
+          elif [ "$SLACK" = failure ]; then step="rendering the Slack fields"
+          fi
+          echo "step=$step" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Slack on success
+        if: success() && steps.warned.outcome != 'success'
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: success
+          platform: Android
+          destination: Play internal
+          build: ${{ steps.slack.outputs.build }}
+          sdks: ${{ steps.slack.outputs.sdks }}
+          source: ${{ steps.slack.outputs.source }}
+          commit_sha: ${{ env.COMMIT_SHA }}
+          get_build: "<${{ steps.result.outputs.install_url }}|Install Klaviyo Expo Example from Google Play> on your Android device to get `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. Only internal testers can open this link."
+
+      - name: Notify Slack on upload with warnings
+        if: success() && steps.warned.outcome == 'success'
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: notes-failure
+          platform: Android
+          destination: Play internal
+          build: ${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})
+          sdks: ${{ steps.slack.outputs.sdks }}
+          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
+          commit_sha: ${{ env.COMMIT_SHA }}
+          failed_step: ${{ steps.warned.outputs.step }}
+
+      - name: Notify Slack on failure
+        if: failure()
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: failure
+          platform: Android
+          destination: Play internal
+          build: ${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})
+          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
+          commit_sha: ${{ env.COMMIT_SHA }}
+          failed_step: ${{ steps.failed.outputs.step }}
+
+  android-notes:
+    name: Set Play release notes
+    needs: deploy-android
+    if: |
+      always()
+      && needs.deploy-android.outputs.uploaded == 'true'
+      && needs.deploy-android.outputs.notes_uploaded == 'true'
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.COMMIT_SHA }}
+          persist-credentials: false
+
+      - name: Set source label
+        uses: ./.github/actions/set-source-label
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download release notes
+        id: download_notes
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: play-notes
+          path: ${{ runner.temp }}
+
+      - name: Set notes on the Play release
+        id: notes
+        if: steps.download_notes.outcome == 'success'
+        continue-on-error: true
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          PLAY_PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
+          PLAY_TRACK: internal
+          PLAY_RELEASE_NAME: ${{ needs.deploy-android.outputs.app_version }} (${{ needs.deploy-android.outputs.build_number }}) ${{ env.COMMIT_SHA }}
+          VERSION_CODE: ${{ needs.deploy-android.outputs.build_number }}
+        run: node scripts/ci/play-release-notes.js "$VERSION_CODE" "${RUNNER_TEMP}/play-notes.txt"
+
+      - name: Warn on Slack that the notes were not set
+        if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: notes-failure
+          platform: Android
+          destination: Play internal
+          build: ${{ needs.deploy-android.outputs.app_version }} (${{ needs.deploy-android.outputs.build_number }})
+          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
+          commit_sha: ${{ env.COMMIT_SHA }}
+
+  deploy-ios:
+    name: Publish to TestFlight
+    needs: [checks, preflight]
+    if: |
+      !cancelled() && !failure()
+      && needs.preflight.outputs.ios == 'true'
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment:
+      name: testflight
+      url: ${{ steps.result.outputs.testflight_url }}
+    outputs:
+      app_version: ${{ steps.deploy.outputs.app_version }}
+      marketing_version: ${{ steps.marketing.outputs.version }}
+      build_number: ${{ steps.deploy.outputs.build_number }}
+      build_date: ${{ steps.deploy.outputs.build_date }}
+      uploaded: ${{ steps.deploy.outcome == 'success' }}
+      notes_uploaded: ${{ steps.upload_notes.outcome == 'success' }}
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      ASC_APP_ID: ${{ vars.ASC_APP_ID }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.COMMIT_SHA }}
+          persist-credentials: false
+
+      - name: Set source label
+        id: label
+        uses: ./.github/actions/set-source-label
+
+      - name: Setup EAS
+        id: setup
+        uses: ./.github/actions/setup-eas
+
+      - name: Set App Store Connect app ID
+        working-directory: example
+        run: |
+          if [ -z "${ASC_APP_ID}" ]; then
+            echo "::error::ASC_APP_ID repository variable is not set. See PUBLISH_EXAMPLE.md."
+            exit 1
+          fi
+          jq --arg id "${ASC_APP_ID}" '.submit.production.ios.ascAppId = $id' eas.json > eas.json.tmp
+          mv eas.json.tmp eas.json
+
+      - name: Resolve app version base
+        id: marketing
+        run: |
+          base=$(node -p "require('./package.json').version")
+          base="${base%%[-+]*}"
+          if [[ ! "$base" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Plugin version '$base' is not X.Y.Z, so the app version cannot be derived."
+            exit 1
+          fi
+          echo "version=${base}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve next build number from App Store Connect
+        id: number
+        env:
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
+          MARKETING_VERSION: ${{ steps.marketing.outputs.version }}
+        run: node scripts/ci/next-build-number.js ios --bundle-id "$IOS_BUNDLE_ID" --marketing-version "$MARKETING_VERSION"
+
+      - name: EAS build and submit
+        id: deploy
+        working-directory: example
+        env:
+          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
+          COMMIT_SHA: ${{ env.COMMIT_SHA }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          BASE_VERSION: ${{ steps.marketing.outputs.version }}
+          MARKETING_VERSION: ${{ steps.marketing.outputs.version }}
+          BUILD_NUMBER: ${{ steps.number.outputs.build_number }}
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
+          RECHECK_CMD: node ../scripts/ci/next-build-number.js ios --bundle-id "$IOS_BUNDLE_ID" --marketing-version "$MARKETING_VERSION"
+        run: ../scripts/ci/eas-deploy.sh ios "$BUILD_NUMBER"
+
+      - name: Record TestFlight link
+        id: result
+        run: echo "testflight_url=https://beta.itunes.apple.com/v1/app/${ASC_APP_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Render release notes
+        id: render_notes
+        if: success()
+        continue-on-error: true
+        env:
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
+          COMMIT_SHA: ${{ env.COMMIT_SHA }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: ./scripts/ci/release-notes.sh ios 4000 "${RUNNER_TEMP}/what-to-test.txt"
+
+      - name: Upload release notes
+        id: upload_notes
+        if: success()
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: what-to-test-notes
+          path: ${{ runner.temp }}/what-to-test.txt
+          retention-days: 7
+
+      - name: Render Slack fields
+        id: slack
+        if: success()
+        continue-on-error: true
+        env:
+          BUILD_INFO_FILE: ${{ runner.temp }}/build-info.json
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          SOURCE_LABEL: ${{ env.SOURCE_LABEL }}
+          COMMIT_SHA: ${{ env.COMMIT_SHA }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          fields=$(node scripts/ci/render-build-info.js slack --platform ios)
+          {
+            echo "build=$(jq -r .build <<< "$fields")"
+            echo "sdks=$(jq -r .sdks <<< "$fields")"
+            echo "source=$(jq -r .source <<< "$fields")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Find the failed step
+        id: failed
+        if: failure()
+        env:
+          SETUP: ${{ steps.setup.outcome }}
+          MARKETING: ${{ steps.marketing.outcome }}
+          NUMBER: ${{ steps.number.outcome }}
+          DEPLOY: ${{ steps.deploy.outcome }}
+        run: |
+          step="an earlier step"
+          if [ "$SETUP" = failure ]; then step="setup"
+          elif [ "$MARKETING" = failure ]; then step="resolving the app version"
+          elif [ "$NUMBER" = failure ]; then step="the App Store Connect build number lookup"
+          elif [ "$DEPLOY" = failure ]; then step="EAS build or submit"
+          fi
+          echo "step=$step" >> "$GITHUB_OUTPUT"
+
+      - name: Find the failed post-upload step
+        id: warned
+        if: success() && (steps.render_notes.outcome == 'failure' || steps.upload_notes.outcome == 'failure' || steps.slack.outcome == 'failure')
+        env:
+          RENDER_NOTES: ${{ steps.render_notes.outcome }}
+          UPLOAD_NOTES: ${{ steps.upload_notes.outcome }}
+          SLACK: ${{ steps.slack.outcome }}
+        run: |
+          step="a post-upload step"
+          if [ "$RENDER_NOTES" = failure ]; then step="rendering the release notes"
+          elif [ "$UPLOAD_NOTES" = failure ]; then step="uploading the release notes"
+          elif [ "$SLACK" = failure ]; then step="rendering the Slack fields"
+          fi
+          echo "step=$step" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Slack on success
+        if: success() && steps.warned.outcome != 'success'
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: success
+          platform: iOS
+          destination: TestFlight
+          build: ${{ steps.slack.outputs.build }}
+          sdks: ${{ steps.slack.outputs.sdks }}
+          source: ${{ steps.slack.outputs.source }}
+          commit_sha: ${{ env.COMMIT_SHA }}
+          get_build: "<${{ steps.result.outputs.testflight_url }}|Open Klaviyo Expo Example in TestFlight> on your iPhone, then install `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. The build shows up once Apple finishes processing it, usually in 5 to 30 minutes."
+
+      - name: Notify Slack on upload with warnings
+        if: success() && steps.warned.outcome == 'success'
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: notes-failure
+          platform: iOS
+          destination: TestFlight
+          build: ${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})
+          sdks: ${{ steps.slack.outputs.sdks }}
+          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
+          commit_sha: ${{ env.COMMIT_SHA }}
+          failed_step: ${{ steps.warned.outputs.step }}
+
+      - name: Notify Slack on failure
+        if: failure()
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: failure
+          platform: iOS
+          destination: TestFlight
+          build: ${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})
+          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
+          commit_sha: ${{ env.COMMIT_SHA }}
+          failed_step: ${{ steps.failed.outputs.step }}
+
+  what-to-test:
+    name: Set TestFlight "What to Test"
+    needs: deploy-ios
+    if: |
+      always()
+      && needs.deploy-ios.outputs.uploaded == 'true'
+      && needs.deploy-ios.outputs.notes_uploaded == 'true'
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.COMMIT_SHA }}
+          persist-credentials: false
+
+      - name: Set source label
+        uses: ./.github/actions/set-source-label
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download release notes
+        id: download_notes
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: what-to-test-notes
+          path: ${{ runner.temp }}
+
+      - name: Set What to Test on the uploaded build
+        id: notes
+        if: steps.download_notes.outcome == 'success'
+        continue-on-error: true
+        env:
+          APP_STORE_CONNECT_API_KEY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY_KEY }}
+          MARKETING_VERSION: ${{ needs.deploy-ios.outputs.marketing_version }}
+          BUILD_NUMBER: ${{ needs.deploy-ios.outputs.build_number }}
+        run: |
+          node scripts/ci/asc-whats-new.js \
+            --bundle-id "$IOS_BUNDLE_ID" \
+            --marketing-version "$MARKETING_VERSION" \
+            --build-number "$BUILD_NUMBER" \
+            --notes-file "${RUNNER_TEMP}/what-to-test.txt"
+
+      - name: Warn on Slack that What to Test was not set
+        if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-example-publish
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: notes-failure
+          platform: iOS
+          destination: TestFlight
+          build: ${{ needs.deploy-ios.outputs.app_version }} (${{ needs.deploy-ios.outputs.build_number }})
+          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
+          commit_sha: ${{ env.COMMIT_SHA }}
+
+  cleanup-label:
+    name: Remove deploy label
+    needs: [deploy-android, deploy-ios]
+    if: |
+      always()
+      && github.event_name == 'pull_request'
+      && startsWith(github.event.label.name, 'deploy-example-app')
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Remove label
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          LABEL_NAME: ${{ github.event.label.name }}
+        with:
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                name: process.env.LABEL_NAME,
+              });
+            } catch (e) {
+              if (e.status !== 404) throw e;
+            }
