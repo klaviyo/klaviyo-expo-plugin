@@ -114,9 +114,7 @@ This development-only demo uses the React Native SDK's public
 [`registerAuthTokenProvider` API](https://github.com/klaviyo/klaviyo-react-native-sdk#personalized-forms-authentication).
 It requires SDK 2.6.0 (native Android 4.6.0 and iOS 5.5.0) and personalized forms
 enablement for your Klaviyo account. No JWT option or bridge is needed in the Expo plugin.
-The example temporarily depends on the named `feat/jwts-for-personalized-forms`
-SDK branch until 2.6.0 is published; replace that dependency with published `2.6.0`
-and regenerate the lockfile before merging this adoption change.
+The example pins the published React Native SDK `2.6.0` package.
 
 1. Install the parent plugin dependencies and run `npm run build` from the repository root.
    Install the example dependencies, then create a new development build for your platform.
