@@ -2,7 +2,7 @@
 
 ## Overview
 
-`.github/workflows/publish-example.yml` builds the example app on EAS and submits it to the Play Store internal track and TestFlight. It runs on every push to `master` or a `rel/**` branch, whenever a GitHub release is published, on demand through `workflow_dispatch`, and when a deploy label is added to a pull request. Until the `EXPO_TOKEN` secret and the `KLAVIYO_EAS_PROJECT_ID` variable exist, the workflow skips with a warning.
+`.github/workflows/publish-example.yml` builds the example app on EAS and submits it to the Play Store internal track and TestFlight. It runs on every push to `master` or a `rel/**` branch, whenever a GitHub release is published, on demand through `workflow_dispatch`, and when a deploy label is added to a pull request. When a required secret or variable from the tables below is missing, a push or release run posts a notice and skips the deploy, while a manual or label run fails with an error.
 
 A run is never cancelled once it starts. A push waits for the in-flight run on the same branch, and a newer queued push replaces an older queued one, so quick merges deploy the latest commit without wasting builds. Cancelling would leave the EAS build running on Expo's servers, unsupervised and using a build number, with no submit step to follow it. Release, manual and label runs queue on their own.
 
@@ -10,7 +10,7 @@ EAS compiles and signs both platforms on Expo's infrastructure. The GitHub runne
 
 Each platform deploys in its own job, in a GitHub environment (`android-internal-track` and `testflight`), so the repo's Deployments page lists every deploy with a link to the build in the store. The environments have no protection rules and no secrets of their own. The repo secrets below still apply.
 
-After each deploy, a second job sets the store release notes: `what-to-test` for TestFlight and `android-notes` for Play. A failure there leaves the build on the store without notes and posts a separate Slack warning.
+After each deploy, a second job sets the store release notes: `what-to-test` for TestFlight and `android-notes` for Play. It runs only when the submit succeeded and the deploy job uploaded the notes file. If the deploy job could not render or upload the notes, its own Slack message carries the warning and the notes job skips. A failure in the notes job leaves the build on the store without notes and posts a separate Slack warning.
 
 `.github/workflows/publish-example-checks.yml` holds the checks: the plugin's type check and jest suite, and the example app's type check. It runs on pull requests that touch the publish files or `example/`, and `publish-example.yml` calls it as its `checks` job. Both deploy jobs `need` that job, so a failing check means nothing reaches a store, label deploys included. It uses no secrets and makes no store or EAS calls.
 
@@ -53,7 +53,6 @@ These are not secret.
 |----------|-------------|
 | `KLAVIYO_EAS_PROJECT_ID` | EAS project ID for `klaviyo/klaviyo-plugin-example` |
 | `APPLE_TEAM_ID` | Apple Developer team that signs the app |
-| `PLAY_TESTERS_URL` | Optional. The internal testing opt-in link from Play Console (Internal testing, Testers tab). Slack uses it for "Get the build" and the environment link, and falls back to the public store listing when it is unset |
 | `ASC_APP_ID` | App Store Connect app ID for `com.klaviyo.expoexample`. The workflow writes it into `eas.json` at build time, since non-interactive iOS submits need it |
 
 ---
@@ -152,9 +151,9 @@ Do not add steps that print environment variables, upload signed artifacts, or p
 
 ## Debugging common failures
 
-### The workflow skips with a warning
+### The workflow skips with a notice
 
-`EXPO_TOKEN` or `KLAVIYO_EAS_PROJECT_ID` is unset. Add them and re-run.
+A push or release run skips the deploy when a required secret or variable from the tables above is missing, and posts a notice naming which ones. A manual or label run fails with an error instead. Add the missing entries and re-run.
 
 ### "Increment Build Number" or a duplicate build number on submit
 
@@ -190,7 +189,7 @@ Add `-f platform=android` or `-f platform=ios` to publish one platform.
 
 EAS builds and signs on Expo's servers, so some pieces of the native workflows do not apply here.
 
-- No Internal App Sharing link: `eas submit` uploads to the internal track and offers no sharing upload. Slack links the internal testing opt-in link from `PLAY_TESTERS_URL` instead.
+- No Internal App Sharing link: `eas submit` uploads to the internal track and offers no sharing upload. Slack links the build's per-release Play URL (`play.google.com/apps/test/<package>/<versionCode>`) instead, which works for the same internal testers.
 - No keystore or signing key cleanup steps: signing material lives on EAS and never reaches the runner. CI holds only `EXPO_TOKEN` and the store API keys, and they are passed through `env` for the steps that need them. No step writes them to disk.
 - Concurrency never cancels a started run. See [Overview](#overview).
 - Android release notes are set after the submit through the Play Developer API, since `eas submit` has no notes option. iOS notes go through the App Store Connect API in their own job, as in the iOS test app.
