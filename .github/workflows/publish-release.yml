@@ -1,6 +1,9 @@
 name: Publish release
 
+# Entry point for every npm publish; the npm trusted publisher names this file.
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       version:
@@ -17,6 +20,9 @@ concurrency:
   group: publish-release
   cancel-in-progress: false
 
+env:
+  VERSION: ${{ inputs.version || github.event.release.tag_name }}
+
 jobs:
   prepare:
     runs-on: ubuntu-22.04
@@ -30,11 +36,10 @@ jobs:
       release_url: ${{ steps.draft.outputs.url }}
     env:
       GH_TOKEN: ${{ github.token }}
-      VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.event.repository.default_branch }}
+          ref: ${{ inputs.ref || github.event.release.tag_name || github.event.repository.default_branch }}
 
       - name: Resolve commit
         id: sha
@@ -46,7 +51,7 @@ jobs:
             echo "::error::version must be X.Y.Z or X.Y.Z-suffix, got '$VERSION'."
             exit 1
           fi
-          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" >/dev/null 2>&1; then
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" >/dev/null 2>&1; then
             echo "::error::Tag $VERSION already exists."
             exit 1
           fi
@@ -100,7 +105,14 @@ jobs:
         id: draft
         env:
           SHA: ${{ steps.sha.outputs.sha }}
+          EVENT_RELEASE_URL: ${{ github.event.release.html_url }}
         run: |
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            echo "url=$EVENT_RELEASE_URL" >> "$GITHUB_OUTPUT"
+            echo "### Release $VERSION awaiting approval" >> "$GITHUB_STEP_SUMMARY"
+            echo "Approve the \`npm\` deployment in this run to publish: $EVENT_RELEASE_URL" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           existing="$(gh release view "$VERSION" --json isDraft,url --jq '"\(.isDraft)\t\(.url)"' 2>/dev/null || true)"
           if [ -n "$existing" ]; then
             if [ "$(cut -f1 <<<"$existing")" != "true" ]; then
@@ -125,12 +137,12 @@ jobs:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
           payload: |
-            text: "⏳ Expo plugin release ${{ inputs.version }} awaiting approval"
+            text: "⏳ Expo plugin release ${{ env.VERSION }} awaiting approval"
             blocks:
               - type: "section"
                 text:
                   type: "mrkdwn"
-                  text: "⏳ *Expo plugin release `${{ inputs.version }}` awaiting approval*\n*Draft release:* <${{ steps.draft.outputs.url }}|Review notes>\n*Started by:* ${{ github.actor }}\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Approve here>"
+                  text: "⏳ *Expo plugin release `${{ env.VERSION }}` awaiting approval*\n*Release:* <${{ steps.draft.outputs.url }}|Review notes>\n*Started by:* ${{ github.actor }}\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Approve here>"
 
   publish-npm:
     needs: prepare
@@ -139,19 +151,19 @@ jobs:
       id-token: write
     uses: ./.github/workflows/publish-sdk.yml
     with:
-      version: ${{ inputs.version }}
+      version: ${{ inputs.version || github.event.release.tag_name }}
       ref: ${{ needs.prepare.outputs.sha }}
       release_url: ${{ needs.prepare.outputs.release_url }}
     secrets: inherit
 
   publish-release:
     needs: [prepare, publish-npm]
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
     permissions:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -179,9 +191,9 @@ jobs:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
           payload: |
-            text: "🚨 Expo plugin ${{ inputs.version }} is on npm but the GitHub release could not be published"
+            text: "🚨 Expo plugin ${{ env.VERSION }} is on npm but the GitHub release could not be published"
             blocks:
               - type: "section"
                 text:
                   type: "mrkdwn"
-                  text: "🚨 *Expo plugin `${{ inputs.version }}` is on npm but the GitHub release could not be published.* Publish the draft by hand.\n*Draft release:* <${{ needs.prepare.outputs.release_url }}|Open draft>\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+                  text: "🚨 *Expo plugin `${{ env.VERSION }}` is on npm but the GitHub release could not be published.* Publish the draft by hand.\n*Draft release:* <${{ needs.prepare.outputs.release_url }}|Open draft>\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"

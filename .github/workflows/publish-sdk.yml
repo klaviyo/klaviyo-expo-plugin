@@ -1,8 +1,6 @@
 name: Publish SDK to NPM
 
 on:
-  release:
-    types: [published]
   workflow_call:
     inputs:
       version:
@@ -33,12 +31,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          ref: ${{ inputs.ref }}
 
       - name: Resolve release version
         id: version
         env:
-          TAG_NAME: ${{ inputs.version || github.event.release.tag_name }}
+          TAG_NAME: ${{ inputs.version }}
         run: |
           version="${TAG_NAME#v}"
           package_version="$(node -p "require('./package.json').version")"
@@ -77,7 +75,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.sha }}
+          ref: ${{ inputs.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -134,5 +132,5 @@ jobs:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           result: ${{ needs.publish-sdk.result == 'success' && 'success' || 'failure' }}
           package: ${{ env.PACKAGE_NAME }}
-          version: ${{ needs.test.outputs.version || inputs.version || github.event.release.tag_name }}
-          release_url: ${{ inputs.release_url || github.event.release.html_url }}
+          version: ${{ needs.test.outputs.version || inputs.version }}
+          release_url: ${{ inputs.release_url }}
