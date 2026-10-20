@@ -76,6 +76,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      already_published: ${{ steps.publish.outputs.already_published }}
 
     steps:
       - uses: actions/checkout@v4
@@ -106,8 +108,20 @@ jobs:
         run: npm publish --dry-run --tag "${{ needs.test.outputs.dist_tag }}"
 
       - name: Publish to npm
+        id: publish
         if: ${{ !inputs.dry_run }}
-        run: npm publish --tag "${{ needs.test.outputs.dist_tag }}"
+        env:
+          VERSION: ${{ needs.test.outputs.version }}
+          DIST_TAG: ${{ needs.test.outputs.dist_tag }}
+        run: |
+          if npm publish --tag "$DIST_TAG"; then
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          elif [ "$(npm view "${PACKAGE_NAME}@${VERSION}" version 2>/dev/null)" = "$VERSION" ]; then
+            echo "::warning::${PACKAGE_NAME}@${VERSION} is already on npm; nothing to publish."
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+          else
+            exit 1
+          fi
 
       - name: Verify the version is on npm
         if: ${{ !inputs.dry_run }}
@@ -129,19 +143,47 @@ jobs:
 
   notify:
     needs: [test, publish-sdk]
-    if: always() && !(inputs.dry_run && needs.publish-sdk.result == 'success')
+    # Cancelled runs are reported by publish-release.yml's stopped job.
+    if: >-
+      always()
+      && !contains(needs.*.result, 'cancelled')
+      && !(inputs.dry_run && needs.publish-sdk.result == 'success')
     runs-on: ubuntu-22.04
     permissions:
       contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v4
+
+      - name: Classify the result
+        id: result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISH_RESULT: ${{ needs.publish-sdk.result }}
+        run: |
+          if [ "$PUBLISH_RESULT" = "success" ]; then
+            echo "result=success" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A rejected deployment fails the publish job before any step runs.
+          ran="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs" \
+            --jq '[.jobs[] | select(.name | endswith("publish-sdk")) | .steps | length] | add // 0' || echo unknown)"
+          if [ "$PUBLISH_RESULT" = "failure" ] && [ "$ran" = "0" ]; then
+            echo "result=stopped" >> "$GITHUB_OUTPUT"
+            echo "reason=npm deploy rejected" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=failure" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Notify Slack
         continue-on-error: true
         uses: ./.github/actions/notify-slack-publish
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: ${{ needs.publish-sdk.result == 'success' && 'success' || 'failure' }}
+          result: ${{ steps.result.outputs.result }}
+          reason: ${{ steps.result.outputs.reason }}
           package: ${{ env.PACKAGE_NAME }}
           version: ${{ needs.test.outputs.version || inputs.version }}
           release_url: ${{ inputs.release_url }}
+          dist_tag: ${{ needs.test.outputs.dist_tag }}
+          already_published: ${{ needs.publish-sdk.outputs.already_published }}

@@ -6,7 +6,7 @@ inputs:
     required: false
     default: ''
   result:
-    description: "'success' or 'failure'; drives the icon and headline"
+    description: "'success', 'failure' or 'stopped' (approval rejected); drives the icon and headline"
     required: true
   package:
     description: npm package name
@@ -17,6 +17,18 @@ inputs:
     default: unknown
   release_url:
     description: URL of the GitHub release that triggered the publish
+    required: false
+    default: ''
+  dist_tag:
+    description: npm dist-tag the version was published to
+    required: false
+    default: ''
+  already_published:
+    description: "'true' when the version was already on npm and nothing was published"
+    required: false
+    default: ''
+  reason:
+    description: Why the publish stopped (result 'stopped' only)
     required: false
     default: ''
 
@@ -36,6 +48,29 @@ runs:
           echo "post=true" >> "$GITHUB_OUTPUT"
         fi
 
+    - name: Compose the headline
+      if: steps.webhook.outputs.post == 'true'
+      id: headline
+      shell: bash
+      env:
+        RESULT: ${{ inputs.result }}
+        DIST_TAG: ${{ inputs.dist_tag }}
+        ALREADY: ${{ inputs.already_published }}
+        REASON: ${{ inputs.reason }}
+      run: |
+        case "$RESULT" in
+          success)
+            if [ "$ALREADY" = "true" ]; then
+              headline="✅ Expo plugin: already on npm, nothing published"
+            else
+              headline="✅ Expo plugin: npm publish succeeded${DIST_TAG:+ (dist-tag $DIST_TAG)}"
+            fi
+            ;;
+          stopped) headline="⚠️ Expo plugin: release stopped (${REASON:-stopped}), nothing published" ;;
+          *) headline="🚨 Expo plugin: npm publish failed" ;;
+        esac
+        echo "text=$headline" >> "$GITHUB_OUTPUT"
+
     - if: steps.webhook.outputs.post == 'true'
       continue-on-error: true
       uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
@@ -43,12 +78,12 @@ runs:
         webhook: ${{ inputs.webhook }}
         webhook-type: incoming-webhook
         payload: |
-          text: "${{ inputs.result == 'success' && '✅' || '🚨' }} Expo plugin: npm publish ${{ inputs.result == 'success' && 'succeeded' || 'failed' }} (${{ inputs.package }}@${{ inputs.version }})"
+          text: "${{ steps.headline.outputs.text }} (${{ inputs.package }}@${{ inputs.version }})"
           blocks:
             - type: "header"
               text:
                 type: "plain_text"
-                text: "${{ inputs.result == 'success' && '✅' || '🚨' }} Expo plugin: npm publish ${{ inputs.result == 'success' && 'succeeded' || 'failed' }}"
+                text: "${{ steps.headline.outputs.text }}"
             - type: "section"
               text:
                 type: "mrkdwn"
