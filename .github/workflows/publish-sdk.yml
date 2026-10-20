@@ -165,10 +165,9 @@ jobs:
             echo "result=success" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # A rejected deployment fails the publish job before any step runs.
-          ran="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs" \
-            --jq '[.jobs[] | select(.name | endswith("publish-sdk")) | .steps | length] | add // 0' || echo unknown)"
-          if [ "$PUBLISH_RESULT" = "failure" ] && [ "$ran" = "0" ]; then
+          rejected="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
+            --jq '[.[] | select(.state == "rejected" and any(.environments[]; .name == "npm"))] | length' || echo 0)"
+          if [ "$PUBLISH_RESULT" = "failure" ] && [ "$rejected" != "0" ]; then
             echo "result=stopped" >> "$GITHUB_OUTPUT"
             echo "reason=npm deploy rejected" >> "$GITHUB_OUTPUT"
           else
