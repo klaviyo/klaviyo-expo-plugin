@@ -32,6 +32,10 @@
   ],
   "author": "Klaviyo",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/klaviyo/klaviyo-expo-plugin.git"
+  },
   "description": "Expo plugin for Klaviyo integration",
   "devDependencies": {
     "@eslint/js": "^9.30.1",

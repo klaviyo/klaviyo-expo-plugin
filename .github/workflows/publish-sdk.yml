@@ -93,10 +93,10 @@ jobs:
 
       # Trusted publishing (OIDC): npm exchanges this job's OIDC token for
       # a short-lived credential, so there is no NPM_TOKEN secret to rotate.
-      # Requires npm >= 11.15 and a trust relationship on npmjs.com allowing
+      # Requires npm >= 11.21 and a trust relationship on npmjs.com allowing
       # `npm publish` from this workflow; provenance attestation is included.
       - name: Update npm for trusted publishing
-        run: npm install -g "npm@^11.15.0"
+        run: npm install -g "npm@^11.21.0"
 
       - name: Publish to npm
         run: npm publish --tag "${{ needs.test.outputs.dist_tag }}"
