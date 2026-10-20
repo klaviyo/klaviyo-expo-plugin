@@ -1,7 +1,18 @@
 name: CI
 
+# Least privilege. Without this block every job inherits the default token scopes;
+# nothing in this workflow writes to the repo, so read is enough.
+permissions:
+  contents: read
+
 on:
   pull_request:
+  # The test-peer-dependencies legs install without a lockfile on purpose, so they exist to
+  # catch upstream Expo/RN graph drift. On pull_request alone that drift is only ever found
+  # the next time somebody happens to open a PR, which defeats the point and lands the
+  # failure on an unrelated contributor. A weekly run puts it on a clock instead.
+  schedule:
+    - cron: '0 6 * * 1'
 
 jobs:
   lint-and-type-check:
@@ -14,7 +25,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20.x'
+        node-version-file: .nvmrc
         cache: 'npm'
         
     - name: Install dependencies
@@ -41,7 +52,7 @@ jobs:
     
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        node-version: [22.x, 24.x]
     
     steps:
     - name: Checkout code
@@ -59,61 +70,108 @@ jobs:
     - name: Run tests with coverage
       run: npm run test:coverage
 
-  test-peer-dependencies:
+  # Emits scripts/expo-sdk-matrix.json so test-peer-dependencies and
+  # scripts/test-peer-dependencies.js read the SAME matrix. Previously the rows were
+  # written out in both places with a "same as CI" comment and nothing enforcing it.
+  sdk-matrix:
     runs-on: ubuntu-22.04
-    
-    strategy:
-      matrix:
-        include:
-          # Test React 18.x with React Native 0.70.x
-          - react-version: "18.1.0"
-            react-native-version: "0.70.0"
-            expo-version: "~48.0.0"
-          # Test React 18.x with React Native 0.71.x
-          - react-version: "18.2.0"
-            react-native-version: "0.71.0"
-            expo-version: "~49.0.0"
-          # Test React 18.x with React Native 0.72.x
-          - react-version: "18.2.0"
-            react-native-version: "0.72.0"
-            expo-version: "~50.0.0"
-          # Test React 18.x with React Native 0.73.x
-          - react-version: "18.2.0"
-            react-native-version: "0.73.0"
-            expo-version: "~51.0.0"
-          # Test React 19.x with React Native 0.79.x
-          - react-version: "19.0.0"
-            react-native-version: "0.79.0"
-            expo-version: "~52.0.0"
-          # Test React 19.x with React Native 0.80.x
-          - react-version: "19.1.0"
-            react-native-version: "0.80.0"
-            expo-version: "~53.0.0"
-    
+    outputs:
+      matrix: ${{ steps.load.outputs.matrix }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
+    - name: Load the Expo SDK matrix
+      id: load
+      run: echo "matrix=$(jq -c . scripts/expo-sdk-matrix.json)" >> "$GITHUB_OUTPUT"
+
+  test-peer-dependencies:
+    runs-on: ubuntu-22.04
+    needs: sdk-matrix
+    name: "test-peer-dependencies (SDK ${{ matrix.sdk }})"
+    # Unsupported rows (52, 53) report without gating; supported rows still fail the build.
+    # Note this makes the job's conclusion success, so the failure is only visible in the
+    # job list - the summary step below is what surfaces it.
+    continue-on-error: ${{ !matrix.supported }}
+
+    strategy:
+      # Sourced from scripts/expo-sdk-matrix.json - see scripts/expo-sdk-matrix.md for the
+      # rules, why SDK 52/53 are included though unsupported, and why 50/51 are not.
+      matrix:
+        include: ${{ fromJSON(needs.sdk-matrix.outputs.matrix) }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # No `cache: 'npm'` here on purpose: setup-node keys the npm cache off the lockfile, and
+    # the install below deliberately ignores the lock, so the cached tree would never be used.
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20.x'
-        cache: 'npm'
-        
+        node-version-file: .nvmrc
+
     - name: Install dependencies with specific peer dependency versions
+      # No `npm ci` and no lockfile on purpose: the committed lock pins the Expo 57 graph,
+      # which ERESOLVEs against an older pairing. Resolving fresh is what a real consumer
+      # on that SDK gets. Lock integrity is covered by the other three jobs.
+      #
+      # These legs are therefore NOT reproducible - an upstream publish can turn one red
+      # with no change here. If a leg fails and git blame shows nothing, suspect upstream.
+      env:
+        REACT_VERSION: ${{ matrix.react }}
+        REACT_NATIVE_VERSION: ${{ matrix.reactNative }}
+        EXPO_VERSION: ${{ matrix.expo }}
+        CONFIG_PLUGINS_VERSION: ${{ matrix.configPlugins }}
       run: |
-        npm ci
-        npm install --no-save react@${{ matrix.react-version }} react-native@${{ matrix.react-native-version }} expo@${{ matrix.expo-version }}
-        
+        # @expo/config-plugins must be installed explicitly. package.json pins it exactly
+        # as a devDependency and that pin wins the root hoist, so installing expo alone
+        # leaves the plugin resolving the newest config-plugins and the leg validates the
+        # wrong pairing.
+        npm install --no-save --no-package-lock \
+          "react@$REACT_VERSION" \
+          "react-native@$REACT_NATIVE_VERSION" \
+          "expo@$EXPO_VERSION" \
+          "@expo/config-plugins@$CONFIG_PLUGINS_VERSION"
+
     - name: Run tests with specific versions
+      env:
+        REACT_VERSION: ${{ matrix.react }}
+        REACT_NATIVE_VERSION: ${{ matrix.reactNative }}
+        EXPO_VERSION: ${{ matrix.expo }}
       run: |
-        echo "Testing with React ${{ matrix.react-version }}, React Native ${{ matrix.react-native-version }}, Expo ${{ matrix.expo-version }}"
+        echo "Testing with React $REACT_VERSION, React Native $REACT_NATIVE_VERSION, Expo $EXPO_VERSION"
         npm test
-        
+
     - name: Build with specific versions
+      env:
+        REACT_VERSION: ${{ matrix.react }}
+        REACT_NATIVE_VERSION: ${{ matrix.reactNative }}
+        EXPO_VERSION: ${{ matrix.expo }}
       run: |
-        echo "Building with React ${{ matrix.react-version }}, React Native ${{ matrix.react-native-version }}, Expo ${{ matrix.expo-version }}"
+        echo "Building with React $REACT_VERSION, React Native $REACT_NATIVE_VERSION, Expo $EXPO_VERSION"
         npm run build
+
+    # The steps above install into THIS repository, where config-plugins is pinned and most
+    # of it is mocked. This installs the PACKED plugin into a throwaway app and runs a real
+    # prebuild, exercising the plugin against the Expo graph a consumer resolves.
+    - name: Prebuild the packed plugin in a throwaway consumer
+      env:
+        SDK: ${{ matrix.sdk }}
+      run: npm run test:packed-consumer -- --sdk "$SDK"
+
+    # Only fires for unsupported rows, whose failures are otherwise invisible in the PR
+    # check summary because continue-on-error marks the job green.
+    - name: Surface an unsupported-SDK failure
+      if: failure() && !matrix.supported
+      env:
+        SDK: ${{ matrix.sdk }}
+      run: |
+        echo "### Expo SDK $SDK leg failed (not a supported SDK)" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "This leg is non-blocking: README declares $SDK tested but not supported." >> "$GITHUB_STEP_SUMMARY"
+        echo "It may also be upstream drift - these legs install without a lockfile." >> "$GITHUB_STEP_SUMMARY"
+        echo "See scripts/expo-sdk-matrix.md." >> "$GITHUB_STEP_SUMMARY"
 
   build:
     runs-on: ubuntu-22.04
@@ -126,7 +184,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20.x'
+        node-version-file: .nvmrc
         cache: 'npm'
         
     - name: Install dependencies
@@ -134,3 +192,9 @@ jobs:
       
     - name: Build project
       run: npm run build
+
+    # `files` in package.json is a hard allowlist, and the example app installs the plugin
+    # with `file:../`, so it sees the whole working tree and can never catch an omission.
+    # Without this, a missing entry fails only for real consumers, after publish.
+    - name: Verify the published tarball contains everything the plugin reads
+      run: npm run verify:package

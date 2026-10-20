@@ -10,8 +10,9 @@ Pod::Spec.new do |s|
   s.license        = package['license']
   s.author         = package['author']
   s.homepage       = 'https://github.com/klaviyo/klaviyo-expo-plugin'
+  # This pod's own floor. expo-modules-autolinking lifts it to the app's target on SDK 56+.
   s.platforms      = {
-    :ios => '12'
+    :ios => '15.1'
   }
   s.swift_version  = '5'
   s.source         = { git: 'https://github.com/klaviyo/klaviyo-expo-plugin.git', tag: s.version.to_s }
@@ -19,6 +20,7 @@ Pod::Spec.new do |s|
 
   s.dependency 'ExpoModulesCore'
   s.dependency 'React-Core'
+  # Unversioned: klaviyo-react-native-sdk pins KlaviyoSwift exactly and governs resolution.
   s.dependency 'KlaviyoSwift'
 
   # Conditional location dependency based on environment variable

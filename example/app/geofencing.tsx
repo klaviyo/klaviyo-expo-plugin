@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Alert, ScrollView, Platform, 
 import Constants from 'expo-constants';
 import { Klaviyo } from 'klaviyo-react-native-sdk';
 import * as Location from 'expo-location';
+import { ExampleColors, useExampleTheme } from '../theme';
 
 interface Geofence {
   identifier: string;
@@ -19,6 +20,8 @@ const platformOptions = (klaviyoPluginOptions?.[Platform.OS] as { geofencingEnab
 const geofencingEnabledInBuild = platformOptions?.geofencingEnabled ?? false;
 
 export default function GeofencingScreen() {
+  const colors = useExampleTheme();
+  const styles = createStyles(colors);
   const [geofencingEnabled, setGeofencingEnabled] = useState(false);
   const [locationPermission, setLocationPermission] = useState<string | null>(null);
   const [currentGeofences, setCurrentGeofences] = useState<Geofence[]>([]);
@@ -261,28 +264,29 @@ export default function GeofencingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ExampleColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   section: {
     padding: 20,
     gap: 15,
   },
   sectionTitle: {
+    color: colors.text,
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: colors.secondaryText,
     marginBottom: 10,
     lineHeight: 20,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.button,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
@@ -292,111 +296,110 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   buttonText: {
-    color: '#fff',
+    color: colors.onButton,
     fontSize: 16,
     fontWeight: 'bold',
   },
   buttonSuccess: {
-    backgroundColor: '#34C759',
+    backgroundColor: colors.successButton,
   },
   buttonDanger: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: colors.dangerButton,
   },
   buttonSecondary: {
-    backgroundColor: '#5856D6',
+    backgroundColor: colors.secondaryButton,
   },
   buttonDisabled: {
-    backgroundColor: '#C7C7CC',
-    opacity: 0.8,
+    backgroundColor: colors.disabledButton,
   },
   buttonTextDisabled: {
-    color: '#8E8E93',
+    color: colors.disabledText,
   },
   disabledBanner: {
     padding: 12,
     marginBottom: 12,
-    backgroundColor: '#FFF3E0',
+    backgroundColor: colors.warningBackground,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FFB74D',
+    borderColor: colors.warningBorder,
   },
   disabledBannerText: {
     fontSize: 14,
-    color: '#E65100',
+    color: colors.warningText,
   },
   statusContainerDisabled: {
-    backgroundColor: '#F5F5F5',
-    borderColor: '#E0E0E0',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
   },
   permissionContainer: {
     padding: 10,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: colors.card,
     borderRadius: 8,
     marginBottom: 10,
   },
   permissionText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.secondaryText,
   },
   statusContainer: {
     marginTop: 10,
     padding: 15,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: colors.successBackground,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#4CAF50',
+    borderColor: colors.successBorder,
   },
   statusText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2E7D32',
+    color: colors.successText,
     marginBottom: 5,
   },
   statusSubtext: {
     fontSize: 14,
-    color: '#558B2F',
+    color: colors.successText,
   },
   geofenceListContainer: {
     marginTop: 10,
     padding: 15,
-    backgroundColor: '#F9F9F9',
+    backgroundColor: colors.surface,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: colors.border,
   },
   geofenceListTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: '#333',
+    color: colors.text,
   },
   noGeofencesText: {
     fontSize: 14,
-    color: '#999',
+    color: colors.secondaryText,
     fontStyle: 'italic',
   },
   geofenceItem: {
     padding: 10,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.background,
     borderRadius: 6,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: colors.border,
   },
   geofenceId: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.text,
     marginBottom: 4,
   },
   geofenceCoords: {
     fontSize: 12,
-    color: '#666',
+    color: colors.secondaryText,
     fontFamily: 'monospace',
     marginBottom: 2,
   },
   geofenceRadius: {
     fontSize: 12,
-    color: '#666',
+    color: colors.secondaryText,
   },
 });

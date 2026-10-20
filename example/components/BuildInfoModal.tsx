@@ -5,6 +5,7 @@ import * as Application from 'expo-application';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ExampleColors, useExampleTheme } from '../theme';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const buildInfoFormat = require('../lib/build-info.js') as {
@@ -38,6 +39,8 @@ function getBuildInfo(): BuildInfoInput {
 
 // Header button for the home tab that opens the Build info modal.
 export function BuildInfoButton() {
+  const colors = useExampleTheme();
+  const styles = createStyles(colors);
   const [visible, setVisible] = useState(false);
   return (
     <>
@@ -49,7 +52,7 @@ export function BuildInfoButton() {
         style={styles.headerButton}
         testID="build-info-button"
       >
-        <Ionicons name="information-circle-outline" size={24} color="#007AFF" />
+        <Ionicons name="information-circle-outline" size={24} color={colors.accent} />
       </Pressable>
       <BuildInfoModal visible={visible} onClose={() => setVisible(false)} />
     </>
@@ -57,6 +60,7 @@ export function BuildInfoButton() {
 }
 
 export function BuildInfoModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const styles = createStyles(useExampleTheme());
   const [copied, setCopied] = useState(false);
   const info = getBuildInfo();
   const sdkKeys = platformSdkKeys();
@@ -101,31 +105,31 @@ function platformSdkKeys(): string[] {
   return ['expo-plugin', 'rn', Platform.OS === 'ios' ? 'ios' : 'android'];
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 16 },
+const createStyles = (colors: ExampleColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 16 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16 },
-  title: { fontSize: 20, fontWeight: '600', color: '#000' },
-  close: { fontSize: 16, color: '#007AFF' },
+  title: { fontSize: 20, fontWeight: '600', color: colors.text },
+  close: { fontSize: 16, color: colors.accent },
   headerButton: { marginRight: 16 },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 24 },
   row: { marginBottom: 14 },
-  label: { fontSize: 12, color: '#8E8E93', marginBottom: 4 },
+  label: { fontSize: 12, color: colors.secondaryText, marginBottom: 4 },
   value: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 14,
-    color: '#000',
-    backgroundColor: '#F2F2F7',
+    color: colors.text,
+    backgroundColor: colors.surface,
     borderRadius: 6,
     padding: 10,
     overflow: 'hidden',
   },
   copyButton: {
     marginTop: 8,
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.button,
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
   },
-  copyText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  copyText: { color: colors.onButton, fontSize: 16, fontWeight: '600' },
 });

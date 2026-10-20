@@ -51,7 +51,7 @@ const pluginRef = (version) => {
 
 module.exports = () => {
   // CI sets APP_VERSION (scripts/ci/eas-deploy.sh), e.g. 1.2.0-rc.7.
-  const appVersion = process.env.APP_VERSION || '1.0.0';
+  const appVersion = process.env.APP_VERSION || examplePackage.version;
   // EAS reads the top-level version for iOS and ignores ios.version; the App
   // Store requires numeric X.Y.Z. eas-deploy.sh exports EAS_BUILD_PLATFORM so
   // the local eas CLI resolves the same value as the build server.
@@ -65,7 +65,6 @@ module.exports = () => {
     icon: './assets/images/icon.png',
     scheme: 'expoexample',
     userInterfaceStyle: 'automatic',
-    newArchEnabled: false,
     ios: {
       // CI sets IOS_BUILD_NUMBER (scripts/ci/next-build-number.js); local builds use 1.
       buildNumber: process.env.IOS_BUILD_NUMBER || '1',
