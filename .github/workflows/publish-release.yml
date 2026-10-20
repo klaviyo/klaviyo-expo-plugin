@@ -23,6 +23,8 @@ jobs:
     permissions:
       contents: write
       checks: read
+      pull-requests: read
+      actions: read
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
       release_url: ${{ steps.draft.outputs.url }}
@@ -76,8 +78,11 @@ jobs:
           fi
           runs=""
           for s in $shas; do
+            skip_suites="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${s}" \
+              --jq '.workflow_runs[] | select(.path | startswith(".github/workflows/publish-example") or startswith("dynamic/")) | .check_suite_id' | jq -s -c .)"
             runs+="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${s}/check-runs" \
-              --jq '.check_runs[] | select(.name | IN("prepare", "stale") or startswith("publish-npm") or startswith("publish-release") | not) | "\(.name)\t\(.status)\t\(.conclusion)"')"$'\n'
+              --jq '.check_runs[] | {name, status, conclusion, suite: .check_suite.id}' \
+              | jq -r --argjson skip "$skip_suites" 'select((.name | IN("prepare", "stale") or startswith("publish-npm") or startswith("publish-release")) or (.suite | IN($skip[])) | not) | "\(.name)\t\(.status)\t\(.conclusion)"')"$'\n'
           done
           runs="$(sed '/^$/d' <<<"$runs")"
           if [ -z "$runs" ]; then
@@ -131,6 +136,7 @@ jobs:
     needs: prepare
     permissions:
       contents: read
+      id-token: write
     uses: ./.github/workflows/publish-sdk.yml
     with:
       version: ${{ inputs.version }}
