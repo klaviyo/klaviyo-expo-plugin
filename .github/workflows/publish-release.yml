@@ -227,6 +227,11 @@ jobs:
         env:
           SHA: ${{ needs.prepare.outputs.sha }}
         run: |
+          tagged="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${VERSION}" --jq .sha 2>/dev/null || true)"
+          if [ -n "$tagged" ] && [ "$tagged" != "$SHA" ]; then
+            echo "::error::Tag $VERSION now points at $tagged, not the released commit $SHA."
+            exit 1
+          fi
           if [[ "$VERSION" == *-* ]]; then
             gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false --target "$SHA"
           else
