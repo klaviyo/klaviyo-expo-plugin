@@ -1,17 +1,58 @@
 name: Publish SDK to NPM
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      version:
+        description: Version to publish (X.Y.Z or X.Y.Z-suffix)
+        required: true
+        type: string
+      ref:
+        description: Commit SHA to build and publish
+        required: true
+        type: string
+      release_url:
+        description: URL of the draft release this publish belongs to
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: Run npm publish --dry-run and skip the npm check and the success alert
+        required: false
+        type: boolean
+        default: false
+
+env:
+  PACKAGE_NAME: klaviyo-expo-plugin
 
 jobs:
-  publish-sdk:
+  test:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
-
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      dist_tag: ${{ steps.version.outputs.dist_tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Resolve release version
+        id: version
+        env:
+          TAG_NAME: ${{ inputs.version }}
+        run: |
+          version="${TAG_NAME#v}"
+          package_version="$(node -p "require('./package.json').version")"
+          if [[ "$version" == *-* ]]; then dist_tag=next; else dist_tag=latest; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$dist_tag" >> "$GITHUB_OUTPUT"
+          echo "Publishing $version to the npm dist-tag '$dist_tag'."
+          if [ "$version" != "$package_version" ]; then
+            echo "::error::Release tag $TAG_NAME does not match package.json version $package_version."
+            exit 1
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -22,9 +63,127 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        run: npm test
+
+  publish-sdk:
+    needs: test
+    runs-on: ubuntu-22.04
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      already_published: ${{ steps.publish.outputs.already_published }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
       - name: Prepare
         run: npm run prepare
 
-      - uses: JS-DevTools/npm-publish@v3
+      # Trusted publishing (OIDC): npm exchanges this job's OIDC token for
+      # a short-lived credential, so there is no NPM_TOKEN secret to rotate.
+      # Requires npm >= 11.21 and a trust relationship on npmjs.com allowing
+      # `npm publish` from this workflow; provenance attestation is included.
+      - name: Update npm for trusted publishing
+        run: npm install -g "npm@^11.21.0"
+
+      - name: Publish to npm (dry run)
+        if: inputs.dry_run
+        run: npm publish --dry-run --tag "${{ needs.test.outputs.dist_tag }}"
+
+      - name: Publish to npm
+        id: publish
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ needs.test.outputs.version }}
+          DIST_TAG: ${{ needs.test.outputs.dist_tag }}
+        run: |
+          if npm publish --tag "$DIST_TAG"; then
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          elif [ "$(npm view "${PACKAGE_NAME}@${VERSION}" version 2>/dev/null)" = "$VERSION" ]; then
+            echo "::warning::${PACKAGE_NAME}@${VERSION} is already on npm; nothing to publish."
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+          else
+            exit 1
+          fi
+
+      - name: Verify the version is on npm
+        if: ${{ !inputs.dry_run }}
+        timeout-minutes: 6
+        env:
+          VERSION: ${{ needs.test.outputs.version }}
+        run: |
+          for attempt in $(seq 1 20); do
+            published="$(npm view "${PACKAGE_NAME}@${VERSION}" version 2>/dev/null || true)"
+            if [ "$published" = "$VERSION" ]; then
+              echo "${PACKAGE_NAME}@${VERSION} is live on npm."
+              exit 0
+            fi
+            echo "Attempt $attempt/20: ${PACKAGE_NAME}@${VERSION} not visible yet; retrying in 15s."
+            sleep 15
+          done
+          echo "::error::${PACKAGE_NAME}@${VERSION} did not appear on npm within 5 minutes."
+          exit 1
+
+  notify:
+    needs: [test, publish-sdk]
+    # Cancelled runs are reported by publish-release.yml's stopped job.
+    if: >-
+      always()
+      && !contains(needs.*.result, 'cancelled')
+      && !(inputs.dry_run && needs.publish-sdk.result == 'success')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Classify the result
+        id: result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISH_RESULT: ${{ needs.publish-sdk.result }}
+        run: |
+          if [ "$PUBLISH_RESULT" = "success" ]; then
+            echo "result=success" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          rejected="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
+            --jq '[.[] | select(.state == "rejected" and any(.environments[]; .name == "npm"))] | length' || echo 0)"
+          if [ "$PUBLISH_RESULT" = "failure" ] && [ "$rejected" != "0" ]; then
+            echo "result=stopped" >> "$GITHUB_OUTPUT"
+            echo "reason=npm deploy rejected" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=failure" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Slack
+        continue-on-error: true
+        uses: ./.github/actions/notify-slack-publish
         with:
-          token: ${{ secrets.NPM_TOKEN }}
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          result: ${{ steps.result.outputs.result }}
+          reason: ${{ steps.result.outputs.reason }}
+          package: ${{ env.PACKAGE_NAME }}
+          version: ${{ needs.test.outputs.version || inputs.version }}
+          release_url: ${{ inputs.release_url }}
+          dist_tag: ${{ needs.test.outputs.dist_tag }}
+          already_published: ${{ needs.publish-sdk.outputs.already_published }}
+          commit: ${{ inputs.ref }}

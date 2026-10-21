@@ -25,7 +25,7 @@ function usage() {
 }
 
 function validateSemver(version) {
-  return /^\d+\.\d+\.\d+$/.test(version);
+  return /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version);
 }
 
 function bumpJson(filePath, version) {

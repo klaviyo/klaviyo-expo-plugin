@@ -1,0 +1,297 @@
+name: Publish release
+
+# Entry point for every npm publish; the npm trusted publisher names this file.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (X.Y.Z, or X.Y.Z-suffix for a prerelease)
+        required: true
+        type: string
+      ref:
+        description: Branch or commit to release (defaults to the default branch)
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: 'Dry run: run the checks, the approval and npm publish --dry-run; create and publish nothing'
+        required: false
+        default: false
+        type: boolean
+      skip_ci_check:
+        description: Skip the CI-green check (the version, branch and tag checks still run)
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+env:
+  VERSION: ${{ inputs.version || github.event.release.tag_name }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      checks: read
+      pull-requests: read
+      actions: read
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+      release_url: ${{ steps.draft.outputs.url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.event.release.tag_name || github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Require a commit on master or rel/*
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --quiet origin '+refs/heads/master:refs/remotes/origin/master' '+refs/heads/rel/*:refs/remotes/origin/rel/*'
+          if [ -z "$(git branch -r --contains HEAD --list 'origin/master' 'origin/rel/*')" ]; then
+            echo "::error::$(git rev-parse HEAD) is not on master or a rel/* branch"
+            exit 1
+          fi
+
+      - name: Resolve commit
+        id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Validate version input
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::version must be X.Y.Z or X.Y.Z-suffix, got '$VERSION'."
+            exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" >/dev/null 2>&1; then
+            echo "::error::Tag $VERSION already exists."
+            exit 1
+          fi
+
+      - name: Check version stamps match
+        run: |
+          fail=0
+          check() {
+            if [ "$2" != "$VERSION" ]; then
+              echo "::error file=$1::$1 has version '$2', expected '$VERSION'. Run: node scripts/bump-version.js $VERSION"
+              fail=1
+            fi
+          }
+          check package.json "$(node -p "require('./package.json').version")"
+          check example/package.json "$(node -p "require('./example/package.json').version")"
+          check ios/klaviyo-plugin-configuration.plist "$(grep -A1 'klaviyo_sdk_plugin_version_override' ios/klaviyo-plugin-configuration.plist | sed -n 's:.*<string>\(.*\)</string>.*:\1:p')"
+          check plugin/withKlaviyoAndroid.ts "$(sed -n "s/.*setStringResource('klaviyo_sdk_plugin_version_override', '\([^']*\)').*/\1/p" plugin/withKlaviyoAndroid.ts)"
+          exit "$fail"
+
+      - name: Check Klaviyo SDK pins
+        run: ./scripts/ci/check-native-pins.sh
+
+      - name: Skip the CI check
+        if: inputs.skip_ci_check
+        run: echo "::warning::CI check skipped by request; pull_request CI for this commit was not verified."
+
+      - name: Check CI is green on the commit
+        if: ${{ !inputs.skip_ci_check }}
+        env:
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          shas="$SHA"
+          pr_head="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/pulls" --jq '[.[] | select(.merged_at != null)][0].head.sha // empty')"
+          if [ -n "$pr_head" ]; then
+            echo "Commit came from a PR; also checking its head commit $pr_head."
+            shas="$shas $pr_head"
+          fi
+          runs=""
+          for s in $shas; do
+            skip_suites="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${s}" \
+              --jq '.workflow_runs[] | select(.path | startswith(".github/workflows/publish-example") or startswith("dynamic/")) | .check_suite_id' | jq -s -c .)"
+            runs+="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${s}/check-runs" \
+              --jq '.check_runs[] | {name, status, conclusion, suite: .check_suite.id}' \
+              | jq -r --argjson skip "$skip_suites" 'select((.name | IN("prepare", "stale") or startswith("publish-npm") or startswith("publish-release")) or (.suite | IN($skip[])) | not) | "\(.name)\t\(.status)\t\(.conclusion)"')"$'\n'
+          done
+          runs="$(sed '/^$/d' <<<"$runs")"
+          if [ -z "$runs" ]; then
+            echo "::error::No CI check runs found on $SHA or its PR."
+            exit 1
+          fi
+          bad="$(awk -F'\t' '$2 != "completed" || ($3 != "success" && $3 != "skipped" && $3 != "neutral")' <<<"$runs")"
+          if [ -n "$bad" ]; then
+            echo "::error::CI is not green:"
+            printf '%s\n' "$bad"
+            exit 1
+          fi
+
+      - name: Summarize the dry run
+        if: inputs.dry_run
+        run: |
+          {
+            echo "### Release $VERSION (dry run)"
+            echo "No draft release is created. Approve the \`npm\` deployment to run \`npm publish --dry-run\`; nothing is published."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Find or create the draft release
+        id: draft
+        if: ${{ !inputs.dry_run }}
+        env:
+          SHA: ${{ steps.sha.outputs.sha }}
+          EVENT_RELEASE_URL: ${{ github.event.release.html_url }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            echo "url=$EVENT_RELEASE_URL" >> "$GITHUB_OUTPUT"
+            echo "### Release $VERSION awaiting approval" >> "$GITHUB_STEP_SUMMARY"
+            echo "Approve the \`npm\` deployment in this run to publish: $EVENT_RELEASE_URL" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          existing="$(gh release view "$VERSION" --json isDraft,url --jq '"\(.isDraft)\t\(.url)"' 2>/dev/null || true)"
+          if [ -n "$existing" ]; then
+            if [ "$(cut -f1 <<<"$existing")" != "true" ]; then
+              echo "::error::Release $VERSION exists and is already published."
+              exit 1
+            fi
+            url="$(cut -f2 <<<"$existing")"
+            echo "Reusing existing draft release; notes left as written."
+          else
+            prerelease_flag=()
+            if [[ "$VERSION" == *-* ]]; then prerelease_flag=(--prerelease --latest=false); fi
+            url="$(gh release create "$VERSION" --draft "${prerelease_flag[@]}" --target "$SHA" --title "$VERSION" --generate-notes)"
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "### Release $VERSION awaiting approval" >> "$GITHUB_STEP_SUMMARY"
+          echo "Review and edit the draft notes, then approve the \`npm\` deployment in this run: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Note the skipped CI check
+        if: inputs.skip_ci_check
+        run: echo "- ⚠️ **CI check skipped:** pull_request CI for this commit was not verified." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify Slack (awaiting approval)
+        if: ${{ !inputs.dry_run }}
+        continue-on-error: true
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "⏳ Expo plugin release ${{ env.VERSION }} awaiting approval${{ inputs.skip_ci_check && ' (⚠️ CI check skipped)' || '' }}"
+            blocks:
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "⏳ *Expo plugin release `${{ env.VERSION }}` awaiting approval*${{ inputs.skip_ci_check && ' ⚠️ CI check skipped' || '' }}\n*Release:* <${{ steps.draft.outputs.url }}|Review notes>\n*Started by:* ${{ github.actor }}\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Approve here>"
+
+      - name: Notify Slack (blocked before approval)
+        if: failure()
+        continue-on-error: true
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "🚨 Expo plugin release ${{ env.VERSION }} blocked before approval"
+            blocks:
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "🚨 *Expo plugin release `${{ env.VERSION }}` blocked before approval.* A pre-publish check failed; nothing was published.\n*Started by:* ${{ github.actor }}\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+
+  publish-npm:
+    needs: prepare
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    uses: ./.github/workflows/publish-sdk.yml
+    with:
+      version: ${{ inputs.version || github.event.release.tag_name }}
+      ref: ${{ needs.prepare.outputs.sha }}
+      release_url: ${{ needs.prepare.outputs.release_url }}
+      dry_run: ${{ inputs.dry_run == true }}
+    secrets: inherit
+
+  publish-release:
+    needs: [prepare, publish-npm]
+    if: github.event_name == 'workflow_dispatch' && !inputs.dry_run
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Publish the draft release
+        id: release
+        env:
+          SHA: ${{ needs.prepare.outputs.sha }}
+        run: |
+          set -euo pipefail
+          tag_ref="$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${VERSION}" \
+            --jq "[.[] | select(.ref == \"refs/tags/${VERSION}\")][0].object // empty | \"\(.type) \(.sha)\"")"
+          tagged=""
+          if [ -n "$tag_ref" ]; then
+            read -r tag_type tagged <<<"$tag_ref"
+            if [ "$tag_type" = "tag" ]; then
+              tagged="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tagged}" --jq .object.sha)"
+            fi
+          fi
+          if [ -n "$tagged" ] && [ "$tagged" != "$SHA" ]; then
+            echo "::error::Tag $VERSION now points at $tagged, not the released commit $SHA."
+            exit 1
+          fi
+          if [[ "$VERSION" == *-* ]]; then
+            gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false --target "$SHA"
+          else
+            gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest --target "$SHA"
+          fi
+          url="$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json url --jq .url)"
+          {
+            echo "### Release $VERSION published"
+            echo "- npm: https://www.npmjs.com/package/klaviyo-expo-plugin/v/$VERSION"
+            echo "- Release: $url"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dispatch the example app deploy
+        id: example
+        run: gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f platform=both
+
+      - name: Notify Slack (release step failed)
+        if: failure()
+        continue-on-error: true
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "🚨 Expo plugin ${{ env.VERSION }} is on npm but ${{ steps.example.outcome == 'failure' && 'the example app deploy could not be dispatched' || 'the GitHub release could not be published' }}"
+            blocks:
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "🚨 *Expo plugin `${{ env.VERSION }}` is on npm but ${{ steps.example.outcome == 'failure' && 'the example app deploy could not be dispatched.* Run publish-example.yml by hand on the tag.' || 'the GitHub release could not be published.* Publish the draft by hand.' }}\n*Release:* <${{ needs.prepare.outputs.release_url }}|Open release>\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+
+  stopped:
+    needs: [prepare, publish-npm, publish-release]
+    if: always() && contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Notify Slack (cancelled)
+        continue-on-error: true
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "⚠️ Expo plugin release ${{ env.VERSION }} stopped: run cancelled"
+            blocks:
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "⚠️ *Expo plugin release `${{ env.VERSION }}` stopped: the run was cancelled.* Check the run for what finished before it stopped.\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
