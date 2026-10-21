@@ -12,7 +12,9 @@
  *   SERVICE_ACCOUNT_JSON   service account key JSON (contents, not a path)
  *   PLAY_PACKAGE_NAME      defaults to com.klaviyo.expoexample
  *   PLAY_TRACK             defaults to internal
- *   PLAY_RELEASE_NAME      when set, written to the release's name field
+ *   PLAY_RELEASE_NAME      when set, written to the release's name field; a full
+ *                          40-char commit SHA in it is shortened to 7 chars and
+ *                          the result is capped at Play's 50-char limit
  */
 
 const crypto = require("crypto");
@@ -34,6 +36,13 @@ function base64url(input) {
 function truncateNotes(text, max) {
   // Array.from splits by code point so a multi-byte character at the cutoff stays whole.
   return Array.from(text).slice(0, max).join("");
+}
+
+const MAX_RELEASE_NAME_LENGTH = 50;
+
+function playReleaseName(name) {
+  const short = (name || "").replace(/\b([0-9a-f]{7})[0-9a-f]{33}\b/g, "$1").trim();
+  return short.length > MAX_RELEASE_NAME_LENGTH ? short.slice(0, MAX_RELEASE_NAME_LENGTH) : short;
 }
 
 function applyReleaseNotes(releases, versionCode, notes, releaseName) {
@@ -130,7 +139,7 @@ async function run({ argv, env, fetchImpl } = {}) {
   }
   const packageName = env.PLAY_PACKAGE_NAME || "com.klaviyo.expoexample";
   const track = env.PLAY_TRACK || "internal";
-  const releaseName = env.PLAY_RELEASE_NAME || "";
+  const releaseName = playReleaseName(env.PLAY_RELEASE_NAME);
   const notes = truncateNotes(
     fs.readFileSync(notesFile, "utf8").trim(),
     MAX_NOTES_LENGTH,
@@ -179,6 +188,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  playReleaseName,
   truncateNotes,
   applyReleaseNotes,
   getAccessToken,

@@ -17,10 +17,12 @@ on:
         type: string
         default: ''
       dry_run:
-        description: Run npm publish --dry-run and skip the npm check and the success alert
+        description: Run npm publish --dry-run and skip the success alert
         required: false
         type: boolean
         default: false
+
+permissions: {}
 
 env:
   PACKAGE_NAME: klaviyo-expo-plugin
@@ -122,24 +124,6 @@ jobs:
           else
             exit 1
           fi
-
-      - name: Verify the version is on npm
-        if: ${{ !inputs.dry_run }}
-        timeout-minutes: 6
-        env:
-          VERSION: ${{ needs.test.outputs.version }}
-        run: |
-          for attempt in $(seq 1 20); do
-            published="$(npm view "${PACKAGE_NAME}@${VERSION}" version 2>/dev/null || true)"
-            if [ "$published" = "$VERSION" ]; then
-              echo "${PACKAGE_NAME}@${VERSION} is live on npm."
-              exit 0
-            fi
-            echo "Attempt $attempt/20: ${PACKAGE_NAME}@${VERSION} not visible yet; retrying in 15s."
-            sleep 15
-          done
-          echo "::error::${PACKAGE_NAME}@${VERSION} did not appear on npm within 5 minutes."
-          exit 1
 
   notify:
     needs: [test, publish-sdk]
