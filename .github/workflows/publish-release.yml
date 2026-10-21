@@ -26,6 +26,8 @@ on:
         default: false
         type: boolean
 
+permissions: {}
+
 concurrency:
   group: publish-release
   cancel-in-progress: false
