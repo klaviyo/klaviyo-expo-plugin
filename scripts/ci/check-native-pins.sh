@@ -31,13 +31,13 @@ for pkg in package.json example/package.json; do
 done
 
 pin_opts="(:(git|branch|commit|tag|path)[[:space:]]*=>|[[:space:],](git|branch|commit|tag|path):[[:space:]])"
-pin_pattern="^[[:space:]]*(s\.dependency|pod)[[:space:]]+['\"]Klaviyo[A-Za-z]*['\"].*${pin_opts}"
+pin_pattern="^[[:space:]]*(s\.dependency|pod)([[:space:]]+|[[:space:]]*\([[:space:]]*)['\"]Klaviyo[A-Za-z]*['\"].*${pin_opts}"
 while IFS= read -r hit; do
   errors+=("${hit#"$root"/}: Klaviyo pod not from a release")
 done < <(grep -rnE "$pin_pattern" "$root/ios" --include='*.podspec' 2>/dev/null || true)
 while IFS= read -r hit; do
   errors+=("${hit#"$root"/}: Klaviyo pod not from a release")
-done < <(grep -rnE "pod[[:space:]]+['\"]Klaviyo[A-Za-z]*['\"][^\"\`]*${pin_opts}" "$root/plugin" --include='*.ts' 2>/dev/null || true)
+done < <(grep -rnE "pod([[:space:]]+|[[:space:]]*\\([[:space:]]*)['\"]Klaviyo[A-Za-z]*['\"][^\"\`]*${pin_opts}" "$root/plugin" --include='*.ts' 2>/dev/null || true)
 
 if [ "${#errors[@]}" -gt 0 ]; then
   for e in "${errors[@]}"; do
