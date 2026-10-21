@@ -91,6 +91,9 @@ jobs:
           check plugin/withKlaviyoAndroid.ts "$(sed -n "s/.*setStringResource('klaviyo_sdk_plugin_version_override', '\([^']*\)').*/\1/p" plugin/withKlaviyoAndroid.ts)"
           exit "$fail"
 
+      - name: Check Klaviyo SDK pins
+        run: ./scripts/ci/check-native-pins.sh
+
       - name: Skip the CI check
         if: inputs.skip_ci_check
         run: echo "::warning::CI check skipped by request; pull_request CI for this commit was not verified."
