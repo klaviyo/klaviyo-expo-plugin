@@ -184,6 +184,7 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Sync release to Linear
         id: linear-sync
