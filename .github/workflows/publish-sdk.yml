@@ -174,7 +174,7 @@ jobs:
 
   linear-release:
     needs: [test, publish-sdk]
-    if: ${{ !inputs.dry_run && needs.publish-sdk.result == 'success' && !contains(inputs.version, '-') }}
+    if: ${{ !inputs.dry_run && needs.publish-sdk.result == 'success' && !contains(inputs.version, '-') && github.event.release.prerelease != true }}
     continue-on-error: true
     runs-on: ubuntu-22.04
     permissions:
