@@ -175,6 +175,7 @@ jobs:
   linear-release:
     needs: [test, publish-sdk]
     if: ${{ !inputs.dry_run && needs.publish-sdk.result == 'success' && !contains(inputs.version, '-') }}
+    continue-on-error: true
     runs-on: ubuntu-22.04
     permissions:
       contents: read
