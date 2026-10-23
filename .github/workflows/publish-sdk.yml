@@ -171,3 +171,36 @@ jobs:
           dist_tag: ${{ needs.test.outputs.dist_tag }}
           already_published: ${{ needs.publish-sdk.outputs.already_published }}
           commit: ${{ inputs.ref }}
+
+  linear-release:
+    needs: [test, publish-sdk]
+    if: ${{ !inputs.dry_run && needs.publish-sdk.result == 'success' && !contains(inputs.version, '-') && github.event.release.prerelease != true }}
+    continue-on-error: true
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Sync release to Linear
+        id: linear-sync
+        continue-on-error: true
+        uses: linear/linear-release-action@30f9ae77461ec29f07fffe0c52edd1909bfbb6f5 # v0.18.1
+        with:
+          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
+          command: sync
+          version: ${{ needs.test.outputs.version }}
+          name: ${{ needs.test.outputs.version }}
+
+      - name: Complete release in Linear
+        if: steps.linear-sync.outcome == 'success'
+        continue-on-error: true
+        uses: linear/linear-release-action@30f9ae77461ec29f07fffe0c52edd1909bfbb6f5 # v0.18.1
+        with:
+          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
+          command: complete
+          version: ${{ needs.test.outputs.version }}
