@@ -30,8 +30,23 @@ on:
     paths-ignore:
       - '**.md'
       - 'LICENSE'
-      - '.github/ISSUE_TEMPLATE/**'
+      - 'CODEOWNERS'
       - '.coderabbit.yaml'
+      - '.cursor/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/dependabot.yml'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/stale.yml'
+      - '.github/workflows/pr-target-check.yml'
+      - '.github/workflows/publish-sdk.yml'
+      - '.github/workflows/publish-release.yml'
+      - '.github/actions/notify-slack-publish/**'
+      - 'tests/**'
+      - 'jest.config.js'
+      - 'eslint.config.mjs'
+      - 'scripts/test-*'
+      - 'scripts/verify-package-contents.js'
+      - 'scripts/expo-sdk-matrix.*'
   release:
     types: [published]
   workflow_dispatch:
