@@ -119,11 +119,12 @@ jobs:
             echo "The tree differs from tag ${version}, so this push deploys."
           fi
 
-  # On a tag run, cancels queued or in-progress master push runs of this workflow whose commit has
-  # the tag's tree, unless one of their "EAS build and submit" steps has started. Never fails the run.
+  # On a tag run that deploys both platforms, cancels queued or in-progress master push runs of
+  # this workflow whose commit has the tag's tree, unless one of their "EAS build and submit"
+  # steps has started. Never fails the run.
   cancel-merge-publish:
     name: Cancel duplicate master publish
-    if: github.ref_type == 'tag'
+    if: github.ref_type == 'tag' && (github.event_name != 'workflow_dispatch' || inputs.platform == 'both')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
