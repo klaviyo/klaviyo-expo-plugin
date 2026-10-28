@@ -63,8 +63,11 @@ on:
   pull_request:
     types: [labeled]
 
-# Runs are never cancelled once started. Pushes to one branch queue behind the in-flight run, and a
-# newer queued push replaces an older queued one. Release, manual and label runs queue alone.
+# Pushes to one branch queue behind the in-flight run, and a newer queued push replaces an older
+# queued one. Release, manual and label runs queue alone here. Each deploy job also joins one
+# queue per platform shared by every run (publish-example-android / publish-example-ios).
+# A tag run cancels master push runs of the same tree that have not started their EAS build
+# (cancel-merge-publish); otherwise a started run is never cancelled.
 concurrency:
   group: publish-example-${{ github.event_name == 'push' && github.ref || github.run_id }}
   cancel-in-progress: false
@@ -78,12 +81,100 @@ env:
   COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
+  # On a push to master, outputs skip=true when the pushed tree equals the tree of the tag named
+  # by the package.json version, whatever the outcome of that tag's own publish run. A missing
+  # tag or any error outputs skip=false.
+  release-merge-check:
+    name: Check for a release merge-back
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - name: Checkout repository
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Compare the tree with the release tag
+        id: check
+        continue-on-error: true
+        run: |
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          version=$(jq -r .version package.json)
+          if ! tag_tree=$(git rev-parse --verify --quiet "refs/tags/${version}^{tree}"); then
+            echo "No tag ${version}, so this push deploys."
+            exit 0
+          fi
+          head_tree=$(git rev-parse "HEAD^{tree}")
+          if [ "$head_tree" = "$tag_tree" ]; then
+            echo "::notice::The tree matches tag ${version}, which publishes it, so this push skips the deploy."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "The tree differs from tag ${version}, so this push deploys."
+          fi
+
+  # On a tag run that deploys both platforms, cancels queued or in-progress master push runs of
+  # this workflow whose commit has the tag's tree, unless one of their "EAS build and submit"
+  # steps has started. Never fails the run.
+  cancel-merge-publish:
+    name: Cancel duplicate master publish
+    if: github.ref_type == 'tag' && (github.event_name != 'workflow_dispatch' || inputs.platform == 'both')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Cancel master push runs of the released tree
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          TAG_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          tag_tree=$(gh api "repos/${REPO}/git/commits/${TAG_SHA}" --jq .tree.sha)
+          for status in requested waiting pending queued in_progress; do
+            gh run list --repo "$REPO" --workflow publish-example.yml --event push --branch master \
+              --status "$status" --limit 50 --json databaseId,headSha \
+              --jq '.[] | "\(.databaseId) \(.headSha)"'
+          done | sort -u | while read -r id sha; do
+            [ "$id" = "$RUN_ID" ] && continue
+            tree=$(gh api "repos/${REPO}/git/commits/${sha}" --jq .tree.sha)
+            if [ "$tree" != "$tag_tree" ]; then
+              echo "Run $id (${sha:0:7}) has a different tree; leaving it."
+              continue
+            fi
+            started=$(gh api "repos/${REPO}/actions/runs/${id}/jobs" --jq '[.jobs[].steps[]?
+              | select(.name == "EAS build and submit")
+              | select(.status == "in_progress" or (.status == "completed" and .conclusion != "skipped"))]
+              | length')
+            if [ "$started" -gt 0 ]; then
+              echo "::notice::Master push run $id (${sha:0:7}) has started its EAS build, so it is left to finish. The release deploy queues behind it."
+              continue
+            fi
+            echo "::notice::Cancelling master push run $id (${sha:0:7}); this release run publishes the same tree."
+            gh run cancel "$id" --repo "$REPO" || echo "::warning::Could not cancel run $id."
+          done
+
   plan:
     name: Choose platforms
+    needs: [release-merge-check, cancel-merge-publish]
+    # Both needs skip on most events, so this runs unless the merge check says skip. Every later
+    # job needs plan's outputs, so skipping plan skips the deploy.
     if: |
-      github.event_name != 'pull_request'
+      !cancelled()
+      && needs.release-merge-check.outputs.skip != 'true'
+      && (github.event_name != 'pull_request'
       || (startsWith(github.event.label.name, 'deploy-example-app')
-          && github.event.pull_request.head.repo.full_name == github.repository)
+          && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -124,7 +215,8 @@ jobs:
     name: Check required secrets
     needs: plan
     if: |
-      (needs.plan.outputs.android == 'true' || needs.plan.outputs.ios == 'true')
+      !cancelled() && needs.plan.result == 'success'
+      && (needs.plan.outputs.android == 'true' || needs.plan.outputs.ios == 'true')
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -189,6 +281,10 @@ jobs:
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    concurrency:
+      group: publish-example-android
+      cancel-in-progress: false
+      queue: max
     environment:
       name: android-internal-track
       url: ${{ steps.result.outputs.install_url }}
@@ -446,6 +542,10 @@ jobs:
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    concurrency:
+      group: publish-example-ios
+      cancel-in-progress: false
+      queue: max
     environment:
       name: testflight
       url: ${{ steps.result.outputs.testflight_url }}
