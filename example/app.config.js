@@ -1,5 +1,6 @@
 const pluginPackage = require('../package.json');
 const examplePackage = require('./package.json');
+const { swiftSource } = require('./plugins/withKlaviyoQaSource');
 
 const fs = require('fs');
 const path = require('path');
@@ -95,6 +96,12 @@ module.exports = () => {
     },
     plugins: [
       'expo-router',
+      ['expo-build-properties', {
+        ios: {
+          extraPods: ['KlaviyoCore', 'KlaviyoSwift', 'KlaviyoForms', 'KlaviyoLocation', 'KlaviyoSwiftExtension']
+            .map(name => ({ name, ...swiftSource })),
+        },
+      }],
       [
         'klaviyo-expo-plugin',
         {
@@ -117,6 +124,7 @@ module.exports = () => {
           },
         },
       ],
+      './plugins/withKlaviyoQaSource',
     ],
     experiments: {
       typedRoutes: true,
@@ -134,9 +142,10 @@ module.exports = () => {
         event: process.env.APP_EVENT,
         sdks: [
           { key: 'expo-plugin', version: pluginPackage.version, ref: pluginRef(pluginPackage.version) },
-          { key: 'rn', version: readInstalledVersion('klaviyo-react-native-sdk') },
+          { key: 'rn', version: readInstalledVersion('klaviyo-react-native-sdk'), ref: examplePackage.dependencies['klaviyo-react-native-sdk'].split('#')[1] },
           {
             key: 'ios',
+            ref: swiftSource.commit,
             version: readNativeSdkVersion('klaviyo-react-native-sdk.podspec', /s\.dependency\s+"KlaviyoSwift",\s*"([^"]+)"/),
           },
           {

@@ -8,6 +8,7 @@ jest.mock("react", () => ({
     () => undefined,
   ],
   useEffect: () => undefined,
+  useRef: (initial: unknown) => ({ current: initial }),
 }));
 jest.mock(
   "react-native",
