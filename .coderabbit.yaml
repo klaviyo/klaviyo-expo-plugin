@@ -20,7 +20,7 @@ reviews:
     eslint:
       enabled: true
   path_instructions:
-    - path: "plugin/**,ios/**,KlaviyoNotificationServiceExtension/**"
+    - path: "{plugin,ios,KlaviyoNotificationServiceExtension}/**"
       instructions: >
         This is public SDK source code (TypeScript (config plugin) and Swift (native module)). Prioritize:
         - Crashes and unhandled errors on realistic inputs.
