@@ -81,19 +81,6 @@ env:
   COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
-  # Push and PR-label runs wait here for a human approval (the example-app-deploy environment's
-  # required reviewers) before anything spends EAS build quota. Release and workflow_dispatch
-  # runs skip this job; the deploy jobs below accept a skipped result.
-  approve:
-    name: Approve the example app deploy
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    permissions: {}
-    environment: example-app-deploy
-    steps:
-      - run: echo "Deploy approved."
-
   # On a push to master, outputs skip=true when the pushed tree equals the tree of the tag named
   # by the package.json version, whatever the outcome of that tag's own publish run. A missing
   # tag or any error outputs skip=false.
@@ -176,6 +163,23 @@ jobs:
             echo "::notice::Cancelling master push run $id (${sha:0:7}); this release run publishes the same tree."
             gh run cancel "$id" --repo "$REPO" || echo "::warning::Could not cancel run $id."
           done
+
+  approve:
+    name: Approve the example app deploy
+    needs: release-merge-check
+    if: |
+      !cancelled()
+      && needs.release-merge-check.outputs.skip != 'true'
+      && (github.event_name == 'push'
+      || (github.event_name == 'pull_request'
+          && startsWith(github.event.label.name, 'deploy-example-app')
+          && github.event.pull_request.head.repo.full_name == github.repository))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions: {}
+    environment: example-app-deploy
+    steps:
+      - run: echo "Deploy approved."
 
   plan:
     name: Choose platforms
