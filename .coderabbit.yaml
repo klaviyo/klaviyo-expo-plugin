@@ -13,7 +13,6 @@ reviews:
     - "!**/package-lock.json"
     - "!**/Pods/**"
   auto_review:
-    drafts: false
     base_branches:
       - ".*"
   tools:
