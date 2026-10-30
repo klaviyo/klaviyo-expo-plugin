@@ -83,10 +83,10 @@ export function BuildInfoModal({ visible, onClose }: { visible: boolean; onClose
           </TouchableOpacity>
         </View>
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <View key={row.label} style={styles.row}>
               <Text style={styles.label}>{row.label}</Text>
-              <Text style={styles.value} selectable testID={`build_info_${toSnakeCase(row.label)}`}>
+              <Text style={styles.value} selectable testID={`build_info_${toSnakeCase(row.label) || `row_${index}`}`}>
                 {row.value}
               </Text>
             </View>
