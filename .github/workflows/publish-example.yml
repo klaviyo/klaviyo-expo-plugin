@@ -81,6 +81,19 @@ env:
   COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
+  # Push and PR-label runs wait here for a human approval (the example-app-deploy environment's
+  # required reviewers) before anything spends EAS build quota. Release and workflow_dispatch
+  # runs skip this job; the deploy jobs below accept a skipped result.
+  approve:
+    name: Approve the example app deploy
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions: {}
+    environment: example-app-deploy
+    steps:
+      - run: echo "Deploy approved."
+
   # On a push to master, outputs skip=true when the pushed tree equals the tree of the tag named
   # by the package.json version, whatever the outcome of that tag's own publish run. A missing
   # tag or any error outputs skip=false.
@@ -166,11 +179,12 @@ jobs:
 
   plan:
     name: Choose platforms
-    needs: [release-merge-check, cancel-merge-publish]
+    needs: [release-merge-check, cancel-merge-publish, approve]
     # Both needs skip on most events, so this runs unless the merge check says skip. Every later
     # job needs plan's outputs, so skipping plan skips the deploy.
     if: |
       !cancelled()
+      && (needs.approve.result == 'success' || needs.approve.result == 'skipped')
       && needs.release-merge-check.outputs.skip != 'true'
       && (github.event_name != 'pull_request'
       || (startsWith(github.event.label.name, 'deploy-example-app')
