@@ -129,7 +129,7 @@ export default function PushScreen() {
     };
 
     return (
-      <View style={styles.notificationContainer}>
+      <View style={styles.notificationContainer} testID={`push_last_${type}_notification`}>
         <Text style={styles.notificationTitle}>
           {type === 'background' ? 'Last Background Notification:' : 
            type === 'silent' ? 'Last Silent Push:' : 'Last Notification:'}
@@ -165,15 +165,17 @@ export default function PushScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} testID="push_screen">
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Push Notifications</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">Push Notifications</Text>
         <TouchableOpacity 
           style={[
             styles.button, 
             styles.fullWidthButton,
             pushPermissionStatus === 'granted' && styles.buttonSuccess
           ]} 
+          testID="push_request_permission_button"
+          accessibilityRole="button"
           onPress={setupNotifications}
         >
           <Text style={styles.buttonText}>
@@ -181,7 +183,7 @@ export default function PushScreen() {
           </Text>
         </TouchableOpacity>
         {pushPermissionStatus && (
-          <Text style={styles.permissionStatus}>
+          <Text style={styles.permissionStatus} testID="push_permission_status_text">
             Status: {pushPermissionStatus}
           </Text>
         )}
@@ -194,6 +196,8 @@ export default function PushScreen() {
           <>
             <TouchableOpacity 
               style={[styles.button, styles.fullWidthButton]} 
+              testID="push_get_token_button"
+              accessibilityRole="button"
               onPress={handleGetPushToken}
             >
               <Text style={styles.buttonText}>
@@ -204,11 +208,14 @@ export default function PushScreen() {
               <View style={styles.tokenContainer}>
                 <Text style={styles.tokenLabel}>Current Token:</Text>
                 <View style={styles.tokenRow}>
-                  <Text style={styles.tokenText} selectable={true}>
+                  <Text style={styles.tokenText} selectable={true} testID="push_token_text">
                     {pushToken}
                   </Text>
                   <TouchableOpacity 
                     style={styles.copyButton}
+                    testID="push_copy_token_button"
+                    accessibilityRole="button"
+                    accessibilityLabel="Copy push token"
                     onPress={() => {
                       Clipboard.setString(pushToken);
                       Alert.alert('Copied', 'Token copied to clipboard');

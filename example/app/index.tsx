@@ -164,7 +164,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled" testID="profile_screen">
       <View style={styles.section}>
         <View style={styles.inputRow}>
           <TextInput
@@ -172,16 +172,27 @@ export default function ProfileScreen() {
             selectionColor={colors.accent}
             style={styles.apiInput}
             placeholder="Enter 6-char API key"
+            testID="company_id_input"
+            accessibilityLabel="Public API key"
             value={apiKey}
             onChangeText={setApiKey}
             maxLength={6}
           />
-          <TouchableOpacity style={styles.button} onPress={handleInitialize}>
+          <TouchableOpacity
+            style={styles.button}
+            testID="company_id_initialize_button"
+            accessibilityRole="button"
+            accessibilityLabel="Initialize Klaviyo"
+            onPress={handleInitialize}
+          >
             <Text style={styles.buttonText}>Initialize</Text>
           </TouchableOpacity>
         </View>
         <TouchableOpacity
           style={[styles.button, styles.fullWidthButton]}
+          testID="events_test_event_button"
+          accessibilityRole="button"
+          accessibilityLabel="Create test event"
           onPress={handleTrackEvent}
         >
           <Text style={styles.buttonText}>Track Event</Text>
@@ -189,12 +200,14 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Profile Information</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">Profile Information</Text>
         <TextInput
           placeholderTextColor={colors.placeholder}
           selectionColor={colors.accent}
           style={styles.input}
           placeholder="Email"
+          testID="profile_email_input"
+          accessibilityLabel="Email"
           value={profile.email}
           onChangeText={(text) => setProfile({ ...profile, email: text })}
           keyboardType="email-address"
@@ -205,6 +218,8 @@ export default function ProfileScreen() {
           selectionColor={colors.accent}
           style={styles.input}
           placeholder="First Name"
+          testID="profile_first_name_input"
+          accessibilityLabel="First name"
           value={profile.firstName}
           onChangeText={(text) => setProfile({ ...profile, firstName: text })}
         />
@@ -213,6 +228,8 @@ export default function ProfileScreen() {
           selectionColor={colors.accent}
           style={styles.input}
           placeholder="Last Name"
+          testID="profile_last_name_input"
+          accessibilityLabel="Last name"
           value={profile.lastName}
           onChangeText={(text) => setProfile({ ...profile, lastName: text })}
         />
@@ -221,6 +238,8 @@ export default function ProfileScreen() {
           selectionColor={colors.accent}
           style={styles.input}
           placeholder="Phone Number"
+          testID="profile_phone_number_input"
+          accessibilityLabel="Phone number"
           value={profile.phoneNumber}
           onChangeText={(text) => setProfile({ ...profile, phoneNumber: text })}
           keyboardType="phone-pad"
@@ -230,11 +249,16 @@ export default function ProfileScreen() {
           selectionColor={colors.accent}
           style={styles.input}
           placeholder="External ID"
+          testID="profile_external_id_input"
+          accessibilityLabel="External ID"
           value={profile.externalId}
           onChangeText={(text) => setProfile({ ...profile, externalId: text })}
         />
         <TouchableOpacity
           style={[styles.button, styles.fullWidthButton]}
+          testID="profile_set_profile_button"
+          accessibilityRole="button"
+          accessibilityLabel="Save profile"
           onPress={handleSaveProfile}
         >
           <Text style={styles.buttonText}>Save Profile</Text>
@@ -242,7 +266,7 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
+        <Text style={styles.sectionTitle} accessibilityRole="header">
           Personalized Forms Authentication
         </Text>
         <Text style={styles.text}>
@@ -253,6 +277,7 @@ export default function ProfileScreen() {
             placeholderTextColor={colors.placeholder}
             selectionColor={colors.accent}
             style={styles.apiInput}
+            testID="auth_token_input"
             accessibilityLabel="Raw JWT"
             placeholder="Paste raw JWT"
             value={pastedToken}
@@ -263,7 +288,9 @@ export default function ProfileScreen() {
           />
           <TouchableOpacity
             style={[styles.button, !pastedToken.trim() && styles.buttonDisabled]}
+            testID="auth_set_token_button"
             accessibilityRole="button"
+            accessibilityLabel="Set JWT"
             accessibilityState={{ disabled: !pastedToken.trim() }}
             disabled={!pastedToken.trim()}
             onPress={handleSetToken}
@@ -271,7 +298,7 @@ export default function ProfileScreen() {
             <Text style={[styles.buttonText, !pastedToken.trim() && styles.buttonTextDisabled]}>Set</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.text}>
+        <Text style={styles.text} testID="auth_token_status_text">
           {tokenAssigned
             ? "A token is assigned in memory."
             : "No token assigned."}
@@ -279,6 +306,7 @@ export default function ProfileScreen() {
         <View style={styles.inputRow}>
           <Text style={styles.text}>Enable JWT provider</Text>
           <Switch
+            testID="auth_provider_switch"
             accessibilityLabel="Enable JWT provider"
             value={providerEnabled}
             disabled={!tokenAssigned}
@@ -291,7 +319,9 @@ export default function ProfileScreen() {
         </Text>
         <TouchableOpacity
           style={styles.button}
+          testID="profile_reset_button"
           accessibilityRole="button"
+          accessibilityLabel="Reset profile"
           onPress={handleResetProfile}
         >
           <Text style={styles.buttonText}>Reset Profile</Text>
