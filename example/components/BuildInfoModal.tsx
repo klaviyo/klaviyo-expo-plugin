@@ -78,7 +78,7 @@ export function BuildInfoModal({ visible, onClose }: { visible: boolean; onClose
       <SafeAreaView style={styles.container}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>Build info</Text>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
+          <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" testID="build-info-close">
             <Text style={styles.close}>Close</Text>
           </TouchableOpacity>
         </View>
@@ -91,7 +91,13 @@ export function BuildInfoModal({ visible, onClose }: { visible: boolean; onClose
               </Text>
             </View>
           ))}
-          <TouchableOpacity style={styles.copyButton} onPress={copy} testID="build-info-copy">
+          <TouchableOpacity
+            style={styles.copyButton}
+            onPress={copy}
+            accessibilityRole="button"
+            accessibilityLabel="Copy build info"
+            testID="build-info-copy"
+          >
             <Text style={styles.copyText}>{copied ? 'Copied' : 'Copy build info'}</Text>
           </TouchableOpacity>
         </ScrollView>
