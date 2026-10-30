@@ -164,13 +164,31 @@ jobs:
             gh run cancel "$id" --repo "$REPO" || echo "::warning::Could not cancel run $id."
           done
 
+  approve:
+    name: Approve the example app deploy
+    needs: release-merge-check
+    if: |
+      !cancelled()
+      && needs.release-merge-check.outputs.skip != 'true'
+      && (github.event_name == 'push'
+      || (github.event_name == 'pull_request'
+          && startsWith(github.event.label.name, 'deploy-example-app')
+          && github.event.pull_request.head.repo.full_name == github.repository))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions: {}
+    environment: example-app-deploy
+    steps:
+      - run: echo "Deploy approved."
+
   plan:
     name: Choose platforms
-    needs: [release-merge-check, cancel-merge-publish]
+    needs: [release-merge-check, cancel-merge-publish, approve]
     # Both needs skip on most events, so this runs unless the merge check says skip. Every later
     # job needs plan's outputs, so skipping plan skips the deploy.
     if: |
       !cancelled()
+      && (needs.approve.result == 'success' || needs.approve.result == 'skipped')
       && needs.release-merge-check.outputs.skip != 'true'
       && (github.event_name != 'pull_request'
       || (startsWith(github.event.label.name, 'deploy-example-app')
