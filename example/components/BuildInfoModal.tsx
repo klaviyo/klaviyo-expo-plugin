@@ -50,7 +50,7 @@ export function BuildInfoButton() {
         onPress={() => setVisible(true)}
         hitSlop={8}
         style={styles.headerButton}
-        testID="build-info-button"
+        testID="build_info_button"
       >
         <Ionicons name="information-circle-outline" size={24} color={colors.accent} />
       </Pressable>
@@ -78,15 +78,15 @@ export function BuildInfoModal({ visible, onClose }: { visible: boolean; onClose
       <SafeAreaView style={styles.container}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>Build info</Text>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" testID="build-info-close">
+          <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" testID="build_info_close">
             <Text style={styles.close}>Close</Text>
           </TouchableOpacity>
         </View>
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <View key={row.label} style={styles.row}>
               <Text style={styles.label}>{row.label}</Text>
-              <Text style={styles.value} selectable testID={`build-info-${row.label}`}>
+              <Text style={styles.value} selectable testID={`build_info_${toSnakeCase(row.label) || `row_${index}`}`}>
                 {row.value}
               </Text>
             </View>
@@ -96,7 +96,7 @@ export function BuildInfoModal({ visible, onClose }: { visible: boolean; onClose
             onPress={copy}
             accessibilityRole="button"
             accessibilityLabel="Copy build info"
-            testID="build-info-copy"
+            testID="build_info_copy"
           >
             <Text style={styles.copyText}>{copied ? 'Copied' : 'Copy build info'}</Text>
           </TouchableOpacity>
@@ -104,6 +104,10 @@ export function BuildInfoModal({ visible, onClose }: { visible: boolean; onClose
       </SafeAreaView>
     </Modal>
   );
+}
+
+function toSnakeCase(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
 // The wrapper SDK and the plugin are in every binary; the native SDK is the one for the running platform.
