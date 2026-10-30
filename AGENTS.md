@@ -89,6 +89,12 @@ npm run eas-android-local
 npm run reset-all
 ```
 
+### UI test IDs
+
+- Give every new interactive or asserted-on control in the example app a snake_case `testID` (`<feature>_<element>_<type>`, e.g. `push_request_permission_button`). The other MAGE apps use `accessibilityIdentifier`, `Semantics(identifier:)` + `ValueKey` and `Modifier.testTag`.
+- Before adding an ID, check the existing names, and reuse the shared name when the same control exists in the other SDK example apps.
+- When you rename or remove a control, update its ID and every test or automation that references it.
+
 ## Plugin Configuration
 
 The plugin is configured in `app.json` or `app.config.js` under the `plugins` array.
