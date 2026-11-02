@@ -219,6 +219,7 @@ export default function AppLayout() {
         name="index"
         options={{
           title: 'Profile',
+          tabBarButtonTestID: 'profile_tab',
           headerRight: () => <BuildInfoButton />,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
@@ -229,6 +230,7 @@ export default function AppLayout() {
         name="forms"
         options={{
           title: 'Forms',
+          tabBarButtonTestID: 'forms_tab',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="document-text" size={size} color={color} />
           ),
@@ -238,6 +240,7 @@ export default function AppLayout() {
         name="push"
         options={{
           title: 'Push',
+          tabBarButtonTestID: 'push_tab',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="notifications" size={size} color={color} />
           ),
@@ -247,6 +250,7 @@ export default function AppLayout() {
         name="geofencing"
         options={{
           title: 'Geofencing',
+          tabBarButtonTestID: 'geofencing_tab',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="location" size={size} color={color} />
           ),

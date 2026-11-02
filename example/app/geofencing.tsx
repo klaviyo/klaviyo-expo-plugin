@@ -155,12 +155,12 @@ export default function GeofencingScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} testID="geofencing_screen">
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Geofencing</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">Geofencing</Text>
 
         {!geofencingEnabledInBuild && (
-          <View style={styles.disabledBanner}>
+          <View style={styles.disabledBanner} testID="geofencing_disabled_banner">
             <Text style={styles.disabledBannerText}>
               Geofencing is disabled ({Platform.OS}.geofencingEnabled is false). Enable it in app.config.js to use these features.
             </Text>
@@ -173,7 +173,7 @@ export default function GeofencingScreen() {
 
         {locationPermission && geofencingEnabledInBuild && (
           <View style={styles.permissionContainer}>
-            <Text style={styles.permissionText}>
+            <Text style={styles.permissionText} testID="geofencing_location_permission_text">
               Location Permission: {locationPermission}
             </Text>
           </View>
@@ -182,6 +182,9 @@ export default function GeofencingScreen() {
         {!geofencingEnabled ? (
           <TouchableOpacity
             style={[styles.button, styles.fullWidthButton, !geofencingEnabledInBuild && styles.buttonDisabled]}
+            testID="geofencing_register_button"
+            accessibilityRole="button"
+            accessibilityLabel="Enable geofencing"
             onPress={geofencingEnabledInBuild ? handleRegisterGeofences : undefined}
             disabled={!geofencingEnabledInBuild}
           >
@@ -193,6 +196,9 @@ export default function GeofencingScreen() {
           <>
             <TouchableOpacity
               style={[styles.button, styles.fullWidthButton, styles.buttonSuccess, !geofencingEnabledInBuild && styles.buttonDisabled]}
+              testID="geofencing_enabled_indicator"
+              accessibilityRole="button"
+              accessibilityLabel="Geofencing enabled"
               disabled
             >
               <Text style={[styles.buttonText, !geofencingEnabledInBuild && styles.buttonTextDisabled]}>
@@ -202,6 +208,9 @@ export default function GeofencingScreen() {
 
             <TouchableOpacity
               style={[styles.button, styles.fullWidthButton, styles.buttonDanger, !geofencingEnabledInBuild && styles.buttonDisabled]}
+              testID="geofencing_unregister_button"
+              accessibilityRole="button"
+              accessibilityLabel="Disable geofencing"
               onPress={geofencingEnabledInBuild ? handleUnregisterGeofences : undefined}
               disabled={!geofencingEnabledInBuild}
             >
@@ -213,7 +222,7 @@ export default function GeofencingScreen() {
         )}
 
         <View style={[styles.statusContainer, !geofencingEnabledInBuild && styles.statusContainerDisabled]}>
-          <Text style={styles.statusText}>
+          <Text style={styles.statusText} testID="geofencing_status_text">
             {geofencingEnabled ? '✓ Geofencing is active' : 'Geofencing Status'}
           </Text>
           <Text style={styles.statusSubtext}>
@@ -227,6 +236,9 @@ export default function GeofencingScreen() {
 
         <TouchableOpacity
           style={[styles.button, styles.fullWidthButton, styles.buttonSecondary, !geofencingEnabledInBuild && styles.buttonDisabled]}
+          testID="geofencing_get_current_geofences_button"
+          accessibilityRole="button"
+          accessibilityLabel="Refresh geofences"
           onPress={geofencingEnabledInBuild ? fetchCurrentGeofences : undefined}
           disabled={!geofencingEnabledInBuild}
         >
@@ -235,7 +247,7 @@ export default function GeofencingScreen() {
           </Text>
         </TouchableOpacity>
 
-        <View style={styles.geofenceListContainer}>
+        <View style={styles.geofenceListContainer} testID="geofences_list">
           <Text style={styles.geofenceListTitle}>
             Current Geofences ({currentGeofences.length})
           </Text>
@@ -245,7 +257,7 @@ export default function GeofencingScreen() {
             </Text>
           ) : (
             currentGeofences.map((geofence, index) => (
-              <View key={index} style={styles.geofenceItem}>
+              <View key={index} style={styles.geofenceItem} testID={`geofence_row_${index}`}>
                 <Text style={styles.geofenceId}>
                   {geofence.identifier}
                 </Text>

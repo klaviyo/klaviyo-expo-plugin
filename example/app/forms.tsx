@@ -15,25 +15,32 @@ export default function FormsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="forms_screen">
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>In-App Forms</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">In-App Forms</Text>
         <TouchableOpacity
           style={[styles.button, styles.fullWidthButton]}
+          testID="forms_register_button"
+          accessibilityRole="button"
+          accessibilityLabel="Register for in-app forms"
           onPress={handleRegisterForInAppForms}
         >
           <Text style={styles.buttonText}>Register for In-App Forms</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.fullWidthButton]}
+          testID="forms_unregister_button"
           accessibilityRole="button"
+          accessibilityLabel="Unregister from in-app forms"
           onPress={handleUnregisterFromInAppForms}
         >
           <Text style={styles.buttonText}>Unregister from In-App Forms</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.fullWidthButton]}
+          testID="events_added_to_cart_button"
           accessibilityRole="button"
+          accessibilityLabel="Create Added to Cart event"
           onPress={() => Klaviyo.createEvent({ name: "Added to Cart" })}
         >
           <Text style={styles.buttonText}>Track Added to Cart</Text>

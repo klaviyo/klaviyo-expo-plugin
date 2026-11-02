@@ -4,7 +4,14 @@
 
 `.github/workflows/publish-example.yml` builds the example app on EAS and submits it to the Play Store internal track and TestFlight. It runs on every push to `master` or a `rel/**` branch, whenever a GitHub release is published, on demand through `workflow_dispatch`, and when a deploy label is added to a pull request. When a required secret or variable from the tables below is missing, a push or release run posts a notice and skips the deploy, while a manual or label run fails with an error.
 
-A run is never cancelled once it starts. A push waits for the in-flight run on the same branch, and a newer queued push replaces an older queued one, so quick merges deploy the latest commit without wasting builds. Cancelling would leave the EAS build running on Expo's servers, unsupervised and using a build number, with no submit step to follow it. Release, manual and label runs queue on their own.
+A push waits for the in-flight run on the same branch, and a newer queued push replaces an older queued one, so quick merges deploy the latest commit without wasting builds. Release, manual and label runs queue on their own. On top of that, each deploy job joins one queue per platform shared by every run (`publish-example-android`, `publish-example-ios`), so two runs never pick a store build number at the same time.
+
+A release is published once, from the tag. Two guards stop the `master` push from publishing it again:
+
+- Merging `rel/X.Y.Z` back into `master` makes an untagged merge commit. The `release-merge-check` job compares the pushed tree with the tree of the `X.Y.Z` tag (the version in the root `package.json`). When they match, the push skips the deploy. The skip happens whether or not the release deploy succeeded: retry a failed release deploy from the release run, so the build keeps the `X.Y.Z` version. If the merge-back carried a hotfix, the trees differ and the push deploys.
+- When the merge lands on `master` first and the release follows, the tag run's `cancel-merge-publish` job cancels any `master` push run of the same tree that has not started its EAS build. A manual tag run for one platform cancels nothing. It also publishes only that platform: if the push skipped because its tree matched the tag, run the other platform on the tag by hand (`gh workflow run publish-example.yml --ref X.Y.Z -f platform=android`, or `ios`). Running it on `master` instead builds `X.Y.Z-alpha.N`. A run whose build has started is left to finish, and the release deploy queues behind it.
+
+Otherwise a started run is never cancelled. Cancelling would leave the EAS build running on Expo's servers, unsupervised and using a build number, with no submit step to follow it.
 
 EAS compiles and signs both platforms on Expo's infrastructure. The GitHub runners only start the build, wait for it, and submit the result with `eas submit`, so there is no macOS job and no signing material in this repo.
 
@@ -191,7 +198,7 @@ EAS builds and signs on Expo's servers, so some pieces of the native workflows d
 
 - No Internal App Sharing link: `eas submit` uploads to the internal track and offers no sharing upload. Slack links the build's per-release Play URL (`play.google.com/apps/test/<package>/<versionCode>`) instead, which works for the same internal testers.
 - No keystore or signing key cleanup steps: signing material lives on EAS and never reaches the runner. CI holds only `EXPO_TOKEN` and the store API keys, and they are passed through `env` for the steps that need them. No step writes them to disk.
-- Concurrency never cancels a started run. See [Overview](#overview).
+- Concurrency never cancels a started run. Only a release run cancels a `master` push run of the same tree, before its EAS build starts. See [Overview](#overview).
 - Android release notes are set after the submit through the Play Developer API, since `eas submit` has no notes option. iOS notes go through the App Store Connect API in their own job, as in the iOS test app.
 - The Slack message has no EAS build page link. The layout is shared across the example apps and has no slot for it, so the build page URL stays in the job log, where only the job output reaches it.
 
