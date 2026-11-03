@@ -44,7 +44,7 @@ Create all of these as repository secrets and variables. The Android preflight c
 | Secret | Description |
 |--------|-------------|
 | `EXPO_TOKEN` | Access token for an Expo robot user with access to the `klaviyo` account |
-| `SLACK_WEBHOOK_URL` | Optional. Incoming webhook for deploy notifications. When it is empty the Slack steps skip quietly |
+| `SLACK_BOT_TOKEN` | Optional. Merlin bot token for deploy notifications. When it is empty the Slack steps skip with a notice |
 | `SERVICE_ACCOUNT_JSON` | Google Play service account key (JSON contents). Used for the versionCode preflight and to set the Play release notes, so it needs release permissions on the app |
 | `APP_STORE_CONNECT_API_KEY_KEY_ID` | App Store Connect API key ID |
 | `APP_STORE_CONNECT_API_KEY_ISSUER_ID` | App Store Connect API issuer ID |
@@ -119,16 +119,17 @@ When the text is over the cap, the release body is cut first, then the CI run li
 
 ## Slack message
 
+Push and label deploys post one `⏳ Expo Example App deploy awaiting approval` message before the `example-app-deploy` gate, with a link to the run. Each platform replies in its thread:
+
 ```
-✅ Expo Example (iOS) → TestFlight
-Build: <full version> (<build>)
-SDKs: Expo <version> · <ref> | RN <version> | iOS <version>
-Source: <source label> (<event>)
-Commit: <sha7, linked> · <CI run, linked>
-Get the build: <login-gated store link and how to become a tester>
+✅ Expo Example (iOS) deployed to TestFlight
+<login-gated store link and the version and build to install>
+Build: <full version> (<build>)    SDKs: Expo <version> · <ref> | RN <version> | iOS <version>
+Source: <source label> (<event>)   Commit: <sha>
+Commit · Run
 ```
 
-A failed deploy posts `❌ Expo Example (<platform>) deploy failed at <step>` with the commit and CI run. A failure to set the store notes posts a separate ⚠️ message and does not fail the run. The source label is reduced to characters that are safe in a Slack payload. The commit is the pull request head for label deploys.
+A failed deploy replies `❌ Expo Example (<platform>) deploy failed at <step>`. A deploy that hits its 90-minute timeout replies `⏹️ ... timed out`. A failure to set the store notes replies with a ⚠️ warning and does not fail the run. When the run ends, the first message is updated with the overall result and a line per platform. Release and manual runs skip the gate, so their platform messages post on their own. The source label is reduced to characters that are safe in a Slack payload. The commit is the pull request head for label deploys.
 
 ## Build info in the app
 

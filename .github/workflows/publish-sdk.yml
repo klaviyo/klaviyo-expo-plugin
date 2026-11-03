@@ -21,11 +21,18 @@ on:
         required: false
         type: boolean
         default: false
+      slack_ts:
+        description: ts of the release's Slack message to update with the result. Empty posts a new message.
+        required: false
+        type: string
+        default: ''
 
 permissions: {}
 
 env:
   PACKAGE_NAME: klaviyo-expo-plugin
+  SLACK_USERNAME: Expo SDK
+  SLACK_ICON_EMOJI: ':merlin-orb-expo:'
 
 jobs:
   test:
@@ -137,40 +144,79 @@ jobs:
       contents: read
       actions: read
     steps:
-      - uses: actions/checkout@v4
-
       - name: Classify the result
         id: result
         env:
           GH_TOKEN: ${{ github.token }}
+          TEST_RESULT: ${{ needs.test.result }}
           PUBLISH_RESULT: ${{ needs.publish-sdk.result }}
+          VERSION: ${{ needs.test.outputs.version || inputs.version }}
+          DIST_TAG: ${{ needs.test.outputs.dist_tag }}
+          ALREADY: ${{ needs.publish-sdk.outputs.already_published }}
         run: |
           if [ "$PUBLISH_RESULT" = "success" ]; then
-            echo "result=success" >> "$GITHUB_OUTPUT"
+            echo "status=success" >> "$GITHUB_OUTPUT"
+            if [ "$ALREADY" = "true" ]; then
+              echo "title=Expo plugin $VERSION already on npm, nothing published" >> "$GITHUB_OUTPUT"
+            else
+              echo "title=Expo plugin $VERSION published to npm${DIST_TAG:+ (dist-tag $DIST_TAG)}" >> "$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
           rejected="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
             --jq '[.[] | select(.state == "rejected" and any(.environments[]; .name == "npm"))] | length' || echo 0)"
           if [ "$PUBLISH_RESULT" = "failure" ] && [ "$rejected" != "0" ]; then
-            echo "result=stopped" >> "$GITHUB_OUTPUT"
-            echo "reason=npm deploy rejected" >> "$GITHUB_OUTPUT"
+            echo "status=stopped" >> "$GITHUB_OUTPUT"
+            echo "title=Expo plugin $VERSION release stopped, npm deploy rejected" >> "$GITHUB_OUTPUT"
           else
-            echo "result=failure" >> "$GITHUB_OUTPUT"
+            echo "status=failure" >> "$GITHUB_OUTPUT"
+            echo "title=Expo plugin $VERSION npm publish failed" >> "$GITHUB_OUTPUT"
+            if [ "$TEST_RESULT" = "failure" ]; then
+              echo "step=the test job (version check, type check or tests)" >> "$GITHUB_OUTPUT"
+            else
+              echo "step=npm publish" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
-      - name: Notify Slack
+      - name: Checkout Slack action
         continue-on-error: true
-        uses: ./.github/actions/notify-slack-publish
+        uses: actions/checkout@v4
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: ${{ steps.result.outputs.result }}
-          reason: ${{ steps.result.outputs.reason }}
-          package: ${{ env.PACKAGE_NAME }}
-          version: ${{ needs.test.outputs.version || inputs.version }}
-          release_url: ${{ inputs.release_url }}
-          dist_tag: ${{ needs.test.outputs.dist_tag }}
-          already_published: ${{ needs.publish-sdk.outputs.already_published }}
-          commit: ${{ inputs.ref }}
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Notify Slack
+        id: slack
+        if: ${{ !(inputs.dry_run && steps.result.outputs.status == 'stopped') }}
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ inputs.slack_ts }}
+          status: ${{ steps.result.outputs.status }}
+          title: ${{ steps.result.outputs.title }}
+          body: ${{ steps.result.outputs.status != 'success' && 'Nothing was published.' || '' }}
+          fields: |
+            Package: ${{ env.PACKAGE_NAME }}
+            Version: ${{ needs.test.outputs.version || inputs.version }}
+            Dist-tag: ${{ needs.test.outputs.dist_tag }}
+            Commit: ${{ inputs.ref }}
+            Requested by: ${{ github.actor }}
+          links: |
+            npm|https://www.npmjs.com/package/${{ env.PACKAGE_NAME }}/v/${{ needs.test.outputs.version || inputs.version }}
+            Release|${{ inputs.release_url }}
+
+      - name: Reply with failure details
+        if: steps.result.outputs.status == 'failure' && steps.slack.outputs.ts != ''
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ steps.slack.outputs.ts }}
+          status: failure
+          title: Failed at ${{ steps.result.outputs.step }}
 
   linear-release:
     needs: [test, publish-sdk]

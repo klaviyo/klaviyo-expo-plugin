@@ -198,7 +198,7 @@ function notesText(input, maxChars) {
 }
 
 // Field map for Slack messages: version/build, short SDK entries joined
-// with ' | ', and the build source. The commit line is built in slack-payload.sh.
+// with ' | ', and the build source. The workflow adds the commit field.
 function slackFields(input, options) {
   const data = input || {};
   const sdks = Array.isArray(data.sdks) ? data.sdks : [];
