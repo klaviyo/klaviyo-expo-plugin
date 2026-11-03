@@ -48,16 +48,17 @@ const mutateAndroidManifest = (config: ExportedConfigWithProps<AndroidManifest>,
   } as ManifestMetaData);
 
   // Manage automatic_push_token_forwarding flag.
-  // The flag is only written when explicitly set to false (opt-out from the native Android SDK's
-  // default-ON token forwarding). When omitted the key is removed so the native default applies.
+  // Written as "true" or "false" to match the prop; when the prop is unset the key is omitted so the
+  // native default applies (forward only tokens FCM delivers).
   const TOKEN_FORWARDING_KEY = 'com.klaviyo.push.automatic_push_token_forwarding';
   application['meta-data'] = (application['meta-data'] || []).filter(
     (item: ManifestMetaData) => item.$['android:name'] !== TOKEN_FORWARDING_KEY
   );
-  if (props.automaticPushTokenForwarding === false) {
-    KlaviyoLog.log('Injecting automatic_push_token_forwarding=false (opt-out)');
+  if (typeof props.automaticPushTokenForwarding === 'boolean') {
+    const tokenForwardingValue = props.automaticPushTokenForwarding.toString();
+    KlaviyoLog.log(`Injecting automatic_push_token_forwarding=${tokenForwardingValue}`);
     application['meta-data'].push({
-      $: { 'android:name': TOKEN_FORWARDING_KEY, 'android:value': 'false' }
+      $: { 'android:name': TOKEN_FORWARDING_KEY, 'android:value': tokenForwardingValue }
     } as ManifestMetaData);
   }
 
