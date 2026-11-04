@@ -47,6 +47,7 @@ jobs:
       actions: read
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
+      sha_short: ${{ steps.sha.outputs.short }}
       release_url: ${{ steps.draft.outputs.url }}
       slack_ts: ${{ steps.slack_pending.outputs.ts }}
     env:
@@ -71,7 +72,10 @@ jobs:
 
       - name: Resolve commit
         id: sha
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          sha=$(git rev-parse HEAD)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "short=${sha:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Validate version input
         id: validate
@@ -204,14 +208,15 @@ jobs:
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           status: pending
-          title: Expo plugin ${{ env.VERSION }} awaiting approval${{ inputs.skip_ci_check && ' (CI check skipped)' || '' }}
+          title: Expo plugin `${{ env.VERSION }}` awaiting approval${{ inputs.skip_ci_check && ' (CI check skipped)' || '' }}
           body: Review the draft release notes, then approve the `npm` deployment on this run.
           fields: |
-            Version: ${{ env.VERSION }}
-            Commit: ${{ steps.sha.outputs.sha }}
+            Version: `${{ env.VERSION }}`
+            Commit: `${{ steps.sha.outputs.short }}`
             Requested by: ${{ github.actor }}
           links: |
             Release|${{ steps.draft.outputs.url }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.sha.outputs.sha }}
 
       - name: Find failed step
         id: failed
@@ -247,12 +252,15 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ steps.slack_pending.outputs.ts }}
           status: failure
-          title: Expo plugin ${{ env.VERSION }} release blocked before approval
+          title: Expo plugin `${{ env.VERSION }}` release blocked before approval
           body: A pre-publish check failed. Nothing was published.
           fields: |
-            Version: ${{ env.VERSION }}
-            Commit: ${{ steps.sha.outputs.sha }}
+            Version: `${{ env.VERSION }}`
+            Commit: `${{ steps.sha.outputs.short }}`
             Requested by: ${{ github.actor }}
+          links: |
+            Release|${{ steps.draft.outputs.url }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.sha.outputs.sha }}
 
       - name: Reply with failure details
         if: failure() && steps.slack_failure.outputs.ts != ''
@@ -353,15 +361,16 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ env.SLACK_TS }}
           status: success
-          title: Expo plugin ${{ env.VERSION }} published${{ contains(env.VERSION, '-') && ' (prerelease)' || '' }}
-          body: On npm, GitHub release published, and the example app deploy dispatched at the tag.
+          title: Expo plugin `${{ env.VERSION }}` published${{ contains(env.VERSION, '-') && ' (prerelease)' || '' }}
+          body: On `npm`, GitHub release published, and the example app deploy dispatched at the tag.
           fields: |
-            Version: ${{ env.VERSION }}
-            Commit: ${{ needs.prepare.outputs.sha }}
+            Version: `${{ env.VERSION }}`
+            Commit: `${{ needs.prepare.outputs.sha_short }}`
             Requested by: ${{ github.actor }}
           links: |
             npm|https://www.npmjs.com/package/klaviyo-expo-plugin/v/${{ env.VERSION }}
             Release|${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ env.VERSION }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
 
       - name: Notify Slack release step failed
         id: slack_failure
@@ -372,14 +381,15 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ env.SLACK_TS }}
           status: failure
-          title: Expo plugin ${{ env.VERSION }} is on npm but ${{ steps.example.outcome == 'failure' && 'the example app deploy could not be dispatched' || 'the GitHub release could not be published' }}
-          body: ${{ steps.example.outcome == 'failure' && 'Run publish-example.yml by hand on the tag.' || 'Publish the draft release by hand.' }}
+          title: Expo plugin `${{ env.VERSION }}` is on `npm` but ${{ steps.example.outcome == 'failure' && 'the example app deploy could not be dispatched' || 'the GitHub release could not be published' }}
+          body: ${{ steps.example.outcome == 'failure' && 'Run `publish-example.yml` by hand on the tag.' || 'Publish the draft release by hand.' }}
           fields: |
-            Version: ${{ env.VERSION }}
-            Commit: ${{ needs.prepare.outputs.sha }}
+            Version: `${{ env.VERSION }}`
+            Commit: `${{ needs.prepare.outputs.sha_short }}`
           links: |
             npm|https://www.npmjs.com/package/klaviyo-expo-plugin/v/${{ env.VERSION }}
             Release|${{ needs.prepare.outputs.release_url }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
 
       - name: Reply with failure details
         if: failure() && steps.slack_failure.outputs.ts != ''
@@ -415,8 +425,10 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ needs.prepare.outputs.slack_ts }}
           status: stopped
-          title: Expo plugin ${{ env.VERSION }} release stopped, run cancelled
+          title: Expo plugin `${{ env.VERSION }}` release stopped, run cancelled
           body: Check the run for what finished before it stopped.
           fields: |
-            Version: ${{ env.VERSION }}
-            Commit: ${{ needs.prepare.outputs.sha }}
+            Version: `${{ env.VERSION }}`
+            Commit: `${{ needs.prepare.outputs.sha_short }}`
+          links: |
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
