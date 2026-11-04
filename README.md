@@ -410,7 +410,7 @@ The plugin does not write any `NSLocation*UsageDescription` keys, so you can wor
 
 iOS terminates the app when it requests location permission and the matching key is missing, and App Store review rejects builds with missing or vague purpose strings.
 
-Since `expo-location` is already a peer dependency, set the strings through its config plugin. List it in `plugins` next to `klaviyo-expo-plugin`:
+Set the strings through the `expo-location` config plugin. `expo-location` is an optional peer dependency of this plugin, so npm does not install it for you. Install it first with `npx expo install expo-location`, then list it in `plugins` next to `klaviyo-expo-plugin`:
 
 ```json
 {
@@ -453,7 +453,7 @@ If you don't use `expo-location`, set the keys directly with `ios.infoPlist`:
 }
 ```
 
-Run `npx expo prebuild` again after you change either one.
+Run `npx expo prebuild` again after you change either one. On Expo SDK 57 and later this erases and regenerates the `ios/` and `android/` folders, so add `--no-clean` if you keep native changes there that the plugin does not generate (see [Installation](#installation)).
 
 ### Requesting Permissions
 
