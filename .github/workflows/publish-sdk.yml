@@ -87,8 +87,13 @@ jobs:
       id-token: write
     outputs:
       already_published: ${{ steps.publish.outputs.already_published }}
+      started: ${{ steps.started.outputs.started }}
 
     steps:
+      - name: Mark job started
+        id: started
+        run: echo "started=true" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
@@ -142,39 +147,40 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
-      actions: read
     steps:
       - name: Classify the result
         id: result
         env:
-          GH_TOKEN: ${{ github.token }}
           TEST_RESULT: ${{ needs.test.result }}
           PUBLISH_RESULT: ${{ needs.publish-sdk.result }}
+          PUBLISH_STARTED: ${{ needs.publish-sdk.outputs.started }}
           VERSION: ${{ needs.test.outputs.version || inputs.version }}
           DIST_TAG: ${{ needs.test.outputs.dist_tag }}
           ALREADY: ${{ needs.publish-sdk.outputs.already_published }}
+          REF: ${{ inputs.ref }}
         run: |
+          echo "commit_short=${REF:0:7}" >> "$GITHUB_OUTPUT"
           if [ "$PUBLISH_RESULT" = "success" ]; then
             echo "status=success" >> "$GITHUB_OUTPUT"
             if [ "$ALREADY" = "true" ]; then
-              echo "title=Expo plugin $VERSION already on npm, nothing published" >> "$GITHUB_OUTPUT"
+              echo "title=Expo plugin \`$VERSION\` already on \`npm\`, nothing published" >> "$GITHUB_OUTPUT"
+            elif [ -n "$DIST_TAG" ]; then
+              echo "title=Expo plugin \`$VERSION\` published to \`npm\` (dist-tag \`$DIST_TAG\`)" >> "$GITHUB_OUTPUT"
             else
-              echo "title=Expo plugin $VERSION published to npm${DIST_TAG:+ (dist-tag $DIST_TAG)}" >> "$GITHUB_OUTPUT"
+              echo "title=Expo plugin \`$VERSION\` published to \`npm\`" >> "$GITHUB_OUTPUT"
             fi
             exit 0
           fi
-          rejected="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
-            --jq '[.[] | select(.state == "rejected" and any(.environments[]; .name == "npm"))] | length' || echo 0)"
-          if [ "$PUBLISH_RESULT" = "failure" ] && [ "$rejected" != "0" ]; then
+          if [ "$PUBLISH_RESULT" = "failure" ] && [ "$PUBLISH_STARTED" != "true" ]; then
             echo "status=stopped" >> "$GITHUB_OUTPUT"
-            echo "title=Expo plugin $VERSION release stopped, npm deploy rejected" >> "$GITHUB_OUTPUT"
+            echo "title=Expo plugin \`$VERSION\` release stopped, \`npm\` deploy approval rejected or expired" >> "$GITHUB_OUTPUT"
           else
             echo "status=failure" >> "$GITHUB_OUTPUT"
-            echo "title=Expo plugin $VERSION npm publish failed" >> "$GITHUB_OUTPUT"
+            echo "title=Expo plugin \`$VERSION\` \`npm publish\` failed" >> "$GITHUB_OUTPUT"
             if [ "$TEST_RESULT" = "failure" ]; then
               echo "step=the test job (version check, type check or tests)" >> "$GITHUB_OUTPUT"
             else
-              echo "step=npm publish" >> "$GITHUB_OUTPUT"
+              echo "step=\`npm publish\`" >> "$GITHUB_OUTPUT"
             fi
           fi
 
@@ -199,14 +205,15 @@ jobs:
           title: ${{ steps.result.outputs.title }}
           body: ${{ steps.result.outputs.status != 'success' && 'Nothing was published.' || '' }}
           fields: |
-            Package: ${{ env.PACKAGE_NAME }}
-            Version: ${{ needs.test.outputs.version || inputs.version }}
-            Dist-tag: ${{ needs.test.outputs.dist_tag }}
-            Commit: ${{ inputs.ref }}
+            Package: `${{ env.PACKAGE_NAME }}`
+            Version: `${{ needs.test.outputs.version || inputs.version }}`
+            Dist-tag: `${{ needs.test.outputs.dist_tag }}`
+            Commit: `${{ steps.result.outputs.commit_short }}`
             Requested by: ${{ github.actor }}
           links: |
             npm|https://www.npmjs.com/package/${{ env.PACKAGE_NAME }}/v/${{ needs.test.outputs.version || inputs.version }}
             Release|${{ inputs.release_url }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ inputs.ref }}
 
       - name: Reply with failure details
         if: steps.result.outputs.status == 'failure' && steps.slack.outputs.ts != ''
