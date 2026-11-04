@@ -87,8 +87,13 @@ jobs:
       id-token: write
     outputs:
       already_published: ${{ steps.publish.outputs.already_published }}
+      started: ${{ steps.started.outputs.started }}
 
     steps:
+      - name: Mark job started
+        id: started
+        run: echo "started=true" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
@@ -142,14 +147,13 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
-      actions: read
     steps:
       - name: Classify the result
         id: result
         env:
-          GH_TOKEN: ${{ github.token }}
           TEST_RESULT: ${{ needs.test.result }}
           PUBLISH_RESULT: ${{ needs.publish-sdk.result }}
+          PUBLISH_STARTED: ${{ needs.publish-sdk.outputs.started }}
           VERSION: ${{ needs.test.outputs.version || inputs.version }}
           DIST_TAG: ${{ needs.test.outputs.dist_tag }}
           ALREADY: ${{ needs.publish-sdk.outputs.already_published }}
@@ -163,11 +167,9 @@ jobs:
             fi
             exit 0
           fi
-          rejected="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
-            --jq '[.[] | select(.state == "rejected" and any(.environments[]; .name == "npm"))] | length' || echo 0)"
-          if [ "$PUBLISH_RESULT" = "failure" ] && [ "$rejected" != "0" ]; then
+          if [ "$PUBLISH_RESULT" = "failure" ] && [ "$PUBLISH_STARTED" != "true" ]; then
             echo "status=stopped" >> "$GITHUB_OUTPUT"
-            echo "title=Expo plugin $VERSION release stopped, npm deploy rejected" >> "$GITHUB_OUTPUT"
+            echo "title=Expo plugin $VERSION release stopped, npm deploy approval rejected or expired" >> "$GITHUB_OUTPUT"
           else
             echo "status=failure" >> "$GITHUB_OUTPUT"
             echo "title=Expo plugin $VERSION npm publish failed" >> "$GITHUB_OUTPUT"

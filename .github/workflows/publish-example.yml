@@ -58,6 +58,11 @@ on:
           - both
           - android
           - ios
+      slack_thread_ts:
+        description: "Slack message ts to reply under. Set by publish-release.yml; empty posts new messages"
+        required: false
+        default: ''
+        type: string
   pull_request:
     types: [labeled]
 
@@ -525,7 +530,7 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          thread_ts: ${{ needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ needs.announce.outputs.slack_ts || inputs.slack_thread_ts }}
           status: success
           title: Expo Example (Android) deployed to Play internal
           body: "<${{ steps.result.outputs.install_url }}|Install Klaviyo Expo Example from Google Play> on your Android device to get `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. Only internal testers can open this link."
@@ -543,7 +548,7 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          thread_ts: ${{ needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ needs.announce.outputs.slack_ts || inputs.slack_thread_ts }}
           status: warning
           title: Expo Example (Android) uploaded to Play internal, but ${{ steps.warned.outputs.step }} failed
           body: The build is on the store. Check the run and set anything missing by hand.
@@ -561,7 +566,7 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          thread_ts: ${{ needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ needs.announce.outputs.slack_ts || inputs.slack_thread_ts }}
           status: ${{ job.status == 'cancelled' && 'stopped' || 'failure' }}
           title: Expo Example (Android) deploy ${{ job.status == 'cancelled' && 'timed out' || format('failed at {0}', steps.failed.outputs.step) }}
           fields: |
@@ -632,7 +637,7 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          thread_ts: ${{ needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ needs.announce.outputs.slack_ts || inputs.slack_thread_ts }}
           status: warning
           title: Expo Example (Android) uploaded to Play internal, but its release notes were not set
           body: Re-run the failed job or set them by hand in the store console.
@@ -850,7 +855,7 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          thread_ts: ${{ needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ needs.announce.outputs.slack_ts || inputs.slack_thread_ts }}
           status: success
           title: Expo Example (iOS) deployed to TestFlight
           body: "<${{ steps.result.outputs.testflight_url }}|Open Klaviyo Expo Example in TestFlight> on your iPhone, then install `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. The build shows up once Apple finishes processing it, usually in 5 to 30 minutes."
@@ -868,7 +873,7 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          thread_ts: ${{ needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ needs.announce.outputs.slack_ts || inputs.slack_thread_ts }}
           status: warning
           title: Expo Example (iOS) uploaded to TestFlight, but ${{ steps.warned.outputs.step }} failed
           body: The build is on the store. Check the run and set anything missing by hand.
@@ -886,7 +891,7 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          thread_ts: ${{ needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ needs.announce.outputs.slack_ts || inputs.slack_thread_ts }}
           status: ${{ job.status == 'cancelled' && 'stopped' || 'failure' }}
           title: Expo Example (iOS) deploy ${{ job.status == 'cancelled' && 'timed out' || format('failed at {0}', steps.failed.outputs.step) }}
           fields: |
@@ -962,7 +967,7 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          thread_ts: ${{ needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ needs.announce.outputs.slack_ts || inputs.slack_thread_ts }}
           status: warning
           title: Expo Example (iOS) uploaded to TestFlight, but its What to Test notes were not set
           body: Re-run the failed job or set them by hand in the store console.
@@ -1006,7 +1011,11 @@ jobs:
   report:
     name: Update the deploy message
     needs: [announce, approve, preflight, checks, deploy-android, deploy-ios]
-    if: always() && needs.announce.outputs.slack_ts != ''
+    if: |
+      always()
+      && (needs.announce.outputs.slack_ts != ''
+          || needs.preflight.result == 'failure'
+          || needs.checks.result == 'failure')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -1085,9 +1094,10 @@ jobs:
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ inputs.slack_thread_ts }}
           status: ${{ steps.result.outputs.status }}
           title: ${{ steps.result.outputs.title }}
-          body: ${{ (needs.deploy-android.result != 'skipped' || needs.deploy-ios.result != 'skipped') && 'Details for each platform are in the thread.' || '' }}
+          body: ${{ needs.announce.outputs.slack_ts != '' && (needs.deploy-android.result != 'skipped' || needs.deploy-ios.result != 'skipped') && 'Details for each platform are in the thread.' || '' }}
           fields: |
             Android: ${{ steps.result.outputs.android }}
             iOS: ${{ steps.result.outputs.ios }}
