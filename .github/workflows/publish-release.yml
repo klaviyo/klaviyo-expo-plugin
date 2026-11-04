@@ -362,7 +362,7 @@ jobs:
           ts: ${{ env.SLACK_TS }}
           status: success
           title: Expo plugin `${{ env.VERSION }}` published${{ contains(env.VERSION, '-') && ' (prerelease)' || '' }}
-          body: On `npm`, GitHub release published, and the example app deploy dispatched at the tag.
+          body: On `npm`, GitHub release published, and the example app deploy dispatched at tag `${{ env.VERSION }}`.
           fields: |
             Version: `${{ env.VERSION }}`
             Commit: `${{ needs.prepare.outputs.sha_short }}`
