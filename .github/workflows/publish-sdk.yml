@@ -82,6 +82,7 @@ jobs:
     name: Announce the npm publish
     needs: test
     runs-on: ubuntu-22.04
+    timeout-minutes: 2
     permissions:
       contents: read
     outputs:
@@ -105,6 +106,7 @@ jobs:
 
       - name: Notify Slack npm publish pending
         id: slack
+        timeout-minutes: 2
         if: ${{ !inputs.dry_run }}
         continue-on-error: true
         uses: ./_slack/.github/actions/notify-slack
