@@ -82,7 +82,7 @@ jobs:
     name: Announce the npm publish
     needs: test
     runs-on: ubuntu-22.04
-    timeout-minutes: 2
+    timeout-minutes: 4
     permissions:
       contents: read
     outputs:

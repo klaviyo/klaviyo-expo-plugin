@@ -182,7 +182,7 @@ jobs:
           && startsWith(github.event.label.name, 'deploy-example-app')
           && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-24.04
-    timeout-minutes: 2
+    timeout-minutes: 4
     outputs:
       slack_ts: ${{ steps.slack.outputs.ts }}
     steps:
@@ -356,7 +356,7 @@ jobs:
       && needs.announce.outputs.slack_ts != ''
       && needs.checks.result == 'success'
     runs-on: ubuntu-24.04
-    timeout-minutes: 2
+    timeout-minutes: 4
     outputs:
       slack_ts: ${{ steps.slack.outputs.ts }}
     steps:
