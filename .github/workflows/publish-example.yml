@@ -179,7 +179,7 @@ jobs:
       || github.event_name == 'release'
       || github.event_name == 'workflow_dispatch'
       || (github.event_name == 'pull_request'
-          && startsWith(github.event.label.name, 'deploy-example-app')
+          && contains(fromJSON('["deploy-example-app","deploy-example-app:android","deploy-example-app:ios"]'), github.event.label.name)
           && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-24.04
     timeout-minutes: 4
@@ -1107,7 +1107,15 @@ jobs:
           IOS: ${{ needs.deploy-ios.result }}
           ANDROID_WARNED: ${{ needs.deploy-android.outputs.warned }}
           IOS_WARNED: ${{ needs.deploy-ios.outputs.warned }}
+          DEPLOY_TIMEOUT_MINUTES: 90
         run: |
+          timed_out=false
+          if [ "$ANDROID" = cancelled ] || [ "$IOS" = cancelled ]; then
+            timed_out=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" --paginate \
+              --jq '.jobs[] | select(.conclusion == "cancelled" and (.name | startswith("Publish to")) and .started_at != null and .completed_at != null)
+                | ((.completed_at | fromdateiso8601) - (.started_at | fromdateiso8601))' 2>/dev/null \
+              | awk -v limit=$(( DEPLOY_TIMEOUT_MINUTES * 60 - 60 )) '$1 >= limit { found = 1 } END { print found ? "true" : "false" }' || echo false)
+          fi
           describe() {
             case "$1" in
               success) if [ "$2" = "true" ]; then echo "uploaded with warnings"; else echo "deployed"; fi ;;
@@ -1126,6 +1134,8 @@ jobs:
             status=failure; title="Expo Example App deploy failed, required secrets are missing"
           elif [ "$CHECKS" = failure ]; then
             status=failure; title="Expo Example App deploy failed, checks did not pass"
+          elif [ "$timed_out" = true ]; then
+            status=failure; title="Expo Example App deploy failed, a deploy job timed out"
           elif [ "$ANDROID" = cancelled ] || [ "$IOS" = cancelled ] || [ "$APPROVE" = cancelled ] || [ "$CHECKS" = cancelled ]; then
             status=stopped; title="Expo Example App deploy stopped, run cancelled"
           elif [ "$APPROVE" = failure ]; then

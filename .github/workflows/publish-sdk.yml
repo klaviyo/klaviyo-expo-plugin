@@ -191,7 +191,8 @@ jobs:
     # Cancelled runs are reported by publish-release.yml's stopped job.
     if: >-
       always()
-      && !contains(needs.*.result, 'cancelled')
+      && needs.publish-sdk.result != 'cancelled'
+      && needs.test.result != 'cancelled'
       && !inputs.dry_run
     runs-on: ubuntu-22.04
     permissions:
