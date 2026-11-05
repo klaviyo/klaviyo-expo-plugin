@@ -356,8 +356,11 @@ jobs:
       && needs.checks.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    outputs:
+      slack_ts: ${{ steps.slack.outputs.ts }}
     steps:
       - name: Checkout Slack action
+        if: ${{ !cancelled() }}
         continue-on-error: true
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -375,11 +378,13 @@ jobs:
         run: echo "COMMIT_SHORT=${COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
 
       - name: Notify Slack checks passed
+        id: slack
         continue-on-error: true
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ inputs.slack_thread_ts }}
           status: pending
           title: Expo Example App checks passed, deploying ${{ needs.preflight.outputs.android == 'true' && needs.preflight.outputs.ios == 'true' && 'Android and iOS' || needs.preflight.outputs.android == 'true' && 'Android' || 'iOS' }}
           fields: |
@@ -1143,6 +1148,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Checkout Slack action
+        if: ${{ !cancelled() }}
         continue-on-error: true
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -1164,7 +1170,7 @@ jobs:
         uses: ./_slack/.github/actions/notify-slack
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
-          ts: ${{ needs.announce.outputs.slack_ts }}
+          ts: ${{ needs.progress.outputs.slack_ts || needs.announce.outputs.slack_ts }}
           thread_ts: ${{ inputs.slack_thread_ts }}
           status: ${{ steps.result.outputs.status }}
           title: ${{ steps.result.outputs.title }}

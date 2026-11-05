@@ -189,7 +189,7 @@ jobs:
     if: >-
       always()
       && !contains(needs.*.result, 'cancelled')
-      && !(inputs.dry_run && needs.publish-sdk.result == 'success')
+      && !inputs.dry_run
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -231,6 +231,7 @@ jobs:
           fi
 
       - name: Checkout Slack action
+        if: ${{ !cancelled() }}
         continue-on-error: true
         uses: actions/checkout@v4
         with:
@@ -241,7 +242,6 @@ jobs:
 
       - name: Notify Slack npm publish result
         id: slack
-        if: ${{ !(inputs.dry_run && steps.result.outputs.status == 'stopped') }}
         continue-on-error: true
         uses: ./_slack/.github/actions/notify-slack
         with:
@@ -264,7 +264,7 @@ jobs:
 
       - name: Update the release message
         id: release_message
-        if: ${{ inputs.slack_ts != '' && !(inputs.dry_run && steps.result.outputs.status == 'stopped') }}
+        if: ${{ inputs.slack_ts != '' }}
         continue-on-error: true
         uses: ./_slack/.github/actions/notify-slack
         with:
