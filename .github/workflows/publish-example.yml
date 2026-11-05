@@ -339,7 +339,7 @@ jobs:
     name: Checks
     needs: preflight
     if: |
-      !cancelled() && !failure()
+      !cancelled() && needs.preflight.result == 'success'
       && (needs.preflight.outputs.android == 'true' || needs.preflight.outputs.ios == 'true')
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     uses: ./.github/workflows/publish-example-checks.yml
@@ -352,7 +352,7 @@ jobs:
     name: Update the deploy message
     needs: [announce, preflight, checks]
     if: |
-      !cancelled() && !failure()
+      !cancelled() && needs.preflight.result == 'success'
       && needs.announce.outputs.slack_ts != ''
       && needs.checks.result == 'success'
     runs-on: ubuntu-24.04
@@ -401,7 +401,7 @@ jobs:
     name: Publish to Play Store internal track
     needs: [checks, preflight, announce]
     if: |
-      !cancelled() && !failure()
+      !cancelled() && needs.preflight.result == 'success' && needs.checks.result == 'success'
       && needs.preflight.outputs.android == 'true'
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
@@ -718,7 +718,7 @@ jobs:
     name: Publish to TestFlight
     needs: [checks, preflight, announce]
     if: |
-      !cancelled() && !failure()
+      !cancelled() && needs.preflight.result == 'success' && needs.checks.result == 'success'
       && needs.preflight.outputs.ios == 'true'
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
