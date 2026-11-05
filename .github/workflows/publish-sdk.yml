@@ -43,7 +43,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       dist_tag: ${{ steps.version.outputs.dist_tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
 
@@ -64,7 +64,7 @@ jobs:
           fi
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -91,7 +91,7 @@ jobs:
       - name: Checkout Slack action
         if: ${{ !inputs.dry_run }}
         continue-on-error: true
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions
@@ -143,12 +143,12 @@ jobs:
         id: started
         run: echo "started=true" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -237,7 +237,7 @@ jobs:
       - name: Checkout Slack action
         if: ${{ !cancelled() }}
         continue-on-error: true
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions
@@ -296,7 +296,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
@@ -305,7 +305,7 @@ jobs:
       - name: Sync release to Linear
         id: linear-sync
         continue-on-error: true
-        uses: linear/linear-release-action@30f9ae77461ec29f07fffe0c52edd1909bfbb6f5 # v0.18.1
+        uses: linear/linear-release-action@dd4fc407f860b9460d2cf0b3fb1edd8985cf443f # v0.18.2
         with:
           access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
           command: sync
@@ -315,7 +315,7 @@ jobs:
       - name: Complete release in Linear
         if: steps.linear-sync.outcome == 'success'
         continue-on-error: true
-        uses: linear/linear-release-action@30f9ae77461ec29f07fffe0c52edd1909bfbb6f5 # v0.18.1
+        uses: linear/linear-release-action@dd4fc407f860b9460d2cf0b3fb1edd8985cf443f # v0.18.2
         with:
           access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
           command: complete
