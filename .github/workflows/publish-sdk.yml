@@ -30,6 +30,7 @@ on:
 permissions: {}
 
 env:
+  TRIGGERED_BY: ${{ github.event_name == 'schedule' && 'schedule' || (endsWith(github.triggering_actor || github.actor, '[bot]') && format('{0} (automation)', github.workflow) || github.triggering_actor || github.actor) }}
   PACKAGE_NAME: klaviyo-expo-plugin
   SLACK_USERNAME: Expo SDK
   SLACK_ICON_EMOJI: ':merlin-orb-expo:'
@@ -121,7 +122,7 @@ jobs:
             Version: `${{ needs.test.outputs.version }}`
             Dist-tag: `${{ needs.test.outputs.dist_tag }}`
             Commit: `${{ steps.short.outputs.commit_short }}`
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             Release|${{ inputs.release_url }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ inputs.ref }}
@@ -260,7 +261,7 @@ jobs:
             Version: `${{ needs.test.outputs.version || inputs.version }}`
             Dist-tag: `${{ needs.test.outputs.dist_tag }}`
             Commit: `${{ steps.result.outputs.commit_short }}`
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             npm|https://www.npmjs.com/package/${{ env.PACKAGE_NAME }}/v/${{ needs.test.outputs.version || inputs.version }}
             Release|${{ inputs.release_url }}
@@ -282,7 +283,7 @@ jobs:
             Version: `${{ needs.test.outputs.version || inputs.version }}`
             Dist-tag: `${{ needs.test.outputs.dist_tag }}`
             Commit: `${{ steps.result.outputs.commit_short }}`
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             npm|https://www.npmjs.com/package/${{ env.PACKAGE_NAME }}/v/${{ needs.test.outputs.version || inputs.version }}
             Release|${{ inputs.release_url }}

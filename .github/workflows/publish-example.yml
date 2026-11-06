@@ -63,6 +63,11 @@ on:
         required: false
         default: ''
         type: string
+      triggered_by:
+        description: Login of the person who started this run. Set by publish-release.yml; leave empty to use the actor
+        required: false
+        default: ''
+        type: string
   pull_request:
     types: [labeled]
 
@@ -79,6 +84,7 @@ permissions:
   contents: read
 
 env:
+  TRIGGERED_BY: ${{ github.event_name == 'schedule' && 'schedule' || inputs.triggered_by || (endsWith(github.triggering_actor || github.actor, '[bot]') && format('{0} (automation)', github.workflow) || github.triggering_actor || github.actor) }}
   ANDROID_PACKAGE: com.klaviyo.expoexample
   IOS_BUNDLE_ID: com.klaviyo.expoexample
   COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -212,14 +218,16 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts }}
           status: pending
-          title: ${{ (github.event_name == 'push' || github.event_name == 'pull_request') && 'Expo Example App deploy awaiting approval' || (github.ref_type == 'tag' && format('Expo Example App deploying `{0}`', github.ref_name) || 'Expo Example App deploying') }}
+          title: "${{ github.event_name == 'pull_request' && format('Expo Example App deploying PR #{0}', github.event.pull_request.number) || github.event_name == 'push' && 'Expo Example App deploy awaiting approval' || (github.ref_type == 'tag' && format('Expo Example App deploying `{0}`', github.ref_name) || 'Expo Example App deploying') }}"
           body: ${{ (github.event_name == 'push' || github.event_name == 'pull_request') && 'Approve the `example-app-deploy` environment on this run to build and submit.' || '' }}
           fields: |
             ${{ github.ref_type == 'tag' && format('Version: `{0}`', github.ref_name) || '' }}
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   approve:
@@ -393,8 +401,10 @@ jobs:
             ${{ github.ref_type == 'tag' && format('Version: `{0}`', github.ref_name) || '' }}
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   deploy-android:
@@ -601,7 +611,10 @@ jobs:
             SDKs: `${{ steps.slack.outputs.sdks }}`
             Source: `${{ steps.slack.outputs.source }}`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
       - name: Notify Slack on upload with warnings
@@ -619,7 +632,10 @@ jobs:
             SDKs: `${{ steps.slack.outputs.sdks }}`
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
       - name: Notify Slack on failure
@@ -635,7 +651,10 @@ jobs:
             Build: `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   android-notes:
@@ -711,7 +730,10 @@ jobs:
             Build: `${{ needs.deploy-android.outputs.app_version }} (${{ needs.deploy-android.outputs.build_number }})`
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   deploy-ios:
@@ -934,7 +956,10 @@ jobs:
             SDKs: `${{ steps.slack.outputs.sdks }}`
             Source: `${{ steps.slack.outputs.source }}`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
       - name: Notify Slack on upload with warnings
@@ -952,7 +977,10 @@ jobs:
             SDKs: `${{ steps.slack.outputs.sdks }}`
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
       - name: Notify Slack on failure
@@ -968,7 +996,10 @@ jobs:
             Build: `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   what-to-test:
@@ -1049,7 +1080,10 @@ jobs:
             Build: `${{ needs.deploy-ios.outputs.app_version }} (${{ needs.deploy-ios.outputs.build_number }})`
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   cleanup-label:
@@ -1137,7 +1171,7 @@ jobs:
           elif [ "$timed_out" = true ]; then
             status=failure; title="Expo Example App deploy failed, a deploy job timed out"
           elif [ "$ANDROID" = cancelled ] || [ "$IOS" = cancelled ] || [ "$APPROVE" = cancelled ] || [ "$CHECKS" = cancelled ]; then
-            status=stopped; title="Expo Example App deploy stopped, run cancelled"
+            status=stopped; title="Expo Example App deploy cancelled"
           elif [ "$APPROVE" = failure ]; then
             state=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
               --jq '[.[] | select(any(.environments[]; .name == "example-app-deploy"))][-1].state // ""' || true)
@@ -1192,6 +1226,8 @@ jobs:
             iOS: ${{ steps.result.outputs.ios }}
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
             Play internal|${{ needs.deploy-android.outputs.install_url }}
             TestFlight|${{ needs.deploy-ios.outputs.testflight_url }}

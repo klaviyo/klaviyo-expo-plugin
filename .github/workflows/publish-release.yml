@@ -33,6 +33,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  TRIGGERED_BY: ${{ github.event_name == 'schedule' && 'schedule' || (endsWith(github.triggering_actor || github.actor, '[bot]') && format('{0} (automation)', github.workflow) || github.triggering_actor || github.actor) }}
   VERSION: ${{ inputs.version || github.event.release.tag_name }}
   SLACK_USERNAME: Expo SDK
   SLACK_ICON_EMOJI: ':merlin-orb-expo:'
@@ -213,7 +214,7 @@ jobs:
           fields: |
             Version: `${{ env.VERSION }}`
             Commit: `${{ steps.sha.outputs.short }}`
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             Release|${{ steps.draft.outputs.url }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.sha.outputs.sha }}
@@ -257,7 +258,7 @@ jobs:
           fields: |
             Version: `${{ env.VERSION }}`
             Commit: `${{ steps.sha.outputs.short }}`
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             Release|${{ steps.draft.outputs.url }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.sha.outputs.sha }}
@@ -332,16 +333,19 @@ jobs:
       - name: Dispatch the example app deploy
         id: example
         run: |
-          # True when the workflow file at $VERSION declares slack_thread_ts.
-          takes_thread_ts() {
+          # True when the workflow file at $VERSION declares the input named by $1.
+          takes_input() {
             gh api "repos/${GITHUB_REPOSITORY}/contents/.github/workflows/publish-example.yml?ref=$VERSION" \
-              -H "Accept: application/vnd.github.raw" | grep -q '^[[:space:]]*slack_thread_ts:'
+              -H "Accept: application/vnd.github.raw" | grep -q "^[[:space:]]*$1:"
           }
-          if [ -n "$SLACK_TS" ] && takes_thread_ts; then
-            gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f platform=both -f "slack_thread_ts=$SLACK_TS"
-          else
-            gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f platform=both
+          args=()
+          if [ -n "$SLACK_TS" ] && takes_input slack_thread_ts; then
+            args+=(-f "slack_thread_ts=$SLACK_TS")
           fi
+          if takes_input triggered_by; then
+            args+=(-f "triggered_by=$TRIGGERED_BY")
+          fi
+          gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f platform=both "${args[@]}"
 
       - name: Dispatch next release branch
         if: ${{ !contains(env.VERSION, '-') }}
@@ -349,7 +353,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh workflow run rel-branch.yml --repo "$GITHUB_REPOSITORY" --ref master -f "base=$VERSION"
+          gh workflow run rel-branch.yml --repo "$GITHUB_REPOSITORY" --ref master -f "base=$VERSION" -f "triggered_by=$TRIGGERED_BY"
           echo "Dispatched rel-branch.yml from $VERSION"
 
       - name: Checkout Slack action
@@ -375,7 +379,7 @@ jobs:
           fields: |
             Version: `${{ env.VERSION }}`
             Commit: `${{ needs.prepare.outputs.sha_short }}`
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             npm|https://www.npmjs.com/package/klaviyo-expo-plugin/v/${{ env.VERSION }}
             Release|${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ env.VERSION }}
@@ -395,6 +399,7 @@ jobs:
           fields: |
             Version: `${{ env.VERSION }}`
             Commit: `${{ needs.prepare.outputs.sha_short }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             npm|https://www.npmjs.com/package/klaviyo-expo-plugin/v/${{ env.VERSION }}
             Release|${{ needs.prepare.outputs.release_url }}
@@ -439,5 +444,6 @@ jobs:
           fields: |
             Version: `${{ env.VERSION }}`
             Commit: `${{ needs.prepare.outputs.sha_short }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
           links: |
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
