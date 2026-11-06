@@ -2,6 +2,35 @@
 
 This guide outlines how to migrate when upgrading to newer versions of the Klaviyo Expo plugin.
 
+## Migrating to v1.1.1
+
+### `klaviyo-react-native-sdk` is now a peer dependency
+
+The plugin now declares `klaviyo-react-native-sdk` `^2.5.0` as a required peer dependency. You
+already install it yourself, so nothing changes for apps on 2.5.0 or later. If your app depends on
+an older version, npm 7+ stops the install with an `ERESOLVE` error (Yarn and pnpm print a peer
+dependency warning). Upgrade it:
+
+```bash
+npm install klaviyo-react-native-sdk@^2.5.0
+```
+
+### iOS geofencing: set the location purpose strings
+
+No plugin behavior changes here. The plugin has never written `NSLocation*UsageDescription` keys,
+and the README now says so. If `ios.geofencingEnabled` is `true`, make sure your app sets both
+`NSLocationWhenInUseUsageDescription` and `NSLocationAlwaysAndWhenInUseUsageDescription`, either
+through the `expo-location` config plugin or `ios.infoPlist`:
+
+```js
+["expo-location", {
+  "locationWhenInUsePermission": "We use your location to show offers for stores near you.",
+  "locationAlwaysAndWhenInUsePermission": "We use your location in the background to notify you about offers when you are near one of our stores."
+}]
+```
+
+See [iOS location purpose strings](./README.md#ios-location-purpose-strings-required) in the README.
+
 ## Migrating to v1.1.0
 
 ### Expo SDK 57: `expo prebuild` erases the native folders
