@@ -343,6 +343,13 @@ jobs:
             gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f platform=both
           fi
 
+      - name: Dispatch next release branch
+        if: ${{ !inputs.dry_run && !contains(env.VERSION, '-') }}
+        continue-on-error: true
+        run: |
+          gh workflow run rel-branch.yml --repo "$GITHUB_REPOSITORY" --ref master -f "base=$VERSION"
+          echo "Dispatched rel-branch.yml from $VERSION"
+
       - name: Checkout Slack action
         if: ${{ !cancelled() }}
         continue-on-error: true
