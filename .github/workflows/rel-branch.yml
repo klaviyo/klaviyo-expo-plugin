@@ -178,6 +178,11 @@ jobs:
             exit 0
           fi
 
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY/compare/master...$BRANCH" --jq .ahead_by)" = 0 ]; then
+            echo "::error::$BRANCH has no commits ahead of master, so GitHub can't open its release PR. Add the version bump to $BRANCH."
+            exit 1
+          fi
+
           assignee=()
           if [[ "$ACTOR" != *"[bot]" ]]; then
             assignee=(--assignee "$ACTOR")
@@ -197,6 +202,7 @@ jobs:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions
           path: ${{ env.SLACK_ACTION_DIR }}
+          persist-credentials: false
 
       - name: Notify Slack of new release branch
         if: success() && steps.push.outputs.created == 'true'
@@ -206,7 +212,7 @@ jobs:
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           status: success
-          title: Expo plugin release branch `${{ steps.resolve.outputs.branch }}` created from `${{ inputs.base || 'master' }}`
+          title: Expo SDK release branch `${{ steps.resolve.outputs.branch }}` created from `${{ inputs.base || 'master' }}`
           fields: |
             Version: `${{ steps.resolve.outputs.version }}`
             Base: `${{ inputs.base || 'master' }}`
@@ -224,7 +230,7 @@ jobs:
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           status: failure
-          title: ${{ steps.resolve.outputs.branch && format('Expo plugin release branch `{0}` could not be created', steps.resolve.outputs.branch) || 'Expo plugin release branch could not be created' }}
+          title: ${{ steps.resolve.outputs.branch && format('Expo SDK release branch `{0}` could not be created', steps.resolve.outputs.branch) || 'Expo SDK release branch could not be created' }}
           fields: |
             Base: `${{ inputs.base || 'master' }}`
             Trigger: `${{ github.event_name }}`
