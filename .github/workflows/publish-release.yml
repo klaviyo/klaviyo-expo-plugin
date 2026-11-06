@@ -34,6 +34,8 @@ concurrency:
 
 env:
   VERSION: ${{ inputs.version || github.event.release.tag_name }}
+  SLACK_USERNAME: Expo SDK
+  SLACK_ICON_EMOJI: ':merlin-orb-expo:'
 
 jobs:
   prepare:
@@ -45,16 +47,21 @@ jobs:
       actions: read
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
+      sha_short: ${{ steps.sha.outputs.short }}
       release_url: ${{ steps.draft.outputs.url }}
+      slack_ts: ${{ steps.slack_pending.outputs.ts }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        id: checkout
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || github.event.release.tag_name || github.event.repository.default_branch }}
           fetch-depth: 0
 
       - name: Require a commit on master or rel/*
+        id: branch
         run: |
           set -euo pipefail
           git fetch --no-tags --quiet origin '+refs/heads/master:refs/remotes/origin/master' '+refs/heads/rel/*:refs/remotes/origin/rel/*'
@@ -65,9 +72,13 @@ jobs:
 
       - name: Resolve commit
         id: sha
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          sha=$(git rev-parse HEAD)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "short=${sha:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Validate version input
+        id: validate
         run: |
           if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "::error::version must be X.Y.Z or X.Y.Z-suffix, got '$VERSION'."
@@ -79,6 +90,7 @@ jobs:
           fi
 
       - name: Check version stamps match
+        id: stamps
         run: |
           fail=0
           check() {
@@ -94,13 +106,16 @@ jobs:
           exit "$fail"
 
       - name: Check Klaviyo SDK pins
+        id: pins
         run: ./scripts/ci/check-native-pins.sh
 
       - name: Skip the CI check
+        id: skipci
         if: inputs.skip_ci_check
         run: echo "::warning::CI check skipped by request; pull_request CI for this commit was not verified."
 
       - name: Check CI is green on the commit
+        id: ci
         if: ${{ !inputs.skip_ci_check }}
         env:
           SHA: ${{ steps.sha.outputs.sha }}
@@ -132,6 +147,7 @@ jobs:
           fi
 
       - name: Summarize the dry run
+        id: dryrun
         if: inputs.dry_run
         run: |
           {
@@ -170,38 +186,91 @@ jobs:
           echo "Review and edit the draft notes, then approve the \`npm\` deployment in this run: $url" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Note the skipped CI check
+        id: skipnote
         if: inputs.skip_ci_check
         run: echo "- ⚠️ **CI check skipped:** pull_request CI for this commit was not verified." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Notify Slack (awaiting approval)
+      - name: Checkout Slack action
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Notify Slack release awaiting approval
+        id: slack_pending
         if: ${{ !inputs.dry_run }}
         continue-on-error: true
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        uses: ./_slack/.github/actions/notify-slack
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            text: "⏳ Expo plugin release ${{ env.VERSION }} awaiting approval${{ inputs.skip_ci_check && ' (⚠️ CI check skipped)' || '' }}"
-            blocks:
-              - type: "section"
-                text:
-                  type: "mrkdwn"
-                  text: "⏳ *Expo plugin release `${{ env.VERSION }}` awaiting approval*${{ inputs.skip_ci_check && ' ⚠️ CI check skipped' || '' }}\n*Release:* <${{ steps.draft.outputs.url }}|Review notes>\n*Started by:* ${{ github.actor }}\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Approve here>"
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          status: pending
+          title: Expo plugin `${{ env.VERSION }}` awaiting approval${{ inputs.skip_ci_check && ' (CI check skipped)' || '' }}
+          body: Review the draft release notes, then approve the `npm` deployment on this run.
+          fields: |
+            Version: `${{ env.VERSION }}`
+            Commit: `${{ steps.sha.outputs.short }}`
+            Requested by: ${{ github.actor }}
+          links: |
+            Release|${{ steps.draft.outputs.url }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.sha.outputs.sha }}
 
-      - name: Notify Slack (blocked before approval)
+      - name: Find failed step
+        id: failed
+        if: failure()
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          step=$(jq -r '
+            {
+              checkout: "Checkout repository",
+              branch: "Require a commit on master or rel/*",
+              sha: "Resolve commit",
+              validate: "Validate version input",
+              stamps: "Check version stamps match",
+              pins: "Check Klaviyo SDK pins",
+              skipci: "Skip the CI check",
+              ci: "Check CI is green on the commit",
+              dryrun: "Summarize the dry run",
+              draft: "Find or create the draft release",
+              skipnote: "Note the skipped CI check"
+            } as $names
+            | ([to_entries[] | select(.value.conclusion == "failure")][0].key) as $key
+            | if $key == null then "unknown step" else ($names[$key] // $key) end
+          ' <<<"$STEPS_JSON")
+          echo "step=$step" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Slack release blocked
+        id: slack_failure
         if: failure()
         continue-on-error: true
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        uses: ./_slack/.github/actions/notify-slack
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            text: "🚨 Expo plugin release ${{ env.VERSION }} blocked before approval"
-            blocks:
-              - type: "section"
-                text:
-                  type: "mrkdwn"
-                  text: "🚨 *Expo plugin release `${{ env.VERSION }}` blocked before approval.* A pre-publish check failed; nothing was published.\n*Started by:* ${{ github.actor }}\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ steps.slack_pending.outputs.ts }}
+          status: failure
+          title: Expo plugin `${{ env.VERSION }}` release blocked before approval
+          body: A pre-publish check failed. Nothing was published.
+          fields: |
+            Version: `${{ env.VERSION }}`
+            Commit: `${{ steps.sha.outputs.short }}`
+            Requested by: ${{ github.actor }}
+          links: |
+            Release|${{ steps.draft.outputs.url }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.sha.outputs.sha }}
+
+      - name: Reply with failure details
+        if: failure() && steps.slack_failure.outputs.ts != ''
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ steps.slack_failure.outputs.ts }}
+          status: failure
+          title: Failed at ${{ steps.failed.outputs.step }}
 
   publish-npm:
     needs: prepare
@@ -215,6 +284,7 @@ jobs:
       ref: ${{ needs.prepare.outputs.sha }}
       release_url: ${{ needs.prepare.outputs.release_url }}
       dry_run: ${{ inputs.dry_run == true }}
+      slack_ts: ${{ needs.prepare.outputs.slack_ts }}
     secrets: inherit
 
   publish-release:
@@ -226,6 +296,7 @@ jobs:
       actions: write
     env:
       GH_TOKEN: ${{ github.token }}
+      SLACK_TS: ${{ needs.prepare.outputs.slack_ts }}
     steps:
       - name: Publish the draft release
         id: release
@@ -260,40 +331,104 @@ jobs:
 
       - name: Dispatch the example app deploy
         id: example
-        run: gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f platform=both
+        run: |
+          # True when the workflow file at $VERSION declares slack_thread_ts.
+          takes_thread_ts() {
+            gh api "repos/${GITHUB_REPOSITORY}/contents/.github/workflows/publish-example.yml?ref=$VERSION" \
+              -H "Accept: application/vnd.github.raw" | grep -q '^[[:space:]]*slack_thread_ts:'
+          }
+          if [ -n "$SLACK_TS" ] && takes_thread_ts; then
+            gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f platform=both -f "slack_thread_ts=$SLACK_TS"
+          else
+            gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f platform=both
+          fi
 
-      - name: Notify Slack (release step failed)
+      - name: Checkout Slack action
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Notify Slack release published
+        if: success()
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ env.SLACK_TS }}
+          status: success
+          title: Expo plugin `${{ env.VERSION }}` published${{ contains(env.VERSION, '-') && ' (prerelease)' || '' }}
+          body: On `npm`, GitHub release published, and the example app deploy dispatched at tag `${{ env.VERSION }}`.
+          fields: |
+            Version: `${{ env.VERSION }}`
+            Commit: `${{ needs.prepare.outputs.sha_short }}`
+            Requested by: ${{ github.actor }}
+          links: |
+            npm|https://www.npmjs.com/package/klaviyo-expo-plugin/v/${{ env.VERSION }}
+            Release|${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ env.VERSION }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
+
+      - name: Notify Slack release step failed
+        id: slack_failure
         if: failure()
         continue-on-error: true
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        uses: ./_slack/.github/actions/notify-slack
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            text: "🚨 Expo plugin ${{ env.VERSION }} is on npm but ${{ steps.example.outcome == 'failure' && 'the example app deploy could not be dispatched' || 'the GitHub release could not be published' }}"
-            blocks:
-              - type: "section"
-                text:
-                  type: "mrkdwn"
-                  text: "🚨 *Expo plugin `${{ env.VERSION }}` is on npm but ${{ steps.example.outcome == 'failure' && 'the example app deploy could not be dispatched.* Run publish-example.yml by hand on the tag.' || 'the GitHub release could not be published.* Publish the draft by hand.' }}\n*Release:* <${{ needs.prepare.outputs.release_url }}|Open release>\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ env.SLACK_TS }}
+          status: failure
+          title: Expo plugin `${{ env.VERSION }}` is on `npm` but ${{ steps.example.outcome == 'failure' && 'the example app deploy could not be dispatched' || 'the GitHub release could not be published' }}
+          body: ${{ steps.example.outcome == 'failure' && 'Run `publish-example.yml` by hand on the tag.' || 'Publish the draft release by hand.' }}
+          fields: |
+            Version: `${{ env.VERSION }}`
+            Commit: `${{ needs.prepare.outputs.sha_short }}`
+          links: |
+            npm|https://www.npmjs.com/package/klaviyo-expo-plugin/v/${{ env.VERSION }}
+            Release|${{ needs.prepare.outputs.release_url }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
+
+      - name: Reply with failure details
+        if: failure() && steps.slack_failure.outputs.ts != ''
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ steps.slack_failure.outputs.ts }}
+          status: failure
+          title: Failed at ${{ steps.example.outcome == 'failure' && 'Dispatch the example app deploy' || 'Publish the draft release' }}
 
   stopped:
+    name: Report stopped release
     needs: [prepare, publish-npm, publish-release]
-    if: always() && contains(needs.*.result, 'cancelled')
+    if: always() && !inputs.dry_run && contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-22.04
     permissions:
       contents: read
     steps:
-      - name: Notify Slack (cancelled)
+      - name: Checkout Slack action
         continue-on-error: true
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        uses: actions/checkout@v4
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            text: "⚠️ Expo plugin release ${{ env.VERSION }} stopped: run cancelled"
-            blocks:
-              - type: "section"
-                text:
-                  type: "mrkdwn"
-                  text: "⚠️ *Expo plugin release `${{ env.VERSION }}` stopped: the run was cancelled.* Check the run for what finished before it stopped.\n*Workflow Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>"
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Notify Slack release stopped
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ needs.prepare.outputs.slack_ts }}
+          status: stopped
+          title: Expo plugin `${{ env.VERSION }}` release stopped, run cancelled
+          body: Check the run for what finished before it stopped.
+          fields: |
+            Version: `${{ env.VERSION }}`
+            Commit: `${{ needs.prepare.outputs.sha_short }}`
+          links: |
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}

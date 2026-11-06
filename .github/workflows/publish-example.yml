@@ -58,6 +58,11 @@ on:
           - both
           - android
           - ios
+      slack_thread_ts:
+        description: "Slack message ts to reply under. Set by publish-release.yml; empty posts new messages"
+        required: false
+        default: ''
+        type: string
   pull_request:
     types: [labeled]
 
@@ -77,6 +82,8 @@ env:
   ANDROID_PACKAGE: com.klaviyo.expoexample
   IOS_BUNDLE_ID: com.klaviyo.expoexample
   COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  SLACK_USERNAME: Expo Example App
+  SLACK_ICON_EMOJI: ':merlin-orb-expo:'
 
 jobs:
   # On a push to master, outputs skip=true when the pushed tree equals the tree of the tag named
@@ -162,9 +169,62 @@ jobs:
             gh run cancel "$id" --repo "$REPO" || echo "::warning::Could not cancel run $id."
           done
 
+  announce:
+    name: Announce the pending deploy
+    needs: release-merge-check
+    if: |
+      !cancelled()
+      && needs.release-merge-check.outputs.skip != 'true'
+      && (github.event_name == 'push'
+      || github.event_name == 'release'
+      || github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'pull_request'
+          && contains(fromJSON('["deploy-example-app","deploy-example-app:android","deploy-example-app:ios"]'), github.event.label.name)
+          && github.event.pull_request.head.repo.full_name == github.repository))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    outputs:
+      slack_ts: ${{ steps.slack.outputs.ts }}
+    steps:
+      - name: Checkout Slack action
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Set source label
+        continue-on-error: true
+        uses: ./_slack/.github/actions/set-source-label
+
+      - name: Resolve the short commit
+        if: always()
+        run: echo "COMMIT_SHORT=${COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
+
+      - name: Notify Slack deploy pending
+        id: slack
+        timeout-minutes: 2
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ inputs.slack_thread_ts }}
+          status: pending
+          title: ${{ (github.event_name == 'push' || github.event_name == 'pull_request') && 'Expo Example App deploy awaiting approval' || (github.ref_type == 'tag' && format('Expo Example App deploying `{0}`', github.ref_name) || 'Expo Example App deploying') }}
+          body: ${{ (github.event_name == 'push' || github.event_name == 'pull_request') && 'Approve the `example-app-deploy` environment on this run to build and submit.' || '' }}
+          fields: |
+            ${{ github.ref_type == 'tag' && format('Version: `{0}`', github.ref_name) || '' }}
+            Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
+            Commit: `${{ env.COMMIT_SHORT }}`
+            Requested by: ${{ github.actor }}
+          links: |
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
+
   approve:
     name: Approve the example app deploy
-    needs: release-merge-check
+    needs: [release-merge-check, announce]
     if: |
       !cancelled()
       && needs.release-merge-check.outputs.skip != 'true'
@@ -279,7 +339,7 @@ jobs:
     name: Checks
     needs: preflight
     if: |
-      !cancelled() && !failure()
+      !cancelled() && needs.preflight.result == 'success'
       && (needs.preflight.outputs.android == 'true' || needs.preflight.outputs.ios == 'true')
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     uses: ./.github/workflows/publish-example-checks.yml
@@ -288,11 +348,60 @@ jobs:
     permissions:
       contents: read
 
+  progress:
+    name: Update the deploy message
+    needs: [announce, preflight, checks]
+    if: |
+      !cancelled() && needs.preflight.result == 'success'
+      && needs.announce.outputs.slack_ts != ''
+      && needs.checks.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    outputs:
+      slack_ts: ${{ steps.slack.outputs.ts }}
+    steps:
+      - name: Checkout Slack action
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Set source label
+        continue-on-error: true
+        uses: ./_slack/.github/actions/set-source-label
+
+      - name: Resolve the short commit
+        if: always()
+        run: echo "COMMIT_SHORT=${COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
+
+      - name: Notify Slack checks passed
+        id: slack
+        timeout-minutes: 2
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ inputs.slack_thread_ts }}
+          status: pending
+          title: Expo Example App checks passed, deploying ${{ needs.preflight.outputs.android == 'true' && needs.preflight.outputs.ios == 'true' && 'Android and iOS' || needs.preflight.outputs.android == 'true' && 'Android' || 'iOS' }}
+          fields: |
+            ${{ github.ref_type == 'tag' && format('Version: `{0}`', github.ref_name) || '' }}
+            Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
+            Commit: `${{ env.COMMIT_SHORT }}`
+            Requested by: ${{ github.actor }}
+          links: |
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
+
   deploy-android:
     name: Publish to Play Store internal track
-    needs: [checks, preflight]
+    needs: [checks, preflight, announce]
     if: |
-      !cancelled() && !failure()
+      !cancelled() && needs.preflight.result == 'success' && needs.checks.result == 'success'
       && needs.preflight.outputs.android == 'true'
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
@@ -310,11 +419,16 @@ jobs:
       build_date: ${{ steps.deploy.outputs.build_date }}
       uploaded: ${{ steps.deploy.outcome == 'success' }}
       notes_uploaded: ${{ steps.upload_notes.outcome == 'success' }}
+      warned: ${{ steps.warned.outcome == 'success' }}
+      install_url: ${{ steps.result.outputs.install_url }}
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
       APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
     steps:
+      - name: Record job start
+        run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -447,53 +561,86 @@ jobs:
           fi
           echo "step=$step" >> "$GITHUB_OUTPUT"
 
+      - name: Classify cancellation
+        id: stop
+        if: cancelled()
+        env:
+          TIMEOUT_MINUTES: 90
+        run: |
+          elapsed=$(( $(date +%s) - ${JOB_START:-$(date +%s)} ))
+          if [ "$elapsed" -ge $(( TIMEOUT_MINUTES * 60 - 60 )) ]; then
+            echo "timed_out=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout Slack action
+        if: always()
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Resolve the short commit
+        if: always()
+        run: echo "COMMIT_SHORT=${COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
+
       - name: Notify Slack on success
         if: success() && steps.warned.outcome != 'success'
         continue-on-error: true
-        uses: ./.github/actions/notify-slack-example-publish
+        uses: ./_slack/.github/actions/notify-slack
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: success
-          platform: Android
-          destination: Play internal
-          build: ${{ steps.slack.outputs.build }}
-          sdks: ${{ steps.slack.outputs.sdks }}
-          source: ${{ steps.slack.outputs.source }}
-          commit_sha: ${{ env.COMMIT_SHA }}
-          get_build: "<${{ steps.result.outputs.install_url }}|Install Klaviyo Expo Example from Google Play> on your Android device to get `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. Only internal testers can open this link."
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
+          status: success
+          title: Expo Example (Android) deployed to Play internal
+          body: "<${{ steps.result.outputs.install_url }}|Install Klaviyo Expo Example from Google Play> on your Android device to get `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. Only internal testers can open this link."
+          fields: |
+            Build: `${{ steps.slack.outputs.build }}`
+            SDKs: `${{ steps.slack.outputs.sdks }}`
+            Source: `${{ steps.slack.outputs.source }}`
+            Commit: `${{ env.COMMIT_SHORT }}`
+          links: |
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
       - name: Notify Slack on upload with warnings
         if: success() && steps.warned.outcome == 'success'
         continue-on-error: true
-        uses: ./.github/actions/notify-slack-example-publish
+        uses: ./_slack/.github/actions/notify-slack
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: notes-failure
-          platform: Android
-          destination: Play internal
-          build: ${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})
-          sdks: ${{ steps.slack.outputs.sdks }}
-          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
-          commit_sha: ${{ env.COMMIT_SHA }}
-          failed_step: ${{ steps.warned.outputs.step }}
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
+          status: warning
+          title: Expo Example (Android) uploaded to Play internal, but ${{ steps.warned.outputs.step }} failed
+          body: The build is on the store. Check the run and set anything missing by hand.
+          fields: |
+            Build: `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`
+            SDKs: `${{ steps.slack.outputs.sdks }}`
+            Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
+            Commit: `${{ env.COMMIT_SHORT }}`
+          links: |
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
       - name: Notify Slack on failure
-        if: failure()
+        if: failure() || (cancelled() && steps.stop.outputs.timed_out == 'true')
         continue-on-error: true
-        uses: ./.github/actions/notify-slack-example-publish
+        uses: ./_slack/.github/actions/notify-slack
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: failure
-          platform: Android
-          destination: Play internal
-          build: ${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})
-          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
-          commit_sha: ${{ env.COMMIT_SHA }}
-          failed_step: ${{ steps.failed.outputs.step }}
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
+          status: ${{ job.status == 'cancelled' && 'stopped' || 'failure' }}
+          title: Expo Example (Android) deploy ${{ job.status == 'cancelled' && 'timed out' || format('failed at {0}', steps.failed.outputs.step) }}
+          fields: |
+            Build: `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`
+            Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
+            Commit: `${{ env.COMMIT_SHORT }}`
+          links: |
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   android-notes:
     name: Set Play release notes
-    needs: deploy-android
+    needs: [deploy-android, announce]
     if: |
       always()
       && needs.deploy-android.outputs.uploaded == 'true'
@@ -536,24 +683,42 @@ jobs:
           VERSION_CODE: ${{ needs.deploy-android.outputs.build_number }}
         run: node scripts/ci/play-release-notes.js "$VERSION_CODE" "${RUNNER_TEMP}/play-notes.txt"
 
+      - name: Checkout Slack action
+        if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Resolve the short commit
+        if: always()
+        run: echo "COMMIT_SHORT=${COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
+
       - name: Warn on Slack that the notes were not set
         if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
         continue-on-error: true
-        uses: ./.github/actions/notify-slack-example-publish
+        uses: ./_slack/.github/actions/notify-slack
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: notes-failure
-          platform: Android
-          destination: Play internal
-          build: ${{ needs.deploy-android.outputs.app_version }} (${{ needs.deploy-android.outputs.build_number }})
-          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
-          commit_sha: ${{ env.COMMIT_SHA }}
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
+          status: warning
+          title: Expo Example (Android) uploaded to Play internal, but its release notes were not set
+          body: Re-run the failed job or set them by hand in the store console.
+          fields: |
+            Build: `${{ needs.deploy-android.outputs.app_version }} (${{ needs.deploy-android.outputs.build_number }})`
+            Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
+            Commit: `${{ env.COMMIT_SHORT }}`
+          links: |
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   deploy-ios:
     name: Publish to TestFlight
-    needs: [checks, preflight]
+    needs: [checks, preflight, announce]
     if: |
-      !cancelled() && !failure()
+      !cancelled() && needs.preflight.result == 'success' && needs.checks.result == 'success'
       && needs.preflight.outputs.ios == 'true'
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
@@ -572,12 +737,17 @@ jobs:
       build_date: ${{ steps.deploy.outputs.build_date }}
       uploaded: ${{ steps.deploy.outcome == 'success' }}
       notes_uploaded: ${{ steps.upload_notes.outcome == 'success' }}
+      warned: ${{ steps.warned.outcome == 'success' }}
+      testflight_url: ${{ steps.result.outputs.testflight_url }}
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       KLAVIYO_EAS_PROJECT_ID: ${{ vars.KLAVIYO_EAS_PROJECT_ID }}
       APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
       ASC_APP_ID: ${{ vars.ASC_APP_ID }}
     steps:
+      - name: Record job start
+        run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -724,53 +894,86 @@ jobs:
           fi
           echo "step=$step" >> "$GITHUB_OUTPUT"
 
+      - name: Classify cancellation
+        id: stop
+        if: cancelled()
+        env:
+          TIMEOUT_MINUTES: 90
+        run: |
+          elapsed=$(( $(date +%s) - ${JOB_START:-$(date +%s)} ))
+          if [ "$elapsed" -ge $(( TIMEOUT_MINUTES * 60 - 60 )) ]; then
+            echo "timed_out=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout Slack action
+        if: always()
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Resolve the short commit
+        if: always()
+        run: echo "COMMIT_SHORT=${COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
+
       - name: Notify Slack on success
         if: success() && steps.warned.outcome != 'success'
         continue-on-error: true
-        uses: ./.github/actions/notify-slack-example-publish
+        uses: ./_slack/.github/actions/notify-slack
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: success
-          platform: iOS
-          destination: TestFlight
-          build: ${{ steps.slack.outputs.build }}
-          sdks: ${{ steps.slack.outputs.sdks }}
-          source: ${{ steps.slack.outputs.source }}
-          commit_sha: ${{ env.COMMIT_SHA }}
-          get_build: "<${{ steps.result.outputs.testflight_url }}|Open Klaviyo Expo Example in TestFlight> on your iPhone, then install `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. The build shows up once Apple finishes processing it, usually in 5 to 30 minutes."
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
+          status: success
+          title: Expo Example (iOS) deployed to TestFlight
+          body: "<${{ steps.result.outputs.testflight_url }}|Open Klaviyo Expo Example in TestFlight> on your iPhone, then install `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`. The build shows up once Apple finishes processing it, usually in 5 to 30 minutes."
+          fields: |
+            Build: `${{ steps.slack.outputs.build }}`
+            SDKs: `${{ steps.slack.outputs.sdks }}`
+            Source: `${{ steps.slack.outputs.source }}`
+            Commit: `${{ env.COMMIT_SHORT }}`
+          links: |
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
       - name: Notify Slack on upload with warnings
         if: success() && steps.warned.outcome == 'success'
         continue-on-error: true
-        uses: ./.github/actions/notify-slack-example-publish
+        uses: ./_slack/.github/actions/notify-slack
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: notes-failure
-          platform: iOS
-          destination: TestFlight
-          build: ${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})
-          sdks: ${{ steps.slack.outputs.sdks }}
-          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
-          commit_sha: ${{ env.COMMIT_SHA }}
-          failed_step: ${{ steps.warned.outputs.step }}
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
+          status: warning
+          title: Expo Example (iOS) uploaded to TestFlight, but ${{ steps.warned.outputs.step }} failed
+          body: The build is on the store. Check the run and set anything missing by hand.
+          fields: |
+            Build: `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`
+            SDKs: `${{ steps.slack.outputs.sdks }}`
+            Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
+            Commit: `${{ env.COMMIT_SHORT }}`
+          links: |
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
       - name: Notify Slack on failure
-        if: failure()
+        if: failure() || (cancelled() && steps.stop.outputs.timed_out == 'true')
         continue-on-error: true
-        uses: ./.github/actions/notify-slack-example-publish
+        uses: ./_slack/.github/actions/notify-slack
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: failure
-          platform: iOS
-          destination: TestFlight
-          build: ${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})
-          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
-          commit_sha: ${{ env.COMMIT_SHA }}
-          failed_step: ${{ steps.failed.outputs.step }}
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
+          status: ${{ job.status == 'cancelled' && 'stopped' || 'failure' }}
+          title: Expo Example (iOS) deploy ${{ job.status == 'cancelled' && 'timed out' || format('failed at {0}', steps.failed.outputs.step) }}
+          fields: |
+            Build: `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`
+            Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
+            Commit: `${{ env.COMMIT_SHORT }}`
+          links: |
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   what-to-test:
     name: Set TestFlight "What to Test"
-    needs: deploy-ios
+    needs: [deploy-ios, announce]
     if: |
       always()
       && needs.deploy-ios.outputs.uploaded == 'true'
@@ -818,18 +1021,36 @@ jobs:
             --build-number "$BUILD_NUMBER" \
             --notes-file "${RUNNER_TEMP}/what-to-test.txt"
 
+      - name: Checkout Slack action
+        if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Resolve the short commit
+        if: always()
+        run: echo "COMMIT_SHORT=${COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
+
       - name: Warn on Slack that What to Test was not set
         if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
         continue-on-error: true
-        uses: ./.github/actions/notify-slack-example-publish
+        uses: ./_slack/.github/actions/notify-slack
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          result: notes-failure
-          platform: iOS
-          destination: TestFlight
-          build: ${{ needs.deploy-ios.outputs.app_version }} (${{ needs.deploy-ios.outputs.build_number }})
-          source: ${{ env.SOURCE_LABEL }} (${{ github.event_name }})
-          commit_sha: ${{ env.COMMIT_SHA }}
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
+          status: warning
+          title: Expo Example (iOS) uploaded to TestFlight, but its What to Test notes were not set
+          body: Re-run the failed job or set them by hand in the store console.
+          fields: |
+            Build: `${{ needs.deploy-ios.outputs.app_version }} (${{ needs.deploy-ios.outputs.build_number }})`
+            Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
+            Commit: `${{ env.COMMIT_SHORT }}`
+          links: |
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   cleanup-label:
     name: Remove deploy label
@@ -860,3 +1081,118 @@ jobs:
             } catch (e) {
               if (e.status !== 404) throw e;
             }
+
+  report:
+    name: Update the deploy message
+    needs: [announce, approve, preflight, checks, progress, deploy-android, deploy-ios]
+    if: |
+      always()
+      && (needs.announce.outputs.slack_ts != ''
+          || needs.preflight.result == 'failure'
+          || needs.checks.result == 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Classify the deploy
+        id: result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPROVE: ${{ needs.approve.result }}
+          PREFLIGHT: ${{ needs.preflight.result }}
+          CHECKS: ${{ needs.checks.result }}
+          ANDROID: ${{ needs.deploy-android.result }}
+          IOS: ${{ needs.deploy-ios.result }}
+          ANDROID_WARNED: ${{ needs.deploy-android.outputs.warned }}
+          IOS_WARNED: ${{ needs.deploy-ios.outputs.warned }}
+          DEPLOY_TIMEOUT_MINUTES: 90
+        run: |
+          timed_out=false
+          if [ "$ANDROID" = cancelled ] || [ "$IOS" = cancelled ]; then
+            timed_out=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" --paginate \
+              --jq '.jobs[] | select(.conclusion == "cancelled" and (.name | startswith("Publish to")) and .started_at != null and .completed_at != null)
+                | ((.completed_at | fromdateiso8601) - (.started_at | fromdateiso8601))' 2>/dev/null \
+              | awk -v limit=$(( DEPLOY_TIMEOUT_MINUTES * 60 - 60 )) '$1 >= limit { found = 1 } END { print found ? "true" : "false" }' || echo false)
+          fi
+          describe() {
+            case "$1" in
+              success) if [ "$2" = "true" ]; then echo "uploaded with warnings"; else echo "deployed"; fi ;;
+              failure) echo "failed" ;;
+              cancelled) echo "stopped" ;;
+              *) echo "not deployed" ;;
+            esac
+          }
+          {
+            echo "android=$(describe "$ANDROID" "$ANDROID_WARNED")"
+            echo "ios=$(describe "$IOS" "$IOS_WARNED")"
+          } >> "$GITHUB_OUTPUT"
+          if [ "$ANDROID" = failure ] || [ "$IOS" = failure ]; then
+            status=failure; title="Expo Example App deploy failed"
+          elif [ "$PREFLIGHT" = failure ]; then
+            status=failure; title="Expo Example App deploy failed, required secrets are missing"
+          elif [ "$CHECKS" = failure ]; then
+            status=failure; title="Expo Example App deploy failed, checks did not pass"
+          elif [ "$timed_out" = true ]; then
+            status=failure; title="Expo Example App deploy failed, a deploy job timed out"
+          elif [ "$ANDROID" = cancelled ] || [ "$IOS" = cancelled ] || [ "$APPROVE" = cancelled ] || [ "$CHECKS" = cancelled ]; then
+            status=stopped; title="Expo Example App deploy stopped, run cancelled"
+          elif [ "$APPROVE" = failure ]; then
+            state=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
+              --jq '[.[] | select(any(.environments[]; .name == "example-app-deploy"))][-1].state // ""' || true)
+            status=stopped
+            if [ "$state" = rejected ]; then
+              title="Expo Example App deploy rejected"
+            else
+              title="Expo Example App deploy approval did not complete"
+            fi
+          elif [ "$ANDROID" != success ] && [ "$IOS" != success ]; then
+            status=info; title="Expo Example App deploy skipped, nothing deployed"
+          elif [ "$ANDROID_WARNED" = true ] || [ "$IOS_WARNED" = true ]; then
+            status=warning; title="Expo Example App uploaded with warnings"
+          else
+            status=success; title="Expo Example App deployed"
+          fi
+          {
+            echo "status=$status"
+            echo "title=$title"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Slack action
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: .github/actions
+          persist-credentials: false
+          path: _slack
+
+      - name: Set source label
+        continue-on-error: true
+        uses: ./_slack/.github/actions/set-source-label
+
+      - name: Resolve the short commit
+        if: always()
+        run: echo "COMMIT_SHORT=${COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
+
+      - name: Update the Slack deploy message
+        continue-on-error: true
+        uses: ./_slack/.github/actions/notify-slack
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ needs.progress.outputs.slack_ts || needs.announce.outputs.slack_ts }}
+          thread_ts: ${{ inputs.slack_thread_ts }}
+          status: ${{ steps.result.outputs.status }}
+          title: ${{ steps.result.outputs.title }}
+          body: ${{ needs.announce.outputs.slack_ts != '' && (needs.deploy-android.result != 'skipped' || needs.deploy-ios.result != 'skipped') && 'Details for each platform are in the thread.' || '' }}
+          fields: |
+            Android: ${{ steps.result.outputs.android }}
+            iOS: ${{ steps.result.outputs.ios }}
+            Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
+            Commit: `${{ env.COMMIT_SHORT }}`
+          links: |
+            Play internal|${{ needs.deploy-android.outputs.install_url }}
+            TestFlight|${{ needs.deploy-ios.outputs.testflight_url }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
