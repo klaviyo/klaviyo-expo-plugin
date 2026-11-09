@@ -349,13 +349,13 @@ jobs:
           else
             spec="klaviyo-react-native-sdk@$REACT_NATIVE"
           fi
+          npm install
           (cd example && npm install --save-exact "$spec")
 
       - name: Install dependencies
         run: |
           set -euo pipefail
 
-          npm install
           (cd example && npm install)
 
       - name: Commit pin
