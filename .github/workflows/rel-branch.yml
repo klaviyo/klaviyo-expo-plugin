@@ -377,10 +377,10 @@ jobs:
 
           git diff --cached --stat
 
-          names=()
-          values=()
-          if [ -n "$REACT_NATIVE" ]; then names+=("React Native SDK"); values+=("$REACT_NATIVE"); fi
-          summary="${names[0]} to ${values[0]}"
+          pinned=()
+          [ -n "$REACT_NATIVE" ] && pinned+=("React Native SDK to $REACT_NATIVE")
+          joined=$(IFS=,; echo "${pinned[*]}")
+          summary=${joined//,/, }
           echo "summary=$summary" >> "$GITHUB_OUTPUT"
 
           git commit -m "chore: pin $summary"
@@ -398,12 +398,12 @@ jobs:
           set -euo pipefail
 
           # shellcheck disable=SC2016
-          body=$(printf 'Pins the native SDKs for `%s`: %s.\n\nOpened by [Release Branch](%s).' "$VERSION" "$SUMMARY" "$RUN_URL")
+          body=$(printf 'Pins the native SDKs on `%s`: %s.\n\nOpened by [Release Branch](%s).' "$BRANCH" "$SUMMARY" "$RUN_URL")
           title="chore: pin React Native SDK for $VERSION"
 
           url=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$PIN_BRANCH" --base "$BRANCH" --state open --json url --jq '.[0].url // empty')
           if [ -n "$url" ]; then
-            gh pr edit "$url" --title "$title" --body "$body"
+            gh pr edit "$url" --body "$body"
           else
             url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base "$BRANCH" --head "$PIN_BRANCH" --title "$title" --body "$body")
           fi
