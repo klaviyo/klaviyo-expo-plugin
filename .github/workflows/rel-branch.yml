@@ -38,8 +38,6 @@ on:
         type: string
         required: false
         default: ''
-  push: # POC-TEMP
-    branches: [ecm/rel-branch-workflow] # POC-TEMP
   schedule:
     - cron: '0 13 * * 1-5'
 
@@ -303,7 +301,7 @@ jobs:
   pin:
     name: Pin native SDKs
     needs: rel_branch
-    if: success() && (inputs.react_native != '' || github.event_name == 'push') # POC-TEMP
+    if: success() && inputs.react_native != ''
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -313,7 +311,7 @@ jobs:
       VERSION: ${{ needs.rel_branch.outputs.version }}
       BRANCH: ${{ needs.rel_branch.outputs.branch }}
       PIN_BRANCH: chore/pin-react-native-${{ needs.rel_branch.outputs.version }}
-      REACT_NATIVE: ${{ inputs.react_native || 'rel/2.8.0' }} # POC-TEMP
+      REACT_NATIVE: ${{ inputs.react_native }}
     steps:
       - name: Check out release branch
         uses: actions/checkout@v4
