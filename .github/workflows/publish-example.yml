@@ -63,6 +63,11 @@ on:
         required: false
         default: ''
         type: string
+      triggered_by:
+        description: Login of the person who started this run. Set by publish-release.yml; leave empty to use the actor
+        required: false
+        default: ''
+        type: string
   pull_request:
     types: [labeled]
 
@@ -79,6 +84,7 @@ permissions:
   contents: read
 
 env:
+  TRIGGERED_BY: ${{ github.event_name == 'schedule' && 'schedule' || inputs.triggered_by || (endsWith(github.triggering_actor || github.actor, '[bot]') && format('{0} (automation)', github.workflow) || github.triggering_actor || github.actor) }}
   ANDROID_PACKAGE: com.klaviyo.expoexample
   IOS_BUNDLE_ID: com.klaviyo.expoexample
   COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -99,7 +105,7 @@ jobs:
     steps:
       - name: Checkout repository
         continue-on-error: true
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
@@ -188,7 +194,7 @@ jobs:
     steps:
       - name: Checkout Slack action
         continue-on-error: true
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions
@@ -212,14 +218,16 @@ jobs:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts }}
           status: pending
-          title: ${{ (github.event_name == 'push' || github.event_name == 'pull_request') && 'Expo Example App deploy awaiting approval' || (github.ref_type == 'tag' && format('Expo Example App deploying `{0}`', github.ref_name) || 'Expo Example App deploying') }}
+          title: "${{ github.event_name == 'pull_request' && format('Expo Example App deploying PR #{0}', github.event.pull_request.number) || github.event_name == 'push' && 'Expo Example App deploy awaiting approval' || (github.ref_type == 'tag' && format('Expo Example App deploying `{0}`', github.ref_name) || 'Expo Example App deploying') }}"
           body: ${{ (github.event_name == 'push' || github.event_name == 'pull_request') && 'Approve the `example-app-deploy` environment on this run to build and submit.' || '' }}
           fields: |
             ${{ github.ref_type == 'tag' && format('Version: `{0}`', github.ref_name) || '' }}
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   approve:
@@ -301,7 +309,7 @@ jobs:
       ios: ${{ steps.ios.outputs.ready }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.COMMIT_SHA }}
           persist-credentials: false
@@ -363,7 +371,7 @@ jobs:
       - name: Checkout Slack action
         if: ${{ !cancelled() }}
         continue-on-error: true
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions
@@ -393,8 +401,10 @@ jobs:
             ${{ github.ref_type == 'tag' && format('Version: `{0}`', github.ref_name) || '' }}
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
-            Requested by: ${{ github.actor }}
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   deploy-android:
@@ -430,7 +440,7 @@ jobs:
         run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.COMMIT_SHA }}
           persist-credentials: false
@@ -504,7 +514,7 @@ jobs:
         id: upload_notes
         if: steps.render_notes.outcome == 'success'
         continue-on-error: true
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: play-notes
           path: ${{ runner.temp }}/play-notes.txt
@@ -575,7 +585,7 @@ jobs:
       - name: Checkout Slack action
         if: always()
         continue-on-error: true
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions
@@ -601,7 +611,10 @@ jobs:
             SDKs: `${{ steps.slack.outputs.sdks }}`
             Source: `${{ steps.slack.outputs.source }}`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
       - name: Notify Slack on upload with warnings
@@ -619,7 +632,10 @@ jobs:
             SDKs: `${{ steps.slack.outputs.sdks }}`
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
       - name: Notify Slack on failure
@@ -635,7 +651,10 @@ jobs:
             Build: `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   android-notes:
@@ -650,7 +669,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.COMMIT_SHA }}
           persist-credentials: false
@@ -659,14 +678,14 @@ jobs:
         uses: ./.github/actions/set-source-label
 
       - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
 
       - name: Download release notes
         id: download_notes
         continue-on-error: true
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: play-notes
           path: ${{ runner.temp }}
@@ -686,7 +705,7 @@ jobs:
       - name: Checkout Slack action
         if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
         continue-on-error: true
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions
@@ -711,7 +730,10 @@ jobs:
             Build: `${{ needs.deploy-android.outputs.app_version }} (${{ needs.deploy-android.outputs.build_number }})`
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   deploy-ios:
@@ -749,7 +771,7 @@ jobs:
         run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.COMMIT_SHA }}
           persist-credentials: false
@@ -837,7 +859,7 @@ jobs:
         id: upload_notes
         if: steps.render_notes.outcome == 'success'
         continue-on-error: true
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: what-to-test-notes
           path: ${{ runner.temp }}/what-to-test.txt
@@ -908,7 +930,7 @@ jobs:
       - name: Checkout Slack action
         if: always()
         continue-on-error: true
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions
@@ -934,7 +956,10 @@ jobs:
             SDKs: `${{ steps.slack.outputs.sdks }}`
             Source: `${{ steps.slack.outputs.source }}`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
       - name: Notify Slack on upload with warnings
@@ -952,7 +977,10 @@ jobs:
             SDKs: `${{ steps.slack.outputs.sdks }}`
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
       - name: Notify Slack on failure
@@ -968,7 +996,10 @@ jobs:
             Build: `${{ steps.deploy.outputs.app_version }} (${{ steps.deploy.outputs.build_number }})`
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   what-to-test:
@@ -983,7 +1014,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.COMMIT_SHA }}
           persist-credentials: false
@@ -992,14 +1023,14 @@ jobs:
         uses: ./.github/actions/set-source-label
 
       - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
 
       - name: Download release notes
         id: download_notes
         continue-on-error: true
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: what-to-test-notes
           path: ${{ runner.temp }}
@@ -1024,7 +1055,7 @@ jobs:
       - name: Checkout Slack action
         if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
         continue-on-error: true
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions
@@ -1049,7 +1080,10 @@ jobs:
             Build: `${{ needs.deploy-ios.outputs.app_version }} (${{ needs.deploy-ios.outputs.build_number }})`
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
+            ${{ github.event.pull_request.html_url && format('Pull request|{0}', github.event.pull_request.html_url) || '' }}
             Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ env.COMMIT_SHA }}
 
   cleanup-label:
@@ -1066,7 +1100,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Remove label
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           LABEL_NAME: ${{ github.event.label.name }}
         with:
@@ -1137,7 +1171,7 @@ jobs:
           elif [ "$timed_out" = true ]; then
             status=failure; title="Expo Example App deploy failed, a deploy job timed out"
           elif [ "$ANDROID" = cancelled ] || [ "$IOS" = cancelled ] || [ "$APPROVE" = cancelled ] || [ "$CHECKS" = cancelled ]; then
-            status=stopped; title="Expo Example App deploy stopped, run cancelled"
+            status=stopped; title="Expo Example App deploy cancelled"
           elif [ "$APPROVE" = failure ]; then
             state=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
               --jq '[.[] | select(any(.environments[]; .name == "example-app-deploy"))][-1].state // ""' || true)
@@ -1162,7 +1196,7 @@ jobs:
       - name: Checkout Slack action
         if: ${{ !cancelled() }}
         continue-on-error: true
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           sparse-checkout: .github/actions
@@ -1192,6 +1226,8 @@ jobs:
             iOS: ${{ steps.result.outputs.ios }}
             Source: `${{ env.SOURCE_LABEL }} (${{ github.event_name }})`
             Commit: `${{ env.COMMIT_SHORT }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+            ${{ github.event.pull_request && github.event.pull_request.user.login != env.TRIGGERED_BY && format('PR author: `{0}`', github.event.pull_request.user.login) || '' }}
           links: |
             Play internal|${{ needs.deploy-android.outputs.install_url }}
             TestFlight|${{ needs.deploy-ios.outputs.testflight_url }}
