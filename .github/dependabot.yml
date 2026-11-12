@@ -1,12 +1,53 @@
+# Baseline rules: SDK Dependabot Bot project, see the rules page.
 version: 2
 updates:
-  - package-ecosystem: github-actions
-    directories:
-      - /
-      - /.github/actions/*
-    schedule:
-      interval: monthly
-    groups:
-      github-actions:
-        patterns:
-          - "*"
+- package-ecosystem: npm
+  directories:
+  - '/'
+  - '/example'
+  schedule:
+    interval: monthly
+  open-pull-requests-limit: 3
+  commit-message:
+    prefix: chore
+    include: scope
+  groups:
+    npm-tooling-minor-patch:
+      applies-to: version-updates
+      patterns:
+      - '*'
+      exclude-patterns:
+      - klaviyo-react-native-sdk
+      update-types:
+      - minor
+      - patch
+    npm-tooling-security:
+      applies-to: security-updates
+      patterns:
+      - '*'
+      exclude-patterns:
+      - klaviyo-react-native-sdk
+  ignore:
+  - dependency-name: klaviyo-react-native-sdk
+- package-ecosystem: github-actions
+  directories:
+  - '/'
+  - '/.github/actions/*'
+  schedule:
+    interval: monthly
+  open-pull-requests-limit: 3
+  commit-message:
+    prefix: chore
+    include: scope
+  groups:
+    actions-minor-patch:
+      applies-to: version-updates
+      patterns:
+      - '*'
+      update-types:
+      - minor
+      - patch
+    actions-security:
+      applies-to: security-updates
+      patterns:
+      - '*'
