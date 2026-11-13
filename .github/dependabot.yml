@@ -28,25 +28,39 @@ updates:
       - klaviyo-react-native-sdk
   ignore:
   - dependency-name: klaviyo-react-native-sdk
+  # Held until the plugin moves to the next Expo SDK. These move together in an
+  # Expo SDK upgrade. Remove them in that change.
+  - dependency-name: expo
+    update-types:
+    - version-update:semver-major
+  - dependency-name: 'expo-*'
+    update-types:
+    - version-update:semver-major
+  - dependency-name: '@expo/*'
+    update-types:
+    - version-update:semver-major
+  - dependency-name: react
+    update-types:
+    - version-update:semver-major
+  - dependency-name: react-native
+    update-types:
+    - version-update:semver-major
+  - dependency-name: '@react-native/*'
+    update-types:
+    - version-update:semver-major
+# Example app is security-only: open-pull-requests-limit 0 turns off version
+# updates but keeps security updates. The example is pinned to its Expo SDK and
+# moves by hand when the plugin supports a new one.
 - package-ecosystem: npm
   directories:
   - '/example'
   schedule:
     interval: monthly
-  open-pull-requests-limit: 3
+  open-pull-requests-limit: 0
   commit-message:
     prefix: chore
     include: scope
   groups:
-    npm-example-minor-patch:
-      applies-to: version-updates
-      patterns:
-      - '*'
-      exclude-patterns:
-      - klaviyo-react-native-sdk
-      update-types:
-      - minor
-      - patch
     npm-example-security:
       applies-to: security-updates
       patterns:
@@ -55,56 +69,6 @@ updates:
       - klaviyo-react-native-sdk
   ignore:
   - dependency-name: klaviyo-react-native-sdk
-  - dependency-name: expo
-    update-types:
-    - version-update:semver-major
-    - version-update:semver-minor
-    - version-update:semver-patch
-  - dependency-name: 'expo-*'
-    update-types:
-    - version-update:semver-major
-    - version-update:semver-minor
-    - version-update:semver-patch
-  - dependency-name: '@expo/*'
-    update-types:
-    - version-update:semver-major
-    - version-update:semver-minor
-    - version-update:semver-patch
-  - dependency-name: react
-    update-types:
-    - version-update:semver-major
-    - version-update:semver-minor
-    - version-update:semver-patch
-  - dependency-name: react-dom
-    update-types:
-    - version-update:semver-major
-    - version-update:semver-minor
-    - version-update:semver-patch
-  - dependency-name: react-native
-    update-types:
-    - version-update:semver-major
-    - version-update:semver-minor
-    - version-update:semver-patch
-  - dependency-name: '@react-native/*'
-    update-types:
-    - version-update:semver-major
-    - version-update:semver-minor
-    - version-update:semver-patch
-  - dependency-name: react-native-safe-area-context
-    update-types:
-    - version-update:semver-major
-    - version-update:semver-minor
-    - version-update:semver-patch
-  - dependency-name: react-native-screens
-    update-types:
-    - version-update:semver-major
-    - version-update:semver-minor
-    - version-update:semver-patch
-  - dependency-name: '@react-native-async-storage/async-storage'
-    update-types:
-    - version-update:semver-major
-    - version-update:semver-minor
-    - version-update:semver-patch
 - package-ecosystem: github-actions
   directories:
   - '/'
