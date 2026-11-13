@@ -1,12 +1,129 @@
+# Baseline rules: SDK Dependabot Bot project, see the rules page.
 version: 2
 updates:
-  - package-ecosystem: github-actions
-    directories:
-      - /
-      - /.github/actions/*
-    schedule:
-      interval: monthly
-    groups:
-      github-actions:
-        patterns:
-          - "*"
+- package-ecosystem: npm
+  directories:
+  - '/'
+  schedule:
+    interval: monthly
+  open-pull-requests-limit: 3
+  commit-message:
+    prefix: chore
+    include: scope
+  groups:
+    npm-tooling-minor-patch:
+      applies-to: version-updates
+      patterns:
+      - '*'
+      exclude-patterns:
+      - klaviyo-react-native-sdk
+      update-types:
+      - minor
+      - patch
+    npm-tooling-security:
+      applies-to: security-updates
+      patterns:
+      - '*'
+      exclude-patterns:
+      - klaviyo-react-native-sdk
+  ignore:
+  - dependency-name: klaviyo-react-native-sdk
+- package-ecosystem: npm
+  directories:
+  - '/example'
+  schedule:
+    interval: monthly
+  open-pull-requests-limit: 3
+  commit-message:
+    prefix: chore
+    include: scope
+  groups:
+    npm-example-minor-patch:
+      applies-to: version-updates
+      patterns:
+      - '*'
+      exclude-patterns:
+      - klaviyo-react-native-sdk
+      update-types:
+      - minor
+      - patch
+    npm-example-security:
+      applies-to: security-updates
+      patterns:
+      - '*'
+      exclude-patterns:
+      - klaviyo-react-native-sdk
+  ignore:
+  - dependency-name: klaviyo-react-native-sdk
+  - dependency-name: expo
+    update-types:
+    - version-update:semver-major
+    - version-update:semver-minor
+    - version-update:semver-patch
+  - dependency-name: 'expo-*'
+    update-types:
+    - version-update:semver-major
+    - version-update:semver-minor
+    - version-update:semver-patch
+  - dependency-name: '@expo/*'
+    update-types:
+    - version-update:semver-major
+    - version-update:semver-minor
+    - version-update:semver-patch
+  - dependency-name: react
+    update-types:
+    - version-update:semver-major
+    - version-update:semver-minor
+    - version-update:semver-patch
+  - dependency-name: react-dom
+    update-types:
+    - version-update:semver-major
+    - version-update:semver-minor
+    - version-update:semver-patch
+  - dependency-name: react-native
+    update-types:
+    - version-update:semver-major
+    - version-update:semver-minor
+    - version-update:semver-patch
+  - dependency-name: '@react-native/*'
+    update-types:
+    - version-update:semver-major
+    - version-update:semver-minor
+    - version-update:semver-patch
+  - dependency-name: react-native-safe-area-context
+    update-types:
+    - version-update:semver-major
+    - version-update:semver-minor
+    - version-update:semver-patch
+  - dependency-name: react-native-screens
+    update-types:
+    - version-update:semver-major
+    - version-update:semver-minor
+    - version-update:semver-patch
+  - dependency-name: '@react-native-async-storage/async-storage'
+    update-types:
+    - version-update:semver-major
+    - version-update:semver-minor
+    - version-update:semver-patch
+- package-ecosystem: github-actions
+  directories:
+  - '/'
+  - '/.github/actions/*'
+  schedule:
+    interval: monthly
+  open-pull-requests-limit: 3
+  commit-message:
+    prefix: chore
+    include: scope
+  groups:
+    actions-minor-patch:
+      applies-to: version-updates
+      patterns:
+      - '*'
+      update-types:
+      - minor
+      - patch
+    actions-security:
+      applies-to: security-updates
+      patterns:
+      - '*'
