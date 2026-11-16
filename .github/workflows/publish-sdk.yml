@@ -89,16 +89,6 @@ jobs:
     outputs:
       slack_ts: ${{ steps.slack.outputs.ts }}
     steps:
-      - name: Checkout Slack action
-        if: ${{ !inputs.dry_run }}
-        continue-on-error: true
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Resolve the short commit
         id: short
         env:
@@ -110,7 +100,7 @@ jobs:
         timeout-minutes: 2
         if: ${{ !inputs.dry_run }}
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_ts }}
@@ -235,20 +225,10 @@ jobs:
             fi
           fi
 
-      - name: Checkout Slack action
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Notify Slack npm publish result
         id: slack
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ needs.announce.outputs.slack_ts }}
@@ -271,7 +251,7 @@ jobs:
         id: release_message
         if: ${{ inputs.slack_ts != '' }}
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ inputs.slack_ts }}
@@ -297,27 +277,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.ref }}
-          fetch-depth: 0
-          persist-credentials: false
-
       - name: Sync release to Linear
-        id: linear-sync
-        continue-on-error: true
-        uses: linear/linear-release-action@dd4fc407f860b9460d2cf0b3fb1edd8985cf443f # v0.18.2
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/linear-release-sync@ecm/mage-1726/shared-ci
         with:
-          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
-          command: sync
           version: ${{ needs.test.outputs.version }}
-          name: ${{ needs.test.outputs.version }}
-
-      - name: Complete release in Linear
-        if: steps.linear-sync.outcome == 'success'
-        continue-on-error: true
-        uses: linear/linear-release-action@dd4fc407f860b9460d2cf0b3fb1edd8985cf443f # v0.18.2
-        with:
-          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
-          command: complete
-          version: ${{ needs.test.outputs.version }}
+          token: ${{ secrets.LINEAR_ACCESS_KEY }}
+          ref: ${{ inputs.ref }}

@@ -192,18 +192,17 @@ jobs:
     outputs:
       slack_ts: ${{ steps.slack.outputs.ts }}
     steps:
-      - name: Checkout Slack action
+      - name: Checkout set-source-label action
         continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
+          sparse-checkout: .github/actions/set-source-label
           persist-credentials: false
-          path: _slack
 
       - name: Set source label
         continue-on-error: true
-        uses: ./_slack/.github/actions/set-source-label
+        uses: ./.github/actions/set-source-label
 
       - name: Resolve the short commit
         if: always()
@@ -213,7 +212,7 @@ jobs:
         id: slack
         timeout-minutes: 2
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts }}
@@ -368,19 +367,18 @@ jobs:
     outputs:
       slack_ts: ${{ steps.slack.outputs.ts }}
     steps:
-      - name: Checkout Slack action
+      - name: Checkout set-source-label action
         if: ${{ !cancelled() }}
         continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
+          sparse-checkout: .github/actions/set-source-label
           persist-credentials: false
-          path: _slack
 
       - name: Set source label
         continue-on-error: true
-        uses: ./_slack/.github/actions/set-source-label
+        uses: ./.github/actions/set-source-label
 
       - name: Resolve the short commit
         if: always()
@@ -390,7 +388,7 @@ jobs:
         id: slack
         timeout-minutes: 2
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ needs.announce.outputs.slack_ts }}
@@ -582,16 +580,6 @@ jobs:
             echo "timed_out=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout Slack action
-        if: always()
-        continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Resolve the short commit
         if: always()
         run: echo "COMMIT_SHORT=${COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
@@ -599,7 +587,7 @@ jobs:
       - name: Notify Slack on success
         if: success() && steps.warned.outcome != 'success'
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
@@ -620,7 +608,7 @@ jobs:
       - name: Notify Slack on upload with warnings
         if: success() && steps.warned.outcome == 'success'
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
@@ -641,7 +629,7 @@ jobs:
       - name: Notify Slack on failure
         if: failure() || (cancelled() && steps.stop.outputs.timed_out == 'true')
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
@@ -702,16 +690,6 @@ jobs:
           VERSION_CODE: ${{ needs.deploy-android.outputs.build_number }}
         run: node scripts/ci/play-release-notes.js "$VERSION_CODE" "${RUNNER_TEMP}/play-notes.txt"
 
-      - name: Checkout Slack action
-        if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
-        continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Resolve the short commit
         if: always()
         run: echo "COMMIT_SHORT=${COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
@@ -719,7 +697,7 @@ jobs:
       - name: Warn on Slack that the notes were not set
         if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
@@ -927,16 +905,6 @@ jobs:
             echo "timed_out=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout Slack action
-        if: always()
-        continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Resolve the short commit
         if: always()
         run: echo "COMMIT_SHORT=${COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
@@ -944,7 +912,7 @@ jobs:
       - name: Notify Slack on success
         if: success() && steps.warned.outcome != 'success'
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
@@ -965,7 +933,7 @@ jobs:
       - name: Notify Slack on upload with warnings
         if: success() && steps.warned.outcome == 'success'
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
@@ -986,7 +954,7 @@ jobs:
       - name: Notify Slack on failure
         if: failure() || (cancelled() && steps.stop.outputs.timed_out == 'true')
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
@@ -1052,16 +1020,6 @@ jobs:
             --build-number "$BUILD_NUMBER" \
             --notes-file "${RUNNER_TEMP}/what-to-test.txt"
 
-      - name: Checkout Slack action
-        if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
-        continue-on-error: true
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
-          persist-credentials: false
-          path: _slack
-
       - name: Resolve the short commit
         if: always()
         run: echo "COMMIT_SHORT=${COMMIT_SHA:0:7}" >> "$GITHUB_ENV"
@@ -1069,7 +1027,7 @@ jobs:
       - name: Warn on Slack that What to Test was not set
         if: steps.download_notes.outcome == 'failure' || steps.notes.outcome == 'failure'
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_thread_ts || needs.announce.outputs.slack_ts }}
@@ -1100,21 +1058,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Remove label
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          LABEL_NAME: ${{ github.event.label.name }}
-        with:
-          script: |
-            try {
-              await github.rest.issues.removeLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                name: process.env.LABEL_NAME,
-              });
-            } catch (e) {
-              if (e.status !== 404) throw e;
-            }
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/remove-deploy-label@ecm/mage-1726/shared-ci
 
   report:
     name: Update the deploy message
@@ -1193,19 +1137,18 @@ jobs:
             echo "title=$title"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Checkout Slack action
+      - name: Checkout set-source-label action
         if: ${{ !cancelled() }}
         continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-          sparse-checkout: .github/actions
+          sparse-checkout: .github/actions/set-source-label
           persist-credentials: false
-          path: _slack
 
       - name: Set source label
         continue-on-error: true
-        uses: ./_slack/.github/actions/set-source-label
+        uses: ./.github/actions/set-source-label
 
       - name: Resolve the short commit
         if: always()
@@ -1213,7 +1156,7 @@ jobs:
 
       - name: Update the Slack deploy message
         continue-on-error: true
-        uses: ./_slack/.github/actions/notify-slack
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ needs.progress.outputs.slack_ts || needs.announce.outputs.slack_ts }}
