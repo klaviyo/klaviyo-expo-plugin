@@ -1,0 +1,230 @@
+name: Publish release
+
+# Entry point for every npm publish; the npm trusted publisher names this file.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (X.Y.Z, or X.Y.Z-suffix for a prerelease)
+        required: true
+        type: string
+      ref:
+        description: Branch or commit to release (defaults to the default branch)
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: 'Dry run: run the checks, the approval and npm publish --dry-run; create and publish nothing'
+        required: false
+        default: false
+        type: boolean
+      skip_ci_check:
+        description: Skip the CI-green check (the version, branch and tag checks still run)
+        required: false
+        default: false
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+env:
+  TRIGGERED_BY: ${{ github.event_name == 'schedule' && 'schedule' || (endsWith(github.triggering_actor || github.actor, '[bot]') && format('{0} (automation)', github.workflow) || github.triggering_actor || github.actor) }}
+  VERSION: ${{ inputs.version || github.event.release.tag_name }}
+  SLACK_USERNAME: Expo SDK
+  SLACK_ICON_EMOJI: ':merlin-orb-expo:'
+
+jobs:
+  prepare:
+    uses: klaviyo/klaviyo-react-native-sdk/.github/workflows/release-preflight.yml@ecm/mage-1726/shared-ci
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    secrets: inherit
+    with:
+      version: ${{ inputs.version || github.event.release.tag_name }}
+      ref: ${{ inputs.ref }}
+      dry-run: ${{ inputs.dry_run == true }}
+      skip-ci-check: ${{ inputs.skip_ci_check == true }}
+      required-workflows: CI
+      ignore-workflows: Publish Example App,Publish Example Checks
+      sdk-checks: |
+        fail=0
+        check() {
+          if [ "$2" != "$VERSION" ]; then
+            echo "::error file=$1::$1 has version '$2', expected '$VERSION'. Run: node scripts/bump-version.js $VERSION"
+            fail=1
+          fi
+        }
+        check package.json "$(node -p "require('./package.json').version")"
+        check example/package.json "$(node -p "require('./example/package.json').version")"
+        check ios/klaviyo-plugin-configuration.plist "$(grep -A1 'klaviyo_sdk_plugin_version_override' ios/klaviyo-plugin-configuration.plist | sed -n 's:.*<string>\(.*\)</string>.*:\1:p')"
+        check plugin/withKlaviyoAndroid.ts "$(sed -n "s/.*setStringResource('klaviyo_sdk_plugin_version_override', '\([^']*\)').*/\1/p" plugin/withKlaviyoAndroid.ts)"
+        [ "$fail" = 0 ]
+        ./scripts/ci/check-native-pins.sh
+      sdk-name: Expo plugin
+      slack-username: Expo SDK
+      slack-icon-emoji: ':merlin-orb-expo:'
+      approval-instructions: Review the draft release notes, then approve the `npm` deployment on this run.
+      runs-on: ubuntu-22.04
+
+  publish-npm:
+    needs: prepare
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    uses: ./.github/workflows/publish-sdk.yml
+    with:
+      version: ${{ inputs.version || github.event.release.tag_name }}
+      ref: ${{ needs.prepare.outputs.sha }}
+      release_url: ${{ needs.prepare.outputs.release_url }}
+      dry_run: ${{ inputs.dry_run == true }}
+      slack_ts: ${{ needs.prepare.outputs.slack_ts }}
+    secrets: inherit
+
+  publish-release:
+    needs: [prepare, publish-npm]
+    if: github.event_name == 'workflow_dispatch' && !inputs.dry_run
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SLACK_TS: ${{ needs.prepare.outputs.slack_ts }}
+    steps:
+      - name: Publish the draft release
+        id: release
+        env:
+          SHA: ${{ needs.prepare.outputs.sha }}
+        run: |
+          set -euo pipefail
+          tag_ref="$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${VERSION}" \
+            --jq "[.[] | select(.ref == \"refs/tags/${VERSION}\")][0].object // empty | \"\(.type) \(.sha)\"")"
+          tagged=""
+          if [ -n "$tag_ref" ]; then
+            read -r tag_type tagged <<<"$tag_ref"
+            if [ "$tag_type" = "tag" ]; then
+              tagged="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tagged}" --jq .object.sha)"
+            fi
+          fi
+          if [ -n "$tagged" ] && [ "$tagged" != "$SHA" ]; then
+            echo "::error::Tag $VERSION now points at $tagged, not the released commit $SHA."
+            exit 1
+          fi
+          if [[ "$VERSION" == *-* ]]; then
+            gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false --target "$SHA"
+          else
+            gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest --target "$SHA"
+          fi
+          url="$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json url --jq .url)"
+          {
+            echo "### Release $VERSION published"
+            echo "- npm: https://www.npmjs.com/package/klaviyo-expo-plugin/v/$VERSION"
+            echo "- Release: $url"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dispatch the example app deploy
+        id: example
+        run: |
+          # True when the workflow file at $VERSION declares the input named by $1.
+          takes_input() {
+            gh api "repos/${GITHUB_REPOSITORY}/contents/.github/workflows/publish-example.yml?ref=$VERSION" \
+              -H "Accept: application/vnd.github.raw" | grep -q "^[[:space:]]*$1:"
+          }
+          args=()
+          if [ -n "$SLACK_TS" ] && takes_input slack_thread_ts; then
+            args+=(-f "slack_thread_ts=$SLACK_TS")
+          fi
+          if takes_input triggered_by; then
+            args+=(-f "triggered_by=$TRIGGERED_BY")
+          fi
+          gh workflow run publish-example.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION" -f platform=both "${args[@]}"
+
+      - name: Dispatch next release branch
+        if: ${{ !cancelled() && steps.release.outcome == 'success' && !contains(env.VERSION, '-') }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run rel-branch.yml --repo "$GITHUB_REPOSITORY" --ref master -f "base=$VERSION" -f "triggered_by=$TRIGGERED_BY"
+          echo "Dispatched rel-branch.yml from $VERSION"
+
+      - name: Notify Slack release published
+        if: success()
+        continue-on-error: true
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ env.SLACK_TS }}
+          status: success
+          title: Expo plugin `${{ env.VERSION }}` published${{ contains(env.VERSION, '-') && ' (prerelease)' || '' }}
+          body: On `npm`, GitHub release published, and the example app deploy dispatched at tag `${{ env.VERSION }}`.
+          fields: |
+            Version: `${{ env.VERSION }}`
+            Commit: `${{ needs.prepare.outputs.short_sha }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+          links: |
+            npm|https://www.npmjs.com/package/klaviyo-expo-plugin/v/${{ env.VERSION }}
+            Release|${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ env.VERSION }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
+
+      - name: Notify Slack release step failed
+        id: slack_failure
+        if: failure()
+        continue-on-error: true
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ env.SLACK_TS }}
+          status: failure
+          title: Expo plugin `${{ env.VERSION }}` is on `npm` but ${{ steps.example.outcome == 'failure' && 'the example app deploy could not be dispatched' || 'the GitHub release could not be published' }}
+          body: ${{ steps.example.outcome == 'failure' && 'Run `publish-example.yml` by hand on the tag.' || 'Publish the draft release by hand.' }}
+          fields: |
+            Version: `${{ env.VERSION }}`
+            Commit: `${{ needs.prepare.outputs.short_sha }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+          links: |
+            npm|https://www.npmjs.com/package/klaviyo-expo-plugin/v/${{ env.VERSION }}
+            Release|${{ needs.prepare.outputs.release_url }}
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
+
+      - name: Reply with failure details
+        if: failure() && steps.slack_failure.outputs.ts != ''
+        continue-on-error: true
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          thread_ts: ${{ steps.slack_failure.outputs.ts }}
+          status: failure
+          title: Failed at ${{ steps.example.outcome == 'failure' && 'Dispatch the example app deploy' || 'Publish the draft release' }}
+
+  stopped:
+    name: Report stopped release
+    needs: [prepare, publish-npm, publish-release]
+    if: always() && !inputs.dry_run && contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Notify Slack release stopped
+        continue-on-error: true
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          ts: ${{ needs.prepare.outputs.slack_ts }}
+          status: stopped
+          title: Expo plugin `${{ env.VERSION }}` release stopped, run cancelled
+          body: Check the run for what finished before it stopped.
+          fields: |
+            Version: `${{ env.VERSION }}`
+            Commit: `${{ needs.prepare.outputs.short_sha }}`
+            Triggered by: `${{ env.TRIGGERED_BY }}`
+          links: |
+            Commit|${{ github.server_url }}/${{ github.repository }}/commit/${{ needs.prepare.outputs.sha }}
