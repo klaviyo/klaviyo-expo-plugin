@@ -100,7 +100,7 @@ jobs:
         timeout-minutes: 2
         if: ${{ !inputs.dry_run }}
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           thread_ts: ${{ inputs.slack_ts }}
@@ -228,7 +228,7 @@ jobs:
       - name: Notify Slack npm publish result
         id: slack
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ needs.announce.outputs.slack_ts }}
@@ -251,7 +251,7 @@ jobs:
         id: release_message
         if: ${{ inputs.slack_ts != '' }}
         continue-on-error: true
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/notify-slack@master
         with:
           token: ${{ secrets.SLACK_BOT_TOKEN }}
           ts: ${{ inputs.slack_ts }}
@@ -278,7 +278,7 @@ jobs:
       contents: read
     steps:
       - name: Sync release to Linear
-        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/linear-release-sync@ecm/mage-1726/shared-ci
+        uses: klaviyo/klaviyo-react-native-sdk/.github/shared/linear-release-sync@master
         with:
           version: ${{ needs.test.outputs.version }}
           token: ${{ secrets.LINEAR_ACCESS_KEY }}
