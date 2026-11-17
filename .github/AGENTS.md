@@ -22,6 +22,7 @@ For agents and humans editing workflows and actions here. `CLAUDE.md` in this di
 - Shared CI lives in klaviyo-react-native-sdk: the composite actions in `.github/shared/` (`notify-slack`, `promotion-check`, `pr-target-check`, `linear-release-sync`, `stale`, `remove-deploy-label`) plus the callable workflows `release-preflight.yml` and `rel-branch-core.yml`. Don't copy it here.
 - Its contract is klaviyo-react-native-sdk `.github/shared/README.md`. Its inputs are additive only.
 - This repo passes its own values as inputs: `bump-files` in `promotion-check.yml`, `sdk-checks` in `publish-release.yml`, and `bump-command` with `node-version-file` in `rel-branch.yml`.
+- The React Native SDK starts `rel-branch.yml` with a `repository_dispatch` of type `native-rel-branch` carrying `client_payload` `{react_native: "rel/X.Y.Z", triggered_by: "<person>"}`. Keep that listener and read the pin branch from `github.event.client_payload` as well as `inputs`; `pin` runs on either.
 
 ## Workflow conventions
 
