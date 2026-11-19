@@ -64,6 +64,21 @@ export default function ProfileScreen() {
     }
   };
 
+  const refreshProfile = () => {
+    // Wait a bit for Klaviyo to finish initializing
+    setTimeout(() => {
+      Klaviyo.getEmail((email: string) => {
+        setProfile((prev) => ({ ...prev, email: email ?? "" }));
+      });
+      Klaviyo.getPhoneNumber((phoneNumber: string) => {
+        setProfile((prev) => ({ ...prev, phoneNumber: phoneNumber ?? "" }));
+      });
+      Klaviyo.getExternalId((externalId: string) => {
+        setProfile((prev) => ({ ...prev, externalId: externalId ?? "" }));
+      });
+    }, 500);
+  };
+
   // Load stored API key and refresh profile from Klaviyo on mount
   useEffect(() => {
     const loadStoredApiKey = async () => {
@@ -75,27 +90,6 @@ export default function ProfileScreen() {
       } catch (error) {
         console.error("Error loading stored API key:", error);
       }
-    };
-
-    const refreshProfile = () => {
-      // Wait a bit for Klaviyo to finish initializing
-      setTimeout(() => {
-        Klaviyo.getEmail((email: string) => {
-          if (email) {
-            setProfile((prev) => ({ ...prev, email }));
-          }
-        });
-        Klaviyo.getPhoneNumber((phoneNumber: string) => {
-          if (phoneNumber) {
-            setProfile((prev) => ({ ...prev, phoneNumber }));
-          }
-        });
-        Klaviyo.getExternalId((externalId: string) => {
-          if (externalId) {
-            setProfile((prev) => ({ ...prev, externalId }));
-          }
-        });
-      }, 500);
     };
 
     loadStoredApiKey();
@@ -125,6 +119,7 @@ export default function ProfileScreen() {
 
       // Initialize Klaviyo
       Klaviyo.initialize(apiKey);
+      refreshProfile();
       Alert.alert("Success", "Klaviyo initialized successfully");
     } catch (error) {
       console.error("Error saving API key:", error);
