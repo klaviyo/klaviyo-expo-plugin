@@ -92,6 +92,8 @@ npm install klaviyo-react-native-sdk
 npx expo install klaviyo-expo-plugin
 ```
 
+The plugin declares `klaviyo-react-native-sdk` `^2.5.0` as a peer dependency. npm 7+ fails the install with `ERESOLVE` when your installed version is outside that range, and installs a matching version if it is missing. Yarn and pnpm print a peer dependency warning instead.
+
 2. Add the plugin to your `app.json` or `app.config.js`:
 
 ```json
@@ -397,6 +399,61 @@ When geofencing is disabled on iOS (default), the plugin sets the `KLAVIYO_INCLU
 When geofencing is enabled on Android, the plugin will:
 - Set the `klaviyoIncludeLocation` gradle property to `true`, which includes the full location module with geofencing support and location permissions
 
+### iOS location purpose strings (required)
+
+The plugin does not write any `NSLocation*UsageDescription` keys, so you can word them for your app. With `ios.geofencingEnabled` set to `true`, your `Info.plist` must contain both of these:
+
+| Key | Shown when |
+|-----|------------|
+| `NSLocationWhenInUseUsageDescription` | The app asks for foreground ("While Using the App") location access |
+| `NSLocationAlwaysAndWhenInUseUsageDescription` | The app asks for background ("Always") location access, which geofencing needs |
+
+iOS terminates the app when it requests location permission and the matching key is missing, and App Store review rejects builds with missing or vague purpose strings.
+
+Set the strings through the `expo-location` config plugin. `expo-location` is an optional peer dependency of this plugin, so npm does not install it for you. Install it first with `npx expo install expo-location`, then list it in `plugins` next to `klaviyo-expo-plugin`:
+
+```json
+{
+  "expo": {
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "We use your location to show offers for stores near you.",
+          "locationAlwaysAndWhenInUsePermission": "We use your location in the background to notify you about offers when you are near one of our stores."
+        }
+      ],
+      [
+        "klaviyo-expo-plugin",
+        {
+          "ios": {
+            "geofencingEnabled": true
+          }
+        }
+      ]
+    ]
+  }
+}
+```
+
+If `expo-location` is installed but not listed in `plugins`, Expo still applies its config plugin with a generic default string ("Allow $(PRODUCT_NAME) to access your location"). Replace it with text that explains how your app uses location.
+
+If you don't use `expo-location`, set the keys directly with `ios.infoPlist`:
+
+```json
+{
+  "expo": {
+    "ios": {
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We use your location to show offers for stores near you.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We use your location in the background to notify you about offers when you are near one of our stores."
+      }
+    }
+  }
+}
+```
+
+Run `npx expo prebuild` again after you change either one. On Expo SDK 57 and later this erases and regenerates the `ios/` and `android/` folders, so add `--no-clean` if you keep native changes there that the plugin does not generate (see [Installation](#installation)).
 
 ### Requesting Permissions
 

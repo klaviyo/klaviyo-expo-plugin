@@ -96,6 +96,15 @@ module.exports = () => {
     plugins: [
       'expo-router',
       [
+        'expo-location',
+        {
+          locationWhenInUsePermission:
+            'The Klaviyo example app uses your location to test geofencing while the app is open.',
+          locationAlwaysAndWhenInUsePermission:
+            'The Klaviyo example app uses your location in the background to test geofence enter and exit events.',
+        },
+      ],
+      [
         'klaviyo-expo-plugin',
         {
           android: {

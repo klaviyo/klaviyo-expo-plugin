@@ -257,7 +257,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           const result = modifier(testConfig);
           expect(result.modResults.resources.string).toContainEqual({
             $: { name: 'klaviyo_sdk_plugin_version_override' },
-            _: '1.1.0'
+            _: '1.2.0'
           });
           return result;
         });
@@ -288,7 +288,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           });
           expect(result.modResults.resources.string).toContainEqual({
             $: { name: 'klaviyo_sdk_plugin_version_override' },
-            _: '1.1.0'
+            _: '1.2.0'
           });
 
           return result;
@@ -426,7 +426,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
           expect(nameString).toBeDefined();
           expect(nameString._).toBe('klaviyo-expo');
           expect(versionString).toBeDefined();
-          expect(versionString._).toBe('1.1.0');
+          expect(versionString._).toBe('1.2.0');
           
           return result;
         });
@@ -702,17 +702,20 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         expect(metaData.some(m => m.$['android:name'] === TOKEN_FORWARDING_KEY)).toBe(false);
       });
 
-      it('does not inject the flag when automaticPushTokenForwarding is true', () => {
+      it('injects automatic_push_token_forwarding="true" when set to true', () => {
         const config = createMockConfig({
           modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
         });
         const props = createMockProps({ automaticPushTokenForwarding: true });
         mutateAndroidManifest(config, props);
         const metaData = config.modResults.manifest.application[0]['meta-data'];
-        expect(metaData.some(m => m.$['android:name'] === TOKEN_FORWARDING_KEY)).toBe(false);
+        const entries = metaData.filter(m => m.$['android:name'] === TOKEN_FORWARDING_KEY);
+        expect(entries).toHaveLength(1);
+        expect(entries[0].$['android:value']).toBe('true');
+        expect(logger.log).toHaveBeenCalledWith('Injecting automatic_push_token_forwarding=true');
       });
 
-      it('injects automatic_push_token_forwarding="false" when set to false (opt-out)', () => {
+      it('injects automatic_push_token_forwarding="false" when set to false', () => {
         const config = createMockConfig({
           modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
         });
@@ -722,7 +725,7 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         const entry = metaData.find(m => m.$['android:name'] === TOKEN_FORWARDING_KEY);
         expect(entry).toBeDefined();
         expect(entry.$['android:value']).toBe('false');
-        expect(logger.log).toHaveBeenCalledWith('Injecting automatic_push_token_forwarding=false (opt-out)');
+        expect(logger.log).toHaveBeenCalledWith('Injecting automatic_push_token_forwarding=false');
       });
 
       it('removes an existing token forwarding entry when prop is omitted (idempotency)', () => {
@@ -757,6 +760,51 @@ describe('withKlaviyoAndroid Internal Functions', () => {
         mutateAndroidManifest(config, props);
         const metaData = config.modResults.manifest.application[0]['meta-data'];
         expect(metaData.filter(m => m.$['android:name'] === TOKEN_FORWARDING_KEY)).toHaveLength(1);
+      });
+
+      it.each([
+        [true, 'true'],
+        [false, 'false']
+      ])('produces exactly one entry with the right value when re-run with %s', (propValue, expected) => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        const props = createMockProps({ automaticPushTokenForwarding: propValue });
+        mutateAndroidManifest(config, props);
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        const entries = metaData.filter(m => m.$['android:name'] === TOKEN_FORWARDING_KEY);
+        expect(entries).toHaveLength(1);
+        expect(entries[0].$['android:value']).toBe(expected);
+      });
+
+      it('replaces an existing "false" entry with "true" when the prop flips to true', () => {
+        const config = createMockConfig({
+          modResults: {
+            manifest: {
+              application: [{
+                $: { 'android:name': '.MainApplication' },
+                'meta-data': [{ $: { 'android:name': TOKEN_FORWARDING_KEY, 'android:value': 'false' } }]
+              }]
+            }
+          }
+        });
+        const props = createMockProps({ automaticPushTokenForwarding: true });
+        mutateAndroidManifest(config, props);
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        const entries = metaData.filter(m => m.$['android:name'] === TOKEN_FORWARDING_KEY);
+        expect(entries).toHaveLength(1);
+        expect(entries[0].$['android:value']).toBe('true');
+      });
+
+      it('removes a previously written "true" entry when the prop goes back to unset', () => {
+        const config = createMockConfig({
+          modResults: { manifest: { application: [{ $: { 'android:name': '.MainApplication' }, 'meta-data': [] }] } }
+        });
+        mutateAndroidManifest(config, createMockProps({ automaticPushTokenForwarding: true }));
+        mutateAndroidManifest(config, createMockProps());
+        const metaData = config.modResults.manifest.application[0]['meta-data'];
+        expect(metaData.some(m => m.$['android:name'] === TOKEN_FORWARDING_KEY)).toBe(false);
       });
     });
 
