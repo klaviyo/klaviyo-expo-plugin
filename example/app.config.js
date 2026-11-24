@@ -95,6 +95,7 @@ module.exports = () => {
     },
     plugins: [
       'expo-router',
+      ['expo-build-properties', { ios: { enableSceneSupport: true } }],
       [
         'expo-location',
         {
